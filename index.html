@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>インターネット社会的死因診断</title>
 <meta name="description" content="いずれインターネットで死ぬあなたへ。15の質問から、得意な厄介ムーブと社会的死因を特定します。">
-<!-- ▼公開時: 下4行の  https://nasuchovi.github.io/internet-bakemon/ を実際のURLに置換▼ -->
+<!-- ▼公開時: 下4行の https://USERNAME.github.io/REPO/ を実際のURLに置換▼ -->
 <meta property="og:title" content="インターネット社会的死因診断">
 <meta property="og:description" content="いずれインターネットで死ぬあなたへ。15の質問から、得意な厄介ムーブと社会的死因を特定します。">
-<meta property="og:url" content="https://nasuchovi.github.io/internet-bakemon/">
-<meta property="og:image" content="https://nasuchovi.github.io/internet-bakemon/ogp.png">
+<meta property="og:url" content="https://USERNAME.github.io/REPO/">
+<meta property="og:image" content="https://USERNAME.github.io/REPO/ogp.png">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -620,12 +620,12 @@ body.decay2 .q-text{animation:textglitch 3.2s steps(1) infinite;}
 
       <div class="share-area">
         <p class="share-cap">― 死亡を報告する ―</p>
-        <button class="btn btn-shu" id="btnShareX">死亡報告を共有する(診断書画像つき)</button>
+        <button class="btn btn-shu" id="btnShareX">Xでポストする(ワンタップ)</button>
         <button class="btn btn-sub" id="btnSaveImg">診断書を画像で保存する</button>
         <button class="btn btn-sub" id="btnCatalog">死因目録を見る(全11種)</button>
         <button class="btn btn-sub" id="btnRetry">再検死(もう一度診断する)</button>
       </div>
-      <p class="retry-note" id="retryNote">画像共有に非対応の環境ではX投稿画面が開きます。<br>その場合は保存した診断書を手動で添付してください。</p>
+      <p class="retry-note" id="retryNote">診断書画像を付けたい場合は、保存してから<br>ポスト画面で添付してください。</p>
     </div>
   </section>
 
@@ -1160,36 +1160,39 @@ async function certBlob(){
   return new Promise(res=>$("certCanvas").toBlob(res, "image/png"));
 }
 
-$("btnShareX").addEventListener("click", async ()=>{
-  if(!currentResult) return;
+function shareText(withUrlInText){
   const t = currentResult.type;
   const hensa = currentResult.stats.hensa;
-  const url = location.href.startsWith("http") ? location.href.split("#")[0] : "";
-  const text = "【死亡報告】私のインターネット死因は「" + t.cause + "」でした。\n厄介偏差値:" + hensa + "\n保有技能:" + t.skill + "\n#インターネット社会的死因診断" + (url ? "\n" + url : "");
-  const blob = await certBlob();
-  // Web Share API: 共有シート経由でXに画像+本文+リンクを渡す
-  if(blob && navigator.canShare){
-    const file = new File([blob], "internet_death_certificate.png", {type:"image/png"});
-    if(navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({text, files:[file]});
-        return;
-      }catch(e){
-        if(e && e.name === "AbortError") return; // ユーザーが共有をやめた
-      }
-    }
-  }
-  // フォールバック: web intent(仕様上、画像の自動添付は不可)
-  const intent = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(
-    "【死亡報告】私のインターネット死因は「" + t.cause + "」でした。\n厄介偏差値:" + hensa + "\n保有技能:" + t.skill + "\n#インターネット社会的死因診断"
-  ) + (url ? "&url=" + encodeURIComponent(url) : "");
+  const url = location.href.startsWith("http") ? location.href.split("#")[0].split("?")[0] : "";
+  let text = "【死亡報告】私のインターネット死因は「" + t.cause + "」でした。\n厄介偏差値:" + hensa + "\n保有技能:" + t.skill + "\n#インターネット社会的死因診断";
+  if(withUrlInText && url){ text += "\n" + url; }
+  return {text, url};
+}
+
+/* ワンタップ投稿: X投稿画面を直接開く(リンクカード表示) */
+$("btnShareX").addEventListener("click", ()=>{
+  if(!currentResult) return;
+  const s = shareText(false);
+  const intent = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(s.text) +
+    (s.url ? "&url=" + encodeURIComponent(s.url) : "");
   window.open(intent, "_blank");
 });
 
-/* ---------- 診断書画像生成 ---------- */
+/* ---------- 診断書画像(画像のみ共有→写真保存/添付) ---------- */
 $("btnSaveImg").addEventListener("click", async ()=>{
   const blob = await certBlob();
   if(!blob) return;
+  const file = new File([blob], "internet_death_certificate.png", {type:"image/png"});
+  // 画像のみなら共有シート経由でXにも正常に添付できる
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file]});
+      return;
+    }catch(e){
+      if(e && e.name === "AbortError") return;
+    }
+  }
+  // フォールバック: ダウンロード
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "internet_death_certificate.png";
