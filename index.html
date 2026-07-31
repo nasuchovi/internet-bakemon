@@ -1,0 +1,1407 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>インターネット社会的死因診断</title>
+<meta name="description" content="いずれインターネットで死ぬあなたへ。15の質問から、得意な厄介ムーブと社会的死因を特定します。">
+<!-- ▼公開時: 下4行の https://USERNAME.github.io/REPO/ を実際のURLに置換▼ -->
+<meta property="og:title" content="インターネット社会的死因診断">
+<meta property="og:description" content="いずれインターネットで死ぬあなたへ。15の質問から、得意な厄介ムーブと社会的死因を特定します。">
+<meta property="og:url" content="https://USERNAME.github.io/REPO/">
+<meta property="og:image" content="https://USERNAME.github.io/REPO/ogp.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700;800&family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#151119;
+  --paper-dark:#201a28;
+  --ink:#eae4f0;
+  --ink-soft:#9d93aa;
+  --rule:#3d3549;
+  --shu:#e04a3c;
+  --shu-deep:#ff4d7d;
+  --gold:#a8853a;
+  --bg:#0a080e;
+  --neon:#ff4d7d;
+  --cyan:#3ee6d6;
+  --pixel:"DotGothic16","Shippori Mincho",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  font-family:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho","MS Mincho",serif;
+  background:var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+  min-height:100dvh;
+  line-height:1.8;
+  font-feature-settings:"palt";
+}
+/* CRT走査線+グロー */
+body::before{
+  content:"";
+  position:fixed;inset:0;
+  pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.03) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse 120% 80% at 50% -10%, rgba(255,77,125,.10), transparent 55%),
+    radial-gradient(ellipse 100% 70% at 50% 110%, rgba(62,230,214,.07), transparent 55%);
+  z-index:2;
+}
+#app{
+  position:relative;z-index:1;
+  max-width:520px;margin:0 auto;
+  padding:20px 14px 48px;
+}
+.sheet{
+  background:var(--paper);
+  border:1.5px solid var(--ink);
+  box-shadow:
+    0 0 22px rgba(255,77,125,.22),
+    0 0 60px rgba(62,230,214,.10),
+    4px 4px 0 rgba(0,0,0,.65);
+  padding:26px 20px 30px;
+  position:relative;
+}
+.sheet::before{
+  content:"";
+  position:absolute;inset:5px;
+  border:1px solid var(--rule);
+  pointer-events:none;
+}
+.screen{display:none;}
+.screen.active{display:block;animation:fadein .35s ease;}
+@keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion: reduce){
+  .screen.active{animation:none;}
+  .stamp{animation:none !important;}
+  .v-title{animation:none !important;text-shadow:none !important;}
+  .gov-eyebrow span:last-child::after{animation:none !important;}
+}
+
+/* ---------- 表紙 ---------- */
+.gov-eyebrow{
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:var(--pixel);
+  font-size:11px;letter-spacing:.1em;color:var(--ink-soft);
+  border-bottom:1px solid var(--rule);
+  padding-bottom:8px;margin-bottom:22px;
+}
+.gov-eyebrow span:last-child{color:var(--neon);}
+.gov-eyebrow span:last-child::after{
+  content:"▮";
+  margin-left:3px;
+  animation:blink 1.1s steps(1) infinite;
+}
+@keyframes blink{50%{opacity:0;}}
+.title-block{
+  display:flex;justify-content:center;gap:26px;
+  min-height:300px;margin-bottom:8px;
+}
+.v-title{
+  writing-mode:vertical-rl;
+  font-size:clamp(34px,9.5vw,44px);
+  font-weight:800;
+  letter-spacing:.22em;
+  line-height:1.25;
+  animation:glitch 4s steps(1) infinite;
+}
+@keyframes glitch{
+  0%,92%{text-shadow:none;transform:none;}
+  93%{text-shadow:2px 0 var(--neon), -2px 0 var(--cyan);transform:translateX(1px);}
+  94.5%{text-shadow:-2px 0 var(--neon), 2px 0 var(--cyan);transform:translateX(-1px);}
+  96%{text-shadow:3px 1px var(--neon), -3px -1px var(--cyan);transform:none;}
+  97.5%{text-shadow:none;transform:none;}
+}
+.v-sub{
+  writing-mode:vertical-rl;
+  font-size:13px;
+  letter-spacing:.28em;
+  color:var(--ink-soft);
+  padding-top:14px;
+}
+.lead{
+  text-align:center;
+  font-size:14px;
+  margin:18px 0 6px;
+}
+.lead strong{color:var(--shu);font-weight:700;}
+.notice{
+  font-size:11px;color:var(--ink-soft);
+  border:1px solid var(--rule);
+  padding:10px 12px;
+  margin:20px 0 24px;
+  line-height:1.7;
+}
+.notice b{font-weight:700;color:var(--ink);}
+
+/* ---------- ボタン ---------- */
+.btn{
+  display:block;width:100%;
+  font-family:inherit;
+  font-size:16px;font-weight:700;letter-spacing:.3em;text-indent:.3em;
+  padding:15px 10px;
+  background:var(--ink);color:var(--paper);
+  border:1.5px solid var(--ink);
+  cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.btn:hover,.btn:focus-visible{background:var(--paper);color:var(--ink);}
+.btn:focus-visible{outline:2px solid var(--shu);outline-offset:2px;}
+.btn-sub{
+  background:var(--paper);color:var(--ink);
+  font-size:13px;letter-spacing:.2em;padding:12px 10px;margin-top:10px;
+}
+.btn-sub:hover,.btn-sub:focus-visible{background:var(--ink);color:var(--paper);}
+.btn-shu{background:var(--neon);border-color:var(--neon);font-family:var(--pixel);letter-spacing:.15em;text-indent:.15em;}
+.btn-shu:hover,.btn-shu:focus-visible{background:var(--paper);color:var(--neon);}
+/* サイバー層: 帳票の周辺装置はドットフォント */
+.cert-head .form-no,.cert-head .en,.data-cell,.share-cap,.retry-note,.axes .cap,.axis-row,.btn-sub{
+  font-family:var(--pixel);
+}
+
+/* ---------- 設問 ---------- */
+.q-head{
+  display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:2px solid var(--ink);
+  padding-bottom:6px;margin-bottom:4px;
+}
+.q-no{font-size:13px;letter-spacing:.15em;font-weight:700;}
+.q-total{font-family:var(--pixel);font-size:11px;color:var(--ink-soft);letter-spacing:.1em;}
+.q-progress{
+  height:6px;background:#161219;
+  border:1px solid var(--ink);
+  margin-bottom:20px;
+}
+.q-progress i{
+  display:block;height:100%;
+  background:linear-gradient(90deg, var(--neon), var(--cyan));
+  transition:width .25s ease;
+}
+.q-text{
+  font-size:16.5px;font-weight:700;
+  margin-bottom:20px;
+  min-height:3.2em;
+}
+.opt{
+  display:block;width:100%;
+  font-family:inherit;font-size:14.5px;text-align:left;
+  background:var(--paper);
+  border:1.5px solid var(--ink);
+  padding:13px 14px 13px 40px;
+  margin-bottom:10px;
+  cursor:pointer;
+  position:relative;
+  line-height:1.6;
+  transition:background .12s;
+}
+.opt::before{
+  content:attr(data-mark);
+  position:absolute;left:12px;top:12px;
+  width:20px;height:20px;
+  border:1.5px solid var(--ink);
+  border-radius:50%;
+  font-size:11px;line-height:19px;text-align:center;
+  font-weight:700;
+}
+.opt:hover,.opt:focus-visible{background:#241b2c;border-color:var(--neon);box-shadow:inset 3px 0 0 var(--neon);}
+.opt:focus-visible{outline:2px solid var(--neon);outline-offset:1px;}
+.q-note{font-family:var(--pixel);font-size:11px;color:var(--ink-soft);text-align:center;margin-top:6px;}
+
+/* ---------- 結果:死亡診断書 ---------- */
+.cert{position:relative;}
+.cert-head{
+  text-align:center;
+  border-bottom:3px double var(--ink);
+  padding-bottom:12px;margin-bottom:16px;
+}
+.cert-head .form-no{
+  font-size:10px;color:var(--ink-soft);letter-spacing:.12em;
+  text-align:left;margin-bottom:6px;
+}
+.cert-head h2{
+  font-size:26px;font-weight:800;letter-spacing:.3em;text-indent:.3em;
+}
+.cert-head .en{
+  font-size:9.5px;color:var(--ink-soft);letter-spacing:.28em;margin-top:2px;
+}
+.stamp{
+  position:absolute;top:34px;right:6px;
+  width:74px;height:74px;
+  border:2.5px solid var(--shu);
+  color:var(--shu);
+  display:flex;align-items:center;justify-content:center;
+  writing-mode:vertical-rl;
+  font-size:13px;font-weight:800;letter-spacing:.18em;line-height:1.3;
+  transform:rotate(7deg);
+  opacity:.92;
+  text-shadow:0 0 12px rgba(224,74,60,.5);
+  animation:stamp-in .3s cubic-bezier(.2,2.4,.5,1) .35s backwards;
+  pointer-events:none;
+}
+@keyframes stamp-in{
+  from{transform:rotate(7deg) scale(2.1);opacity:0;}
+  to{transform:rotate(7deg) scale(1);opacity:.92;}
+}
+.row{
+  display:flex;
+  border:1px solid var(--ink);
+  border-bottom:none;
+  font-size:13.5px;
+}
+.row:last-of-type{border-bottom:1px solid var(--ink);}
+.row .th{
+  flex:0 0 92px;
+  background:var(--paper-dark);
+  border-right:1px solid var(--ink);
+  padding:9px 8px;
+  font-size:11.5px;font-weight:700;letter-spacing:.1em;
+  color:var(--ink-soft);
+  display:flex;align-items:center;
+}
+.row .td{flex:1;padding:9px 12px;}
+.cause-main{
+  font-size:19px;font-weight:800;line-height:1.5;
+  color:var(--shu-deep);
+  text-shadow:0 0 14px rgba(255,77,125,.45);
+}
+.skill-name{font-size:15.5px;font-weight:800;}
+.detail-box{
+  border:1px solid var(--ink);
+  margin-top:14px;
+  padding:14px 14px 12px;
+  font-size:13.5px;
+  position:relative;
+}
+.detail-box .cap{
+  position:absolute;top:-9px;left:10px;
+  background:var(--paper);
+  padding:0 8px;
+  font-size:10.5px;font-weight:700;letter-spacing:.15em;
+  color:var(--ink-soft);
+}
+.detail-box p{margin-bottom:.7em;}
+.detail-box p:last-child{margin-bottom:0;}
+.detail-box .quote{
+  color:var(--shu-deep);font-weight:700;
+  padding-left:1em;
+}
+.data-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  border:1px solid var(--ink);
+  margin-top:14px;
+}
+.data-cell{
+  border-bottom:1px solid var(--rule);
+  padding:8px 10px 7px;
+  font-size:11px;color:var(--ink-soft);letter-spacing:.05em;
+}
+.data-cell:nth-child(odd){border-right:1px solid var(--rule);}
+.data-cell:nth-last-child(-n+2){border-bottom:none;}
+.data-cell b{
+  display:block;
+  font-size:15px;color:var(--ink);font-weight:800;letter-spacing:0;
+  margin-top:1px;
+}
+.data-cell.hero{
+  grid-column:1/-1;
+  text-align:center;
+  border-right:none !important;
+  padding:12px 10px 10px;
+}
+.data-cell.hero b{
+  font-family:"Shippori Mincho",serif;
+  font-size:34px;color:var(--neon);
+  text-shadow:0 0 16px rgba(255,77,125,.5);
+  margin-top:2px;
+}
+.yokai .data-cell.hero b{color:#e0b13c;text-shadow:0 0 16px rgba(224,177,60,.5);}
+.will-box{
+  margin-top:14px;
+  border-left:4px solid var(--ink);
+  background:var(--paper-dark);
+  padding:11px 14px;
+  font-size:13px;
+}
+.will-box .cap{font-size:10.5px;font-weight:700;letter-spacing:.15em;color:var(--ink-soft);display:block;margin-bottom:3px;}
+.will-box .w{font-size:14.5px;font-weight:700;}
+.rebirth{
+  margin-top:12px;
+  font-size:12.5px;
+  text-align:right;
+  color:var(--ink-soft);
+}
+.rebirth b{color:var(--ink);font-weight:800;font-size:14px;}
+.compat-box{
+  border:1px solid var(--ink);
+  margin-top:16px;
+  padding:16px 14px 4px;
+  position:relative;
+}
+.compat-box .cap{
+  position:absolute;top:-9px;left:10px;
+  background:var(--paper);
+  padding:0 8px;
+  font-family:var(--pixel);
+  font-size:10.5px;font-weight:700;letter-spacing:.15em;
+  color:var(--ink-soft);
+}
+.compat-row{margin-bottom:13px;font-size:13px;}
+.compat-row .tag{
+  font-family:var(--pixel);
+  font-size:11px;letter-spacing:.1em;
+  display:inline-block;margin-right:8px;
+}
+.compat-row.good .tag{color:var(--cyan);text-shadow:0 0 8px rgba(62,230,214,.4);}
+.compat-row.bad .tag{color:var(--neon);text-shadow:0 0 8px rgba(255,77,125,.4);}
+.compat-row b{font-size:14px;font-weight:800;}
+.compat-row p{margin-top:2px;color:var(--ink-soft);font-size:12.5px;line-height:1.7;}
+.yokai .compat-box{border-color:var(--gold);}
+.yokai .compat-box .cap{background:#171512;color:#b3a986;}
+.yokai .compat-row.good .tag{color:#e0b13c;text-shadow:0 0 8px rgba(224,177,60,.4);}
+.yokai .compat-row p{color:#8f866f;}
+
+/* ---------- 死因目録 ---------- */
+.cat-item{
+  border:1px solid var(--ink);
+  padding:12px 12px 10px;
+  margin-bottom:12px;
+  position:relative;
+}
+.cat-item .cat-no{
+  font-family:var(--pixel);
+  font-size:10px;color:var(--ink-soft);letter-spacing:.15em;
+}
+.cat-cause{
+  display:block;
+  font-size:16px;font-weight:800;
+  color:var(--shu-deep);
+  margin:2px 0 4px;
+}
+.cat-skill{font-size:12.5px;}
+.cat-will{font-size:12px;color:var(--ink-soft);margin-top:3px;}
+.cat-item.me{
+  border-color:var(--neon);
+  box-shadow:0 0 14px rgba(255,77,125,.35);
+}
+.cat-item.me::after{
+  content:"あなた";
+  position:absolute;top:10px;right:10px;
+  font-family:var(--pixel);
+  font-size:10px;color:var(--neon);
+  border:1px solid var(--neon);
+  padding:1px 6px;letter-spacing:.1em;
+}
+.cat-item.locked{border-color:var(--gold);}
+.cat-item.locked .cat-cause{color:var(--gold);letter-spacing:.2em;}
+.cat-lock-note{
+  font-family:var(--pixel);
+  font-size:10.5px;color:var(--ink-soft);
+}
+.cat-foot{
+  font-family:var(--pixel);
+  font-size:10.5px;color:var(--ink-soft);
+  text-align:center;margin:14px 0 12px;letter-spacing:.1em;
+}
+.axes{
+  margin-top:16px;
+  border:1px solid var(--rule);
+  padding:12px 12px 8px;
+}
+.axes .cap{font-size:10.5px;font-weight:700;letter-spacing:.15em;color:var(--ink-soft);margin-bottom:8px;}
+.axis-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;}
+.axis-row .lab{flex:0 0 62px;letter-spacing:.05em;}
+.axis-row .bar{flex:1;height:8px;background:#161219;border:1px solid var(--rule);}
+.axis-row .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--neon),var(--cyan));}
+.axis-row .val{flex:0 0 26px;text-align:right;font-weight:700;}
+.share-area{margin-top:24px;}
+.share-cap{
+  text-align:center;font-size:11px;color:var(--ink-soft);
+  letter-spacing:.15em;margin-bottom:10px;
+}
+#certCanvas{display:none;}
+.retry-note{
+  text-align:center;font-size:11px;color:var(--ink-soft);margin-top:16px;line-height:1.7;
+}
+
+/* ---------- 病み層 ---------- */
+.sheet{animation:breathe 5.5s ease-in-out infinite;}
+@keyframes breathe{
+  0%,100%{box-shadow:0 0 22px rgba(255,77,125,.22),0 0 60px rgba(62,230,214,.10),4px 4px 0 rgba(0,0,0,.65);}
+  50%{box-shadow:0 0 36px rgba(255,77,125,.42),0 0 84px rgba(62,230,214,.15),4px 4px 0 rgba(0,0,0,.65);}
+}
+#whispers{position:fixed;inset:0;pointer-events:none;z-index:3;overflow:hidden;}
+.whisper{
+  position:absolute;
+  font-family:var(--pixel);
+  color:rgba(62,230,214,.5);
+  font-size:12px;letter-spacing:.12em;white-space:nowrap;
+  text-shadow:0 0 8px rgba(62,230,214,.55);
+  animation:whisp 4.5s ease forwards;
+}
+.whisper.bad{
+  color:rgba(255,77,125,.75);
+  font-size:13px;
+  text-shadow:0 0 12px rgba(255,77,125,.8);
+  animation-duration:3.6s;
+}
+@keyframes whisp{
+  0%{opacity:0;transform:translateY(8px);}
+  20%{opacity:1;}
+  75%{opacity:.65;}
+  100%{opacity:0;transform:translateY(-12px);}
+}
+body.flash::after{
+  content:"";
+  position:fixed;inset:0;z-index:4;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(255,77,125,.16) 0 2px,transparent 2px 5px);
+  mix-blend-mode:screen;
+  animation:flashout .16s steps(2) forwards;
+}
+@keyframes flashout{to{opacity:0;}}
+/* 検死が進むほど装置が病む */
+body.decay1 .sheet{animation-duration:3.4s;}
+body.decay1 .q-note{color:var(--neon);}
+body.decay2 .sheet{animation-duration:1.9s;}
+body.decay2 .q-no{color:var(--shu);}
+body.decay2 .q-note{color:var(--neon);text-shadow:0 0 8px rgba(255,77,125,.5);}
+body.decay2 .q-text{animation:textglitch 3.2s steps(1) infinite;}
+@keyframes textglitch{
+  0%,93%{text-shadow:none;transform:none;}
+  94%{text-shadow:2px 0 var(--neon),-2px 0 var(--cyan);transform:translateX(1px);}
+  96%{text-shadow:-2px 0 var(--neon),2px 0 var(--cyan);transform:translateX(-1px);}
+  97.5%{text-shadow:none;transform:none;}
+}
+.cause-main.glitchy{animation:textglitch 2.8s steps(1) infinite;}
+.death-no{
+  font-family:var(--pixel);
+  font-size:11px;color:var(--neon);
+  text-align:center;margin-top:6px;letter-spacing:.15em;
+}
+#deathToday{
+  font-family:var(--pixel);
+  font-size:12px;color:var(--neon);
+  text-align:center;margin-top:12px;letter-spacing:.1em;
+  text-shadow:0 0 8px rgba(255,77,125,.4);
+}
+@media (prefers-reduced-motion: reduce){
+  .sheet,.q-text,.cause-main.glitchy{animation:none !important;}
+  .whisper{animation:none;opacity:.4;}
+  body.flash::after{display:none;}
+}
+
+/* ---------- 妖怪(レア) ---------- */
+.yokai .sheet{
+  background:#171512;
+  border-color:var(--gold);
+  box-shadow:0 1px 0 var(--gold), 3px 3px 0 rgba(0,0,0,.5);
+  color:#e8ddc4;
+}
+.yokai .sheet::before{border-color:#4a4436;}
+.yokai .cert-head{border-color:var(--gold);}
+.yokai .cert-head .form-no,.yokai .cert-head .en{color:#8f866f;}
+.yokai .row,.yokai .detail-box,.yokai .data-grid{border-color:var(--gold);}
+.yokai .row .th{background:#221f19;border-color:var(--gold);color:#b3a986;}
+.yokai .cause-main{color:#e0b13c;}
+.yokai .detail-box .cap{background:#171512;color:#b3a986;}
+.yokai .detail-box .quote{color:#e0b13c;}
+.yokai .data-cell{border-color:#4a4436;color:#8f866f;}
+.yokai .data-cell b{color:#e8ddc4;}
+.yokai .will-box{background:#221f19;border-color:var(--gold);}
+.yokai .will-box .cap{color:#b3a986;}
+.yokai .rebirth{color:#8f866f;}
+.yokai .rebirth b{color:#e0b13c;}
+.yokai .stamp{border-color:#e0b13c;color:#e0b13c;mix-blend-mode:normal;}
+.yokai .axes{border-color:#4a4436;}
+.yokai .axes .cap,.yokai .axis-row{color:#b3a986;}
+.yokai .axis-row .bar{background:#221f19;border-color:#4a4436;}
+.yokai .axis-row .bar i{background:#e0b13c;}
+.yokai .btn-sub{background:transparent;color:#e8ddc4;border-color:var(--gold);}
+.yokai .btn-sub:hover{background:var(--gold);color:#171512;}
+.yokai .retry-note{color:#8f866f;}
+.yokai-note{
+  text-align:center;font-size:12px;color:#e0b13c;
+  letter-spacing:.2em;margin-bottom:14px;font-weight:700;
+}
+</style>
+</head>
+<body>
+<div id="whispers"></div>
+<div id="app">
+
+  <!-- ========== 表紙 ========== -->
+  <section id="screen-title" class="screen active">
+    <div class="sheet">
+      <div class="gov-eyebrow">
+        <span>様式第九六八号</span>
+        <span>NET-KOSEKI.SYS Ver.9.68</span>
+      </div>
+      <div class="title-block">
+        <div class="v-sub">いずれインターネットで死ぬあなたへ</div>
+        <h1 class="v-title">社会的死因診断</h1>
+      </div>
+      <p class="lead">十五の質問から、<strong>得意な厄介ムーブ</strong>と<br><strong>社会的死因</strong>を特定します。</p>
+      <p id="deathToday"></p>
+      <div class="notice">
+        <b>【注意事項】</b><br>
+        一、本診断に医学的・法的・統計的根拠は一切ありません。<br>
+        一、診断結果に対する異議申し立ては受け付けておりません。<br>
+        一、診断中の離脱は、既読無視として記録されます。<br>
+        一、心当たりがあっても、それはあなたの問題です。
+      </div>
+      <button class="btn" id="btnStart">検 死 を 開 始 す る</button>
+    </div>
+  </section>
+
+  <!-- ========== 設問 ========== -->
+  <section id="screen-quiz" class="screen">
+    <div class="sheet">
+      <div class="q-head">
+        <span class="q-no" id="qNo">第1問</span>
+        <span class="q-total">全15問</span>
+      </div>
+      <div class="q-progress"><i id="qBar" style="width:0%"></i></div>
+      <p class="q-text" id="qText"></p>
+      <div id="qOpts"></div>
+      <p class="q-note" id="qNote">※ どれを選んでも印象は悪くなります</p>
+    </div>
+  </section>
+
+  <!-- ========== 結果 ========== -->
+  <section id="screen-result" class="screen">
+    <p class="yokai-note" id="yokaiNote" style="display:none">― 特殊個体が検出されました ―</p>
+    <div class="sheet cert">
+      <div class="stamp" id="stampEl">戸籍局<br>審査済</div>
+      <div class="cert-head">
+        <p class="form-no" id="certNo">様式第九六八号(死第00-000号)</p>
+        <h2>死亡診断書</h2>
+        <p class="en">CERTIFICATE OF SOCIAL DEATH (INTERNET)</p>
+        <p class="death-no" id="deathNo"></p>
+      </div>
+
+      <div class="row"><div class="th">死　因</div><div class="td cause-main" id="rCause"></div></div>
+      <div class="row"><div class="th">保有技能</div><div class="td skill-name" id="rSkill"></div></div>
+      <div class="row"><div class="th">死亡場所</div><div class="td" id="rPlace"></div></div>
+
+      <div class="detail-box">
+        <span class="cap">検 死 所 見</span>
+        <div id="rDetail"></div>
+      </div>
+
+      <div class="data-grid" id="rData"></div>
+
+      <div class="will-box">
+        <span class="cap">最 後 の 投 稿</span>
+        <span class="w" id="rWill"></span>
+      </div>
+
+      <p class="rebirth">転生先：<b id="rRebirth"></b></p>
+
+      <div class="compat-box">
+        <span class="cap">相 性 鑑 定</span>
+        <div class="compat-row good">
+          <span class="tag">◎ 共存可能</span><b id="cGoodName"></b>
+          <p id="cGoodWhy"></p>
+        </div>
+        <div class="compat-row bad">
+          <span class="tag">× 炎上必至</span><b id="cBadName"></b>
+          <p id="cBadWhy"></p>
+        </div>
+      </div>
+
+      <div class="axes">
+        <p class="cap">解 剖 デ ー タ(五軸)</p>
+        <div id="rAxes"></div>
+      </div>
+
+      <div class="share-area">
+        <p class="share-cap">― 死亡を報告する ―</p>
+        <button class="btn btn-shu" id="btnShareX">死亡報告を共有する(診断書画像つき)</button>
+        <button class="btn btn-sub" id="btnSaveImg">診断書を画像で保存する</button>
+        <button class="btn btn-sub" id="btnCatalog">死因目録を見る(全11種)</button>
+        <button class="btn btn-sub" id="btnRetry">再検死(もう一度診断する)</button>
+      </div>
+      <p class="retry-note" id="retryNote">画像共有に非対応の環境ではX投稿画面が開きます。<br>その場合は保存した診断書を手動で添付してください。</p>
+    </div>
+  </section>
+
+  <!-- ========== 死因目録 ========== -->
+  <section id="screen-catalog" class="screen">
+    <div class="sheet">
+      <div class="gov-eyebrow">
+        <span>別表第一</span>
+        <span>死因目録 全11種</span>
+      </div>
+      <div id="catalogList"></div>
+      <p class="cat-foot">本目録は予告なく増補されることがあります。</p>
+      <button class="btn btn-sub" id="btnBackResult">診断書に戻る</button>
+    </div>
+  </section>
+
+</div>
+<canvas id="certCanvas" width="1080" height="1920"></canvas>
+
+<script>
+"use strict";
+/* =========================================================
+   インターネット社会的死因診断
+   軸: A=承認欲求 B=他責性 C=危機管理 D=演出力 E=粘着性
+========================================================= */
+
+const AXES = ["A","B","C","D","E"];
+const AXIS_LABEL = {A:"承認欲求", B:"他責性", C:"危機管理", D:"演出力", E:"粘着性"};
+
+const QUESTIONS = [
+ {t:"深夜に投稿した長文が、朝になると恥ずかしく見えました。",
+  o:[["誰にも見られていないうちに消す",{C:2,A:1}],
+     ["いいねが付いているので残す",{A:2}],
+     ["「昨日は少し病んでました」と追加投稿する",{A:2,D:2}],
+     ["さらに長い補足を書く",{D:3,A:1}]]},
+ {t:"知人が明らかに間違った情報を投稿しています。",
+  o:[["人前で訂正する",{B:2}],
+     ["匿名アカウントで指摘する",{C:2,B:1}],
+     ["スクリーンショットを仲間に送る",{E:2,B:1}],
+     ["今後使えるので黙って保存する",{C:2,E:2}]]},
+ {t:"気になる相手から半日返信がありません。",
+  o:[["忙しいのだと思う",{C:1}],
+     ["相手のオンライン状況を確認する",{E:2}],
+     ["意味深な投稿をする",{D:2,A:1}],
+     ["別の相手に連絡して心を安定させる",{C:1,D:1}]]},
+ {t:"裏垢を作る一番の理由は？",
+  o:[["本音を吐き出すため",{A:1,C:1}],
+     ["特定の人を監視するため",{E:3}],
+     ["表では言えない趣味のため",{C:2}],
+     ["裏垢を持っている自分に少し憧れているため",{D:2,A:1}]]},
+ {t:"炎上したとき、最初にすることは？",
+  o:[["事情を説明する",{D:1,B:1}],
+     ["投稿を削除する",{C:2}],
+     ["味方になりそうな人へ連絡する",{B:2,E:1}],
+     ["自分より問題のある人を探す",{B:3}]]},
+ {t:"知人から「これ、わたしのこと？」と聞かれました。",
+  o:[["違うと答える",{C:1,B:1}],
+     ["「そう思ったなら心当たりがあるの？」と返す",{B:2,D:1}],
+     ["既読を付けずに投稿を消す",{C:2}],
+     ["本人に分かるように書いたので認める",{E:2,D:1}]]},
+ {t:"一番信用できない言葉は？",
+  o:[["「怒ってないよ」",{B:1}],
+     ["「誰にも言わない」",{E:1,C:1}],
+     ["「寝てた」",{B:1,C:1}],
+     ["「もうアカウント消します」",{A:2,D:1}]]},
+ {t:"昔ブロックされた相手のアカウント、どうしていますか？",
+  o:[["もう見ていない",{C:1}],
+     ["別垢で定期的に確認している",{E:3}],
+     ["ブロックされたこと自体をまだ根に持っている",{B:2,E:1}],
+     ["相手の新しい交友関係まで把握している",{E:3,C:1}]]},
+ {t:"スマホの写真フォルダを人に見られそうになったとき。",
+  o:[["特に問題ない",{}],
+     ["一瞬で角度を変える反射神経がある",{C:2}],
+     ["見せる用のアルバムを普段から用意している",{C:3,D:1}],
+     ["そもそも人前でスマホを開かない",{C:2,E:1}]]},
+ {t:"投稿して10分、反応がゼロです。",
+  o:[["気にしない",{}],
+     ["何度か画面を更新して確認する",{A:2}],
+     ["時間帯が悪かったと分析を始める",{A:2,B:1}],
+     ["一度消して、ゴールデンタイムに再投稿する",{A:3,C:1}]]},
+ {t:"プロフィール文に書きがちなものは？",
+  o:[["事実だけ",{C:1}],
+     ["「気軽に絡んでください」(絡みにくい)",{A:1}],
+     ["意味深なポエム",{D:3}],
+     ["少し盛った経歴",{D:2,A:1}]]},
+ {t:"グループチャットで自分だけ既読スルーされたとき。",
+  o:[["気のせいだと思う",{}],
+     ["送った内容を読み返して反省する",{A:1,C:1}],
+     ["「あの人たち感じ悪いよね」と別の人に言う",{B:3,E:1}],
+     ["通信障害の可能性を疑う",{B:2}]]},
+ {t:"終わった恋人・友人とのトーク履歴は？",
+  o:[["すぐ消す",{C:2}],
+     ["消さないが、見ない",{E:1}],
+     ["定期的に読み返す",{E:2,A:1}],
+     ["スクショしてバックアップまである",{E:3,C:1}]]},
+ {t:"「病んでいる」ことを、どう伝えますか？",
+  o:[["直接言う",{}],
+     ["言わない",{C:1}],
+     ["絵文字のない短文を深夜に置く",{D:2,A:2}],
+     ["ストーリーに白黒の空の写真",{D:3,A:1}]]},
+ {t:"誤爆に気づいたときの初動は？",
+  o:[["素直に謝って訂正する",{}],
+     ["秒で削除し、なかったことにする",{C:2}],
+     ["「乗っ取られました」",{B:3,D:1}],
+     ["誤爆すら計算だったことにする",{D:3,B:1}]]}
+];
+
+/* ---------- 診断タイプ ---------- */
+const TYPES = [
+ {id:1, cause:"深夜ポエム過剰摂取死",
+  skill:"悲劇の主人公演出技能士　一級",
+  place:"自室のベッドの上(午前3時)",
+  vec:{A:9,B:3,C:3,D:9,E:3},
+  detail:[
+   "あなたの失恋は、あなたが思っているほど文学ではありません。",
+   "句読点が減り、改行が増え、最後が「…」で終わり始めたら、それはポエムではなく発作です。",
+   "直接死因:午前3時の自分の文章を、覚醒した午前9時の自分が読んでしまったこと。"],
+  will:"「昨日の投稿は忘れてください」",
+  rebirth:"誰も見ていないブログ",
+  compat:{good:["承認欲求餓死","お互いの投稿に3秒でいいねを付け合う永久機関が完成します。"], bad:["正論孤独死","深夜のポエムに「で、解決策は？」と返されます。朝までに関係が終わります。"]}},
+ {id:2, cause:"裏垢誤爆による社会的出血死",
+  skill:"使い分けているつもり技能士　二級",
+  place:"本垢のタイムライン上",
+  vec:{A:5,B:4,C:1,D:3,E:8},
+  detail:[
+   "あなたは「裏垢は別人格」だと思っています。残念ですが違います。全部あなたです。",
+   "悪口の腕前だけは確かですが、アカウント切替の確認は人生で一度もしたことがありません。",
+   "直接死因:本垢に投稿した「今日も面倒なのから連絡来てる」に対する、本人からの「これ俺？」。"],
+  will:"「乗っ取られました」",
+  rebirth:"鍵アカウント",
+  compat:{good:["転生失敗死","バレた者同士、特定された後の身の振り方だけは誰よりも的確に教え合えます。"], bad:["恋愛相談暴露死","あなたの裏垢の存在が、「相談」という形式で共通の知人全員に共有されます。"]}},
+ {id:3, cause:"匂わせ投稿による集団窒息死",
+  skill:"交際偽装職人(無認可)",
+  place:"よく行く店のテーブル席",
+  vec:{A:8,B:3,C:4,D:8,E:6},
+  detail:[
+   "手、グラス、ホテルの壁、二人分の食事。あなたの写真には、なぜか顔だけが写りません。",
+   "交際の事実がないまま交際の空気だけを供給するのは、無許可の営業です。",
+   "直接死因:匂わせていた相手が、別の人物と同じ店で同じ構図を撮っていたことの発覚。"],
+  will:"「別にそういう関係ではないです」",
+  rebirth:"加工アプリの中",
+  compat:{good:["深夜ポエム過剰摂取死","匂わせ写真に意味深ポエムが添えられ、作品として完成します。"], bad:["裏垢誤爆による社会的出血死","あなたの匂わせは全て別垢で記録されています。相手が誤爆した日が、あなたの命日です。"]}},
+ {id:4, cause:"正論孤独死",
+  skill:"頼まれていない問題解決技能士　特級",
+  place:"リプライ欄の最深部",
+  vec:{A:2,B:9,C:6,D:1,E:6},
+  detail:[
+   "あなたの言うことはいつも正しい。そして、いつも求められていません。",
+   "慰めてほしい人に解決策を出すのは、腹痛の人に筋トレを勧める行為です。",
+   "直接死因:すべてのレスバに勝利した結果、話しかけてくる人間が一人もいなくなったこと。"],
+  will:"「反論できないなら絡んでくるな」",
+  rebirth:"まとめサイトのコメント欄",
+  compat:{good:["謝罪文中毒死","あなたが論破し、相手が美しく謝罪する。需要と供給が一致した小さな地獄です。"], bad:["被害者ポジション固定死","正論を言った0.3秒後に加害者にされます。開戦から炎上までの最短記録を更新します。"]}},
+ {id:5, cause:"謝罪文中毒死",
+  skill:"反省しているように見える文章作成士　一級",
+  place:"メモアプリのスクリーンショット内",
+  vec:{A:5,B:7,C:5,D:8,E:3},
+  detail:[
+   "あなたの謝罪文は回を追うごとに上手くなっています。反省が減った分が、文章力に回っているからです。",
+   "「関係者各位」は、個人が使っていい言葉ではありません。",
+   "直接死因:謝罪文の完成度が、謝罪の必要性を上回ったこと。"],
+  will:"「真摯に受け止めております」",
+  rebirth:"企業の公式リリース担当",
+  compat:{good:["正論孤独死","怒ってくれる人がいないと謝れません。あちらは無限に供給してくれます。"], bad:["過去ツイート発掘事故死","謝罪するたびに、過去の謝罪文との矛盾を発掘されます。"]}},
+ {id:6, cause:"過去ツイート発掘事故死",
+  skill:"昔の自分は別人理論　専門家",
+  place:"7年前のタイムライン",
+  vec:{A:4,B:6,C:1,D:4,E:2},
+  detail:[
+   "今のあなたは良識的です。7年前のあなたは、とても元気です。",
+   "あなたは埋めたつもりでいますが、インターネットに時効はありません。",
+   "直接死因:昔の尖った発言が、本人の代表作として発掘・展示されたこと。"],
+  will:"「当時は若かったので」",
+  rebirth:"インターネットアーカイブ",
+  compat:{good:["転生失敗死","「過去は別人」理論の同志。お互いの前世に触れない不可侵条約が結べます。"], bad:["裏垢誤爆による社会的出血死","あなたの7年分のログを全部保存しています。あなたの代表作の管理人です。"]}},
+ {id:7, cause:"被害者ポジション固定死",
+  skill:"先に怒らせてから怖がる職人",
+  place:"「もう無理」と投稿した直後の画面",
+  vec:{A:5,B:9,C:4,D:7,E:4},
+  detail:[
+   "相手が我慢している間、あなたは強気です。相手が怒った瞬間、被害者席に着席します。所要時間0.3秒。",
+   "「そんな言い方しなくてもよくない？」は、魔法の言葉ではありません。",
+   "直接死因:被害者席を指定席にしたことによる、信用の全損。"],
+  will:"「もう誰も信じられない」",
+  rebirth:"相談掲示板の常連",
+  compat:{good:["深夜ポエム過剰摂取死","あなたの被害を最も美しく詠んでくれます。共依存の完成形です。"], bad:["正論孤独死","泣いても正論が止まりません。あなたの被害者席が撤去されます。"]}},
+ {id:8, cause:"承認欲求餓死",
+  skill:"消す前提投稿技能士　準一級",
+  place:"通知欄(未受信)",
+  vec:{A:10,B:4,C:4,D:5,E:4},
+  detail:[
+   "あなたは通知を確認していないフリをします。でも通知欄は3分に1回見ています。",
+   "「消すかも」は消しません。「誰も見てないと思うけど」は、全員に見てほしい。",
+   "直接死因:投稿から7分間、いいねが付かなかったこと。"],
+  will:"「やっぱり消しました」",
+  rebirth:"招待制SNS(招待は来ない)",
+  compat:{good:["深夜ポエム過剰摂取死","相手は読んでほしい、あなたは反応したい。いいねの永久機関です。"], bad:["匂わせ投稿による集団窒息死","相手の匂わせに集まるいいねを眺めて、餓死が加速します。"]}},
+ {id:9, cause:"恋愛相談暴露死",
+  skill:"相談という名の情報漏洩技能士　二級",
+  place:"共通の知人のグループ通話内",
+  vec:{A:5,B:6,C:2,D:4,E:8},
+  detail:[
+   "あなたは本人にだけ言いません。本人以外の全員には言います。",
+   "「誰にも言わないで」を付ければ漏れないと思っていますが、それは呪文ではなく予告です。",
+   "直接死因:相談内容が知人網を一周して、本人に届いたこと。"],
+  will:"「誰にも言わないでって言ったのに」",
+  rebirth:"グループ通話の聞き専",
+  compat:{good:["被害者ポジション固定死","相談が無限に湧いてくる情報源です。あなたは今日も「誰にも言わないよ」と言います。"], bad:["転生失敗死","相手の転生先を3時間で全員に共有してしまい、輪廻を破壊します。"]}},
+ {id:10, cause:"転生失敗死",
+  skill:"定期的アカウント作り直し技能士　三級",
+  place:"開設3時間の新アカウント",
+  vec:{A:3,B:5,C:1,D:3,E:4},
+  detail:[
+   "あなたは人間関係をリセットするために転生します。しかし文体、絵文字、句読点の癖が、全部前世のままです。",
+   "輪廻の回数だけは多いのに、匿名化には一度も成功していません。",
+   "直接死因:新アカウント開設3時間後の「もしかして○○？」。"],
+  will:"「人違いです」",
+  rebirth:"新アカウント(既に特定済み)",
+  compat:{good:["過去ツイート発掘事故死","お互いの前世に触れずにいてくれる、この世で唯一の相手です。"], bad:["裏垢誤爆による社会的出血死","別垢からずっと観察されています。転生しても初日に特定されます。"]}},
+];
+
+const YOKAI = {
+ id:99, cause:"死亡不能(インターネットバケモン化)",
+ skill:"全技能保持者(国家資格外・概念)",
+ place:"特定不能(遍在)",
+ detail:[
+  "あなたは全項目で規定値を超過しました。もう、個人としては死ねません。",
+  "アカウントを消しても語り継がれ、名前を伏せても特定され、忘れられた頃に発掘されます。",
+  "本局はこれを死亡ではなく「概念としての定着」と認定し、診断書の発行を保留します。おめでとうございます。"],
+ will:"(投稿は不要。あなたの行動がすでに投稿である)",
+ rebirth:"転生不能(概念として永続)",
+ compat:{good:["該当なし","バケモンに相性という概念はありません。全人類と相互観察関係にあります。"], bad:["もう一体のバケモン","概念同士が接触すると、インターネットが一つ終わります。"]}};
+
+/* ---------- 状態 ---------- */
+let qIndex = 0;
+let score = {A:0,B:0,C:0,D:0,E:0};
+let axisMax = {A:0,B:0,C:0,D:0,E:0};
+QUESTIONS.forEach(q=>{
+  AXES.forEach(ax=>{
+    axisMax[ax] += Math.max(0, ...q.o.map(o=>o[1][ax]||0));
+  });
+});
+let currentResult = null;
+
+/* ---------- 病み装置: X通知(破滅進行) ---------- */
+function whisperText(i){
+  const r = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
+  const t1 = [ // 無害な通知
+    ()=>"通知 "+r(1,3)+"件",
+    ()=>"いいね ♡"+r(0,2),
+    ()=>"不明なアカウントに閲覧されました",
+    ()=>"フォロワー +0",
+    ()=>"あなたのポストが表示されました"
+  ];
+  const t2 = [ // ざわつき始める
+    ()=>"引用リポスト +"+r(3,18),
+    ()=>"リプライ +"+r(5,24),
+    ()=>"知らない人に発見されました",
+    ()=>"相互フォロワーがスクショを保存しました",
+    ()=>"インプレッション 急上昇",
+    ()=>"「これって…」"
+  ];
+  const t3 = [ // 破滅
+    ()=>"トレンド入り:あなた",
+    ()=>"フォロワー -"+r(80,400),
+    ()=>"まとめ記事が作成されました",
+    ()=>"アカウント特定スレ 進行中",
+    ()=>"通知 +"+r(99,999)+"件",
+    ()=>"「これ本人？」",
+    ()=>"過去ポストが発掘されました"
+  ];
+  const pool = i<9 ? t1 : i<13 ? t2 : t3;
+  return pool[Math.floor(Math.random()*pool.length)]();
+}
+function spawnWhisper(i){
+  const box = document.getElementById("whispers");
+  if(!box) return;
+  const s = document.createElement("span");
+  s.className = "whisper" + (i>=13 ? " bad" : "");
+  s.textContent = whisperText(i);
+  s.style.left = (8 + Math.random()*60) + "%";
+  s.style.top = (10 + Math.random()*75) + "%";
+  box.appendChild(s);
+  setTimeout(()=>s.remove(), 4800);
+}
+function noteFor(i){
+  if(i < 4)  return "※ どれを選んでも印象は悪くなります";
+  if(i < 8)  return (i%2===0) ? "※ 迷っている時間も記録されています" : "※ いまの回答、本心ですか？";
+  if(i < 12) return (i%2===0) ? "※ 傾向は概ね把握しました" : "※ 正直に答えても手遅れです";
+  return (i%2===0) ? "※ もう戻れません" : "※ まもなく死亡が確定します";
+}
+function dailyCount(){
+  const d = new Date();
+  const seed = d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate();
+  return 380 + ((seed * 2654435761) >>> 16) % 470;
+}
+const todayCount = dailyCount();
+
+/* ---------- バケモン遭遇記録(保存不可環境では揮発) ---------- */
+let rareSeen = false;
+try{ rareSeen = localStorage.getItem("idsd_rare") === "1"; }catch(e){}
+function markRareSeen(){
+  rareSeen = true;
+  try{ localStorage.setItem("idsd_rare","1"); }catch(e){}
+}
+
+/* ---------- 死因目録 ---------- */
+function renderCatalog(){
+  const all = TYPES.concat([YOKAI]);
+  const myId = currentResult ? currentResult.type.id : null;
+  $("catalogList").innerHTML = all.map((t,i)=>{
+    const isRare = t.id === 99;
+    const no = isRare ? "特殊個体" : "第" + String(i+1).padStart(2,"0") + "号";
+    if(isRare && !rareSeen){
+      return '<div class="cat-item locked"><div class="cat-no">'+no+'</div>'+
+        '<b class="cat-cause">？？？？？？？？</b>'+
+        '<p class="cat-lock-note">厄介偏差値が規定値を超過した者のみ、本欄を閲覧できます。</p></div>';
+    }
+    return '<div class="cat-item'+(t.id===myId?' me':'')+'">'+
+      '<div class="cat-no">'+no+'</div>'+
+      '<b class="cat-cause">'+escapeHtml(t.cause)+'</b>'+
+      '<p class="cat-skill">'+escapeHtml(t.skill)+'</p>'+
+      '<p class="cat-will">遺言:'+escapeHtml(t.will)+'</p></div>';
+  }).join("");
+}
+
+/* ---------- 画面制御 ---------- */
+const $ = id => document.getElementById(id);
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  $(id).classList.add("active");
+  window.scrollTo({top:0});
+}
+
+$("deathToday").textContent = "本日の社会的死亡受理件数：" + todayCount + "件";
+
+$("btnStart").addEventListener("click", ()=>{
+  qIndex = 0;
+  score = {A:0,B:0,C:0,D:0,E:0};
+  document.body.classList.remove("decay1","decay2","yokai");
+  renderQuestion();
+  show("screen-quiz");
+});
+
+const MARKS = ["ア","イ","ウ","エ"];
+const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function renderQuestion(){
+  const q = QUESTIONS[qIndex];
+  document.body.classList.toggle("decay1", qIndex >= 5);
+  document.body.classList.toggle("decay2", qIndex >= 10);
+  $("qNo").textContent = "第" + (qIndex+1) + "問";
+  $("qBar").style.width = (qIndex/QUESTIONS.length*100) + "%";
+  $("qText").textContent = q.t;
+  $("qNote").textContent = noteFor(qIndex);
+  if(qIndex >= 4 && !REDUCED){
+    const p = qIndex < 9 ? 0.5 : qIndex < 13 ? 0.8 : 1;
+    if(Math.random() < p){ spawnWhisper(qIndex); }
+    if(qIndex >= 13 && Math.random() < 0.5){
+      setTimeout(()=>spawnWhisper(qIndex), 900 + Math.random()*800);
+    }
+  }
+  const wrap = $("qOpts");
+  wrap.innerHTML = "";
+  q.o.forEach((opt,i)=>{
+    const b = document.createElement("button");
+    b.className = "opt";
+    b.dataset.mark = MARKS[i];
+    b.textContent = opt[0];
+    b.addEventListener("click", ()=>answer(opt[1]));
+    wrap.appendChild(b);
+  });
+}
+
+function answer(s){
+  AXES.forEach(ax=>{ score[ax] += (s[ax]||0); });
+  if(!REDUCED){
+    document.body.classList.remove("flash");
+    void document.body.offsetWidth;
+    document.body.classList.add("flash");
+    setTimeout(()=>document.body.classList.remove("flash"), 200);
+  }
+  qIndex++;
+  if(qIndex < QUESTIONS.length){
+    renderQuestion();
+  }else{
+    finish();
+  }
+}
+
+/* ---------- 判定 ---------- */
+function normalized(){
+  const n = {};
+  AXES.forEach(ax=>{ n[ax] = axisMax[ax] ? (score[ax]/axisMax[ax])*10 : 0; });
+  return n;
+}
+function judge(){
+  // 本人の平均に対する「軸の突出パターン」で判定(センタリング+コサイン類似度)
+  const n = normalized();
+  const total = AXES.reduce((s,ax)=>s+n[ax],0);
+  // レア判定: 全軸の総量が規定値超過 → 妖怪(実測 約1%)
+  if(total >= 25){ return {type:YOKAI, n, rare:true}; }
+  const um = total/5;
+  const u = AXES.map(ax=>n[ax]-um);
+  const ul = Math.sqrt(u.reduce((s,v)=>s+v*v,0)) || 1;
+  let best = null, bestS = -Infinity;
+  TYPES.forEach(t=>{
+    const tm = AXES.reduce((s,ax)=>s+t.vec[ax],0)/5;
+    const tv = AXES.map(ax=>t.vec[ax]-tm);
+    const tl = Math.sqrt(tv.reduce((s,v)=>s+v*v,0)) || 1;
+    let dot = 0;
+    for(let i=0;i<5;i++) dot += u[i]*tv[i];
+    const cos = dot/(ul*tl);
+    if(cos > bestS){ bestS = cos; best = t; }
+  });
+  return {type:best, n, rare:false};
+}
+
+/* ---------- 動的データ ---------- */
+function buildStats(n, rare){
+  const A=n.A,B=n.B,C=n.C,D=n.D,E=n.E;
+  const total = A+B+C+D+E;
+  const jitter = m => Math.floor(Math.random()*m); // 再検死ごとに微変動
+  const hensa = Math.max(28, Math.min(95, Math.round(50 + (total-16)*2.4 + jitter(3))));
+  if(rare){
+    return {
+      hensa: "測定不能",
+      hero: ["厄介偏差値","測定不能(振り切れ)"],
+      cells: [
+        ["推定死亡時刻","死亡せず"],
+        ["SNS残り寿命","無期限(概念のため)"],
+        ["炎上規模","観測不能"],
+        ["スクショ保存数","全人類が保有"],
+        ["謝罪文の完成度","謝罪の概念を超越"],
+        ["反省度","0％"]
+      ]
+    };
+  }
+  const h = Math.min(4, 1 + Math.round(A/3.2));
+  const m = (Math.round(A*7 + E*13) + jitter(7)) % 60;
+  const time = "午前" + h + "時" + String(m).padStart(2,"0") + "分";
+  const spread = B+E;
+  const scale = spread<6 ? "半径5メートル" :
+                spread<10 ? "相互フォロワー全員" :
+                spread<14 ? "知人には全員届く" :
+                spread<17 ? "学区・職場一帯" : "トレンド入り(2時間)";
+  const ss = Math.round(3 + E*8.5) + jitter(4);
+  const apology = Math.min(100, Math.round(40 + D*6) + jitter(5));
+  const regret = Math.max(2, Math.round(100 - B*11 - jitter(6)));
+  const life = Math.max(3, Math.round(380 - total*13 + C*18 + jitter(30)));
+  return {
+    hensa,
+    hero: ["厄介偏差値", String(hensa)],
+    cells: [
+      ["推定死亡時刻", time],
+      ["SNS残り寿命", "あと" + life + "日"],
+      ["炎上規模", scale],
+      ["スクショ保存数", ss + "枚"],
+      ["謝罪文の完成度", apology + "点"],
+      ["反省度", regret + "％"]
+    ]
+  };
+}
+
+/* ---------- 結果描画 ---------- */
+function finish(){
+  const r = judge();
+  const stats = buildStats(r.n, r.rare);
+  const certNo = "様式第九六八号(死第" +
+    String(new Date().getFullYear()).slice(-2) + "-" +
+    String(100 + Math.floor(Math.random()*900)) + "号)";
+  const deathNo = todayCount + 1;
+  currentResult = {...r, stats, certNo, deathNo};
+
+  document.body.classList.toggle("yokai", r.rare);
+  if(r.rare){ markRareSeen(); }
+  $("yokaiNote").style.display = r.rare ? "block" : "none";
+  $("stampEl").innerHTML = r.rare ? "戸籍局<br>認定外" : "戸籍局<br>審査済";
+  $("certNo").textContent = certNo;
+  $("deathNo").textContent = "本日の死亡受付　第" + deathNo + "号";
+  $("rCause").textContent = r.type.cause;
+  $("rCause").classList.add("glitchy");
+  $("rSkill").textContent = r.type.skill;
+  $("rPlace").textContent = r.type.place;
+  $("rDetail").innerHTML = r.type.detail.map(p=>{
+    return "<p>" + escapeHtml(p) + "</p>";
+  }).join("");
+  $("rData").innerHTML =
+    '<div class="data-cell hero">'+escapeHtml(stats.hero[0])+'<b>'+escapeHtml(stats.hero[1])+'</b></div>' +
+    stats.cells.map(s=>
+      '<div class="data-cell">'+escapeHtml(s[0])+'<b>'+escapeHtml(s[1])+'</b></div>'
+    ).join("");
+  $("rWill").textContent = r.type.will;
+  $("rRebirth").textContent = r.type.rebirth;
+  $("cGoodName").textContent = r.type.compat.good[0];
+  $("cGoodWhy").textContent = r.type.compat.good[1];
+  $("cBadName").textContent = r.type.compat.bad[0];
+  $("cBadWhy").textContent = r.type.compat.bad[1];
+  $("rAxes").innerHTML = AXES.map(ax=>{
+    const v = r.n[ax];
+    return '<div class="axis-row"><span class="lab">'+AXIS_LABEL[ax]+'</span>'+
+      '<span class="bar"><i style="width:'+(v*10)+'%"></i></span>'+
+      '<span class="val">'+v.toFixed(1)+'</span></div>';
+  }).join("");
+  show("screen-result");
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+$("btnCatalog").addEventListener("click", ()=>{
+  renderCatalog();
+  show("screen-catalog");
+});
+$("btnBackResult").addEventListener("click", ()=>{
+  show("screen-result");
+});
+
+$("btnRetry").addEventListener("click", ()=>{
+  document.body.classList.remove("yokai","decay1","decay2");
+  qIndex = 0;
+  score = {A:0,B:0,C:0,D:0,E:0};
+  renderQuestion();
+  show("screen-quiz");
+});
+
+/* ---------- 共有(画像つき) ---------- */
+async function certBlob(){
+  if(!currentResult) return null;
+  try{ await document.fonts.ready; }catch(e){}
+  drawCert(currentResult);
+  return new Promise(res=>$("certCanvas").toBlob(res, "image/png"));
+}
+
+$("btnShareX").addEventListener("click", async ()=>{
+  if(!currentResult) return;
+  const t = currentResult.type;
+  const hensa = currentResult.stats.hensa;
+  const url = location.href.startsWith("http") ? location.href.split("#")[0] : "";
+  const text = "【死亡報告】私のインターネット死因は「" + t.cause + "」でした。\n厄介偏差値:" + hensa + "\n保有技能:" + t.skill + "\n#インターネット社会的死因診断" + (url ? "\n" + url : "");
+  const blob = await certBlob();
+  // Web Share API: 共有シート経由でXに画像+本文+リンクを渡す
+  if(blob && navigator.canShare){
+    const file = new File([blob], "internet_death_certificate.png", {type:"image/png"});
+    if(navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({text, files:[file]});
+        return;
+      }catch(e){
+        if(e && e.name === "AbortError") return; // ユーザーが共有をやめた
+      }
+    }
+  }
+  // フォールバック: web intent(仕様上、画像の自動添付は不可)
+  const intent = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(
+    "【死亡報告】私のインターネット死因は「" + t.cause + "」でした。\n厄介偏差値:" + hensa + "\n保有技能:" + t.skill + "\n#インターネット社会的死因診断"
+  ) + (url ? "&url=" + encodeURIComponent(url) : "");
+  window.open(intent, "_blank");
+});
+
+/* ---------- 診断書画像生成 ---------- */
+$("btnSaveImg").addEventListener("click", async ()=>{
+  const blob = await certBlob();
+  if(!blob) return;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "internet_death_certificate.png";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+});
+
+function drawCert(r){
+  const cv = $("certCanvas");
+  const ctx = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  const rare = r.rare;
+  const PAPER = rare ? "#171512" : "#151119";
+  const INK   = rare ? "#e8ddc4" : "#eae4f0";
+  const SOFT  = rare ? "#8f866f" : "#9d93aa";
+  const SHU   = rare ? "#e0b13c" : "#e04a3c";
+  const RULE  = rare ? "#4a4436" : "#3d3549";
+  const FILL  = rare ? "#221f19" : "#201a28";
+  const MIN = '"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif';
+  const PIX = '"DotGothic16",monospace';
+  const NEON = "#ff4d7d", CYAN = "#3ee6d6";
+
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(0,0,W,H);
+
+  // 外枠(二重)
+  ctx.strokeStyle = INK; ctx.lineWidth = 6;
+  ctx.strokeRect(36,36,W-72,H-72);
+  ctx.lineWidth = 2;
+  ctx.strokeRect(54,54,W-108,H-108);
+
+  const L = 96, R = W-96;
+  let y = 150;
+
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = SOFT;
+  ctx.font = "26px " + PIX;
+  ctx.textAlign = "left";
+  ctx.fillText(r.certNo, L, y);
+  ctx.textAlign = "right";
+  ctx.fillStyle = rare ? SHU : NEON;
+  ctx.fillText("NET-KOSEKI.SYS", R, y);
+  ctx.textAlign = "left";
+  y += 84;
+
+  ctx.fillStyle = INK;
+  ctx.textAlign = "center";
+  ctx.font = "800 92px " + MIN;
+  ctx.fillText("死 亡 診 断 書", W/2, y);
+  y += 46;
+  ctx.fillStyle = SOFT;
+  ctx.font = "24px " + PIX;
+  ctx.fillText("CERTIFICATE OF SOCIAL DEATH ( INTERNET )", W/2, y);
+  y += 30;
+  // 二重罫+ネオンライン
+  ctx.strokeStyle = INK; ctx.lineWidth = 5;
+  line(ctx, L, y, R, y); ctx.lineWidth = 2; line(ctx, L, y+10, R, y+10);
+  const grad = ctx.createLinearGradient(L,0,R,0);
+  grad.addColorStop(0, NEON); grad.addColorStop(1, CYAN);
+  ctx.strokeStyle = grad; ctx.lineWidth = 4;
+  line(ctx, L, y+22, R, y+22);
+  y += 86;
+
+  // 朱印
+  ctx.save();
+  ctx.translate(R-90, 200);
+  ctx.rotate(7*Math.PI/180);
+  ctx.strokeStyle = SHU; ctx.lineWidth = 7;
+  ctx.globalAlpha = .9;
+  ctx.strokeRect(-75,-75,150,150);
+  ctx.fillStyle = SHU;
+  ctx.font = "800 42px " + MIN;
+  ctx.textAlign = "center";
+  ctx.fillText(rare?"認定外":"審査済", 0, -10);
+  ctx.fillText("戸籍局", 0, 44);
+  ctx.restore();
+
+  // 死因
+  ctx.textAlign = "left";
+  ctx.fillStyle = SOFT;
+  ctx.font = "700 30px " + MIN;
+  ctx.fillText("【死　因】", L, y);
+  y += 62;
+  ctx.fillStyle = rare ? SHU : NEON;
+  ctx.font = "800 58px " + MIN;
+  wrapText(ctx, r.type.cause, L, y, R-L, 74);
+  y = wrapText.lastY + 64;
+
+  // 保有技能
+  ctx.fillStyle = SOFT;
+  ctx.font = "700 30px " + MIN;
+  ctx.fillText("【保有技能】", L, y);
+  y += 54;
+  ctx.fillStyle = INK;
+  ctx.font = "800 42px " + MIN;
+  wrapText(ctx, r.type.skill, L, y, R-L, 58);
+  y = wrapText.lastY + 60;
+
+  ctx.strokeStyle = RULE; ctx.lineWidth = 2;
+  line(ctx, L, y, R, y);
+  y += 56;
+
+  // 厄介偏差値(1枚看板)
+  ctx.textAlign = "center";
+  ctx.fillStyle = SOFT;
+  ctx.font = "30px " + PIX;
+  ctx.fillText("厄 介 偏 差 値", W/2, y);
+  ctx.fillStyle = rare ? SHU : NEON;
+  ctx.font = "800 " + (rare ? "64px " : "120px ") + MIN;
+  ctx.fillText(r.stats.hero[1], W/2, y + (rare ? 90 : 130));
+  y += rare ? 150 : 190;
+  ctx.textAlign = "left";
+
+  // データ表
+  const stats = r.stats.cells;
+  ctx.font = "28px " + MIN;
+  const colW = (R-L)/2;
+  for(let i=0;i<stats.length;i++){
+    const cx = L + (i%2)*colW;
+    const cy = y + Math.floor(i/2)*96;
+    ctx.fillStyle = SOFT;
+    ctx.font = "26px " + PIX;
+    ctx.fillText(stats[i][0], cx, cy);
+    ctx.fillStyle = INK;
+    ctx.font = "800 38px " + MIN;
+    ctx.fillText(stats[i][1], cx, cy+44);
+  }
+  y += Math.ceil(stats.length/2)*96 + 20;
+
+  ctx.strokeStyle = RULE; ctx.lineWidth = 2;
+  line(ctx, L, y, R, y);
+  y += 66;
+
+  // 最後の投稿
+  ctx.fillStyle = FILL;
+  const willTop = y-44;
+  ctx.fillRect(L, willTop, R-L, 130);
+  ctx.fillStyle = INK;
+  ctx.fillRect(L, willTop, 8, 130);
+  ctx.fillStyle = SOFT;
+  ctx.font = "700 26px " + MIN;
+  ctx.fillText("最 後 の 投 稿", L+34, y);
+  y += 50;
+  ctx.fillStyle = INK;
+  ctx.font = "700 34px " + MIN;
+  wrapText(ctx, r.type.will, L+34, y, R-L-68, 46);
+  y = willTop + 130 + 58;
+
+  // 転生先
+  ctx.fillStyle = SOFT;
+  ctx.font = "28px " + MIN;
+  ctx.textAlign = "right";
+  ctx.fillText("転生先：", R-360, y);
+  ctx.fillStyle = rare ? SHU : INK;
+  ctx.font = "800 34px " + MIN;
+  ctx.textAlign = "right";
+  ctx.fillText(r.type.rebirth, R, y);
+  y += 72;
+
+  // 五軸バー
+  ctx.textAlign = "left";
+  ctx.fillStyle = SOFT;
+  ctx.font = "700 26px " + MIN;
+  ctx.fillText("解剖データ(五軸)", L, y);
+  y += 36;
+  AXES.forEach(ax=>{
+    const v = r.n[ax];
+    ctx.fillStyle = SOFT;
+    ctx.font = "24px " + MIN;
+    ctx.fillText(AXIS_LABEL[ax], L, y+22);
+    const bx = L+150, bw = R-L-230;
+    ctx.strokeStyle = RULE; ctx.lineWidth = 2;
+    ctx.strokeRect(bx, y, bw, 26);
+    const bg2 = ctx.createLinearGradient(bx,0,bx+bw,0);
+    bg2.addColorStop(0, rare?SHU:NEON); bg2.addColorStop(1, rare?SHU:CYAN);
+    ctx.fillStyle = bg2;
+    ctx.fillRect(bx+2, y+2, Math.max(0,(bw-4)*v/10), 22);
+    ctx.fillStyle = INK;
+    ctx.font = "700 24px " + PIX;
+    ctx.textAlign = "right";
+    ctx.fillText(v.toFixed(1), R, y+22);
+    ctx.textAlign = "left";
+    y += 46;
+  });
+  y += 30;
+
+  // フッター
+  ctx.fillStyle = rare ? SHU : NEON;
+  ctx.font = "24px " + PIX;
+  ctx.textAlign = "center";
+  ctx.fillText("本日の死亡受付　第" + (r.deathNo || "?") + "号", W/2, H-124);
+  ctx.fillStyle = SOFT;
+  ctx.fillText("インターネット戸籍局　#インターネット社会的死因診断", W/2, H-84);
+}
+
+function line(ctx,x1,y1,x2,y2){
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+}
+function wrapText(ctx, text, x, y, maxW, lh){
+  let cur = "", yy = y;
+  for(const ch of text){
+    const test = cur + ch;
+    if(ctx.measureText(test).width > maxW && cur){
+      ctx.fillText(cur, x, yy);
+      cur = ch; yy += lh;
+    }else{ cur = test; }
+  }
+  if(cur) ctx.fillText(cur, x, yy);
+  wrapText.lastY = yy;
+  return yy;
+}
+</script>
+</body>
+</html>
