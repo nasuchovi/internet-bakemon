@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a080e">
+<meta name="robots" content="noindex, nofollow">
+<title>ヒロイン生成ラボ / Heroine Lab</title>
+<meta name="description" content="プレイヤーが設定した容姿・声質・性格から、画像・音声・台詞をAIで自動生成するためのプロトタイプ。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700;800&family=DotGothic16&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ 年齢確認 ============ -->
+  <section id="gate" class="screen active">
+    <div class="sheet">
+      <div class="eyebrow"><span>ACCESS CONTROL</span><span class="r18">R18</span></div>
+      <h1>年齢確認</h1>
+      <p class="sub">ADULTS ONLY / 18歳未満の方は閲覧できません</p>
+      <div class="gate-note">
+        本ページは成人向け作品の開発用ツールです。<br>
+        <b>あなたは18歳以上ですか？</b><br>
+        「はい」を選ぶと、確認済みであることがこの端末に記録されます。
+      </div>
+      <button class="btn btn-neon" id="gate-yes">はい（18歳以上）</button>
+      <button class="btn btn-sub" id="gate-no" style="margin-top:8px">いいえ</button>
+      <p class="footnote">
+        本ツールは成人キャラクターのみを対象とします。未成年を想起させる設定、および実在人物の
+        肖像・音声の再現は、システム側で常時ブロックされます。
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 本体 ============ -->
+  <section id="main" class="screen">
+    <div class="eyebrow"><span>HEROINE GENERATION LAB</span><span class="r18">R18</span></div>
+    <h1>ヒロイン生成ラボ</h1>
+    <p class="sub">設定した容姿・声質・性格を、画像／音声／台詞の生成入力へ変換します</p>
+
+    <div class="cols">
+      <!-- 左: 設定フォーム -->
+      <div>
+        <form id="form" class="sheet"><!-- SCHEMA から自動生成 --></form>
+
+        <details class="settings">
+          <summary>生成エンジンの接続設定</summary>
+          <div class="grid" id="engine-settings"><!-- app.js が描画 --></div>
+          <p class="footnote" style="border:0;padding-top:6px;margin-top:6px">
+            既定は「モック」。バックエンド不要で配線だけを確認できます。実生成にはローカルの
+            画像生成・音声合成サーバを起動し、上でエンドポイントを指定してください。
+          </p>
+        </details>
+      </div>
+
+      <!-- 右: プレビュー -->
+      <div class="preview">
+        <div class="sheet">
+          <div class="portrait" id="portrait">
+            <span class="ph">立ち絵はここに表示されます<br>［生成する］を押してください</span>
+          </div>
+          <div class="meta">
+            <span id="meta-engine">engine: -</span>
+            <span class="seed" id="meta-seed">seed: -</span>
+          </div>
+
+          <button class="btn btn-neon" id="btn-image" style="margin-top:10px">立ち絵を生成する</button>
+          <div class="btn-row">
+            <button class="btn btn-sub" id="btn-voice">声を聴く</button>
+            <button class="btn btn-sub" id="btn-random">ランダム</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-sub" id="btn-save">カード保存</button>
+            <button class="btn btn-sub" id="btn-load">カード読込</button>
+          </div>
+          <input type="file" id="file-load" accept="application/json" hidden>
+
+          <div class="field" style="margin-top:14px">
+            <label for="sample-line">試聴・会話に使う台詞</label>
+            <input type="text" id="sample-line" value="はじめまして。今日はどんな話をしましょうか。">
+          </div>
+        </div>
+
+        <div class="sheet" style="margin-top:14px">
+          <div class="tabs" role="tablist">
+            <button class="tab" role="tab" aria-selected="true"  data-tab="prompt">画像プロンプト</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="voice">音声パラメータ</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="persona">ペルソナ</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="chat">会話</button>
+          </div>
+          <pre class="out" id="out-prompt"></pre>
+          <pre class="out" id="out-voice" hidden></pre>
+          <pre class="out" id="out-persona" hidden></pre>
+          <div id="out-chat" hidden>
+            <div class="log" id="chat-log"><p class="sub" style="margin:0">台詞生成のテスト。設定を反映した応答が返ります。</p></div>
+            <div class="row">
+              <input type="text" id="chat-input" placeholder="話しかける…">
+              <button class="btn btn-sub" id="btn-chat">送信</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="footnote">
+      表現レベルの語彙（R18タグ）は本リポジトリには同梱していません。<code>ratings.local.json</code> を
+      置くと <code>compile.js</code> が読み込み、プロンプト末尾へ差し込みます。<br>
+      配布前に必ず確認: 使用モデル／音声ライブラリのライセンス、配布プラットフォームの規約、
+      決済事業者の規約、年齢確認の実装。詳細は <code>docs/heroine-generation.md</code>。
+    </p>
+  </section>
+
+  <div class="toast" id="toast"></div>
+</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
