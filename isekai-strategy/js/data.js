@@ -162,7 +162,7 @@ const NATION_TEMPLATES = [
   { race: 'human', gov: '帝国', size: 'big', color: [176, 38, 50] },
   { race: 'human', gov: '王国', size: 'mid', color: [50, 96, 184] },
   { race: 'human', gov: '公国', size: 'small', color: [214, 156, 46] },
-  { race: 'human', gov: '聖教国', size: 'mid', color: [236, 232, 214] },
+  { race: 'human', gov: '聖教国', size: 'mid', color: [118, 132, 196] },
   { race: 'human', gov: '自由都市同盟', size: 'small', color: [206, 104, 160] },
   { race: 'elf', gov: '森王国', size: 'mid', color: [44, 150, 80] },
   { race: 'elf', gov: '盟約国', size: 'small', color: [150, 204, 90] },

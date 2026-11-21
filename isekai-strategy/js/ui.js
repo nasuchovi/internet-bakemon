@@ -673,6 +673,7 @@ function initInput() {
     refresh(true);
   });
   $('btn-mute').onclick = () => { toggleMute(); refresh(true); };
+  $('btn-export').onclick = () => { if (!S) return; exportMap(); sfx('coin'); if (S.started) hooks.log(`🗺 王国暦${START_YEAR + Math.floor(S.day / 360)}年の勢力図を古地図として保存した`, 'info'); };
   $('btn-pause').onclick = () => { if (S.started && !S.over) S.paused = !S.paused; refresh(true); };
   $('btn-faster').onclick = () => { S.speed = Math.min(5, S.speed + 1); refresh(true); };
   $('btn-slower').onclick = () => { S.speed = Math.max(1, S.speed - 1); refresh(true); };
