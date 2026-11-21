@@ -24,7 +24,7 @@ const TUT_STEPS = [
   {
     title: '州を開発する',
     start() { S.tut.dev0 = totalDev(S.player); },
-    text: () => `自国の州をクリックし、「開発度」の<b>＋1</b>を押そう。<br>統・外・軍の点数は毎月貯まる。開発すると収入や兵力が増える。`,
+    text: () => `自国の州をクリックし、「<b>🏗 開拓</b>」を押して発展度を上げよう。<br>政務は毎月貯まる。発展度が上がると収入や兵力が増える。州に<b>代官</b>を置けば自然に発展していく。`,
     check: () => totalDev(S.player) > S.tut.dev0,
     reward: { mana: true, label: '初回の召喚に必要な魔力' },
   },

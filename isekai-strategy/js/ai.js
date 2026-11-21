@@ -126,7 +126,7 @@ function aiEconomy(n) {
     for (const a of S.armies) if (a.owner === n.id) { total += armyRegs(a); cav += a.regs.cav; mage += a.regs.mage; }
     let t = 'inf';
     if (total > 3 && cav / total < 0.22) t = 'cav';
-    else if (n.tech.mil >= 2 && total > 5 && mage / total < 0.12) t = 'mage';
+    else if (n.inventions.length >= 2 && total > 5 && mage / total < 0.12) t = 'mage';
     if (n.gold < UNITS[t].cost + reserve || n.manpower < 1000) break;
     if (!threatened && inc.net < UNITS[t].maint + 0.5) break;
     let pid = n.capital;
@@ -134,9 +134,19 @@ function aiEconomy(n) {
     if (!recruit(n.id, pid, t)) break;
     regs++;
   }
+  // 商会（建設より先に検討）
+  if (!war && n.gold > guildCost(n) + 40 && guildsOf(n.id).length < maxGuilds(n) && Math.random() < 0.6) {
+    const cand = landProvs().filter(p => canFoundGuild(n.id, p.id)).map(p => ({ p, v: guildIncome({ owner: n.id, pid: p.id }) })).sort((a, b) => b.v - a.v);
+    if (cand.length) foundGuild(n.id, cand[0].p.id);
+  }
+  // 余剰資金の投資
+  for (let k = 0; k < 6 && !war && n.gold > 600; k++) {
+    const p = ownedProvs(n.id).filter(p => p.controller === n.id && p.dev < DEV_CAP).sort((a, b) => investCost(n, a) - investCost(n, b))[0];
+    if (!p || !invest(n, p)) break;
+  }
   if (n.gold < 0 && inc.net < 0) {
     const a = S.armies.filter(a => a.owner === n.id && !a.inBattle).sort((x, y) => armyRegs(y) - armyRegs(x))[0];
-    if (a) { const t = a.regs.cav > 0 ? 'cav' : a.regs.mage > 0 ? 'mage' : 'inf'; if (a.regs[t] > 0) { a.men[t] -= a.men[t] / a.regs[t]; a.regs[t]--; } if (armyRegs(a) <= 0) destroyArmy(a); }
+    for (let k = 0; k < 3 && a && S.armies.includes(a); k++) { const t = a.regs.cav > 0 ? 'cav' : a.regs.mage > 0 ? 'mage' : 'inf'; if (a.regs[t] > 0) { a.men[t] -= a.men[t] / a.regs[t]; a.regs[t]--; } if (armyRegs(a) <= 0) destroyArmy(a); }
     const f = S.fleets.find(f => f.owner === n.id); if (f) { if (f.trans > 0) f.trans--; else if (f.war > 0) f.war--; if (f.war + f.trans <= 0) destroyFleet(f); }
   }
   // 海軍
@@ -145,8 +155,8 @@ function aiEconomy(n) {
     let war = 0, trans = 0; for (const f of S.fleets) if (f.owner === n.id) { war += f.war; trans += f.trans; }
     const wantWar = Math.floor(inc.dev / 45), wantTrans = Math.min(8, Math.floor(inc.regs * 0.3));
     const port = coastal.find(p => p.id === n.capital) || coastal[0];
-    if (war < wantWar && n.gold > SHIPS.war.cost + 60 && inc.net > 2) buildShip(n.id, port.id, 'war');
-    else if (trans < wantTrans && n.gold > SHIPS.trans.cost + 50 && inc.net > 1) buildShip(n.id, port.id, 'trans');
+    if (war < wantWar && n.gold > shipCost(n, 'war') + 60 && inc.net > 2) buildShip(n.id, port.id, 'war');
+    else if (trans < wantTrans && n.gold > shipCost(n, 'trans') + 50 && inc.net > 1) buildShip(n.id, port.id, 'trans');
   }
   if (!war) {
     const provs = ownedProvs(n.id).filter(p => p.controller === n.id).sort((a, b) => dev(b) - dev(a));
@@ -160,26 +170,29 @@ function aiEconomy(n) {
     if (n.gold > 80) { const p = ownedProvs(n.id).find(p => canConvert(n.id, p.id)); if (p) convert(n.id, p.id); }
   }
   // 安定度・技術・開発・将軍
-  if ((n.stab || 0) < 1 && n.adm >= stabCost(n) + 50) raiseStab(n);
-  for (const t of ['mil', 'adm', 'dip']) buyTech(n, t);
-  if (n.generals.length < Math.min(3, S.armies.filter(a => a.owner === n.id).length) && n.mil > 150) recruitGeneral(n);
-  for (const t of ['adm', 'dip', 'mil']) {
-    if (n[t] > 500) {
-      const type = Object.keys(DEV_TYPES).find(k => DEV_TYPES[k].pt === t);
-      const p = ownedProvs(n.id).filter(p => p.controller === n.id).sort((a, b) => devCost(n, a) - devCost(n, b))[0];
-      if (p) develop(n, p, type);
-    }
+  if ((n.stab || 0) < 1 && n.gov >= stabCost(n) + 50) raiseStab(n);
+  // 発明（安いものから）
+  const avail = INVENTIONS.filter(i => canInvent(n, i.id)).sort((a, b) => a.tier - b.tier || Math.random() - 0.5);
+  if (avail.length) invent(n, avail[0].id);
+  if (n.generals.length < Math.min(3, S.armies.filter(a => a.owner === n.id).length) && n.gov > 150) recruitGeneral(n);
+  // 代官：控えの異世界人と現地の代官を、発展度の高い州から配置
+  const ungov = ownedProvs(n.id).filter(p => p.controller === n.id && !governorAt(p)).sort((a, b) => dev(b) - dev(a));
+  for (const c of [...n.bench]) { const p = ungov.shift(); if (!p) break; assignGovernor(n, c, p.id); }
+  for (const c of n.governors.filter(c => c.pid == null)) { const p = ungov.shift(); if (!p) break; assignGovernor(n, c, p.id); }
+  if (ungov.length && n.governors.length < 2 + Math.floor(totalDev(n.id) / 60) && n.gov > 120) { const c = recruitNativeGov(n); if (c) assignGovernor(n, c, ungov[0].id); }
+  if (n.gov > 400) {
+    const p = ownedProvs(n.id).filter(p => p.controller === n.id).sort((a, b) => devCost(n, a) - devCost(n, b))[0];
+    if (p) develop(n, p);
   }
   // 召喚
   if (canSummon(n) && n.gold > 150 && Math.random() < 0.3) {
     const r = doSummon(n);
     if (r && r.char && (r.char.rarity === 'SSR' || r.char.rarity === 'SR')) hooks.log(`✨ ${n.name}が異世界から${r.char.title}（${r.char.rarity}）を召喚したという噂だ`, 'info');
   }
-  // 商人
-  if (S.day % 360 === 30 || !n.merchants.length) {
-    const T = computeTrade(), max = Math.max(0, maxMerchants(n));
-    const score = T.val.map((v, i) => ({ i, s: v * (T.pow[i][n.id] + 5) / (T.tot[i] + 10) })).filter(x => T.pow[x.i][n.id] > 0).sort((a, b) => b.s - a.s);
-    n.merchants = n.overlord ? [] : score.slice(0, max).map(x => x.i);
+  // 商会
+  if (!war && n.gold > guildCost(n) + 70 && guildsOf(n.id).length < maxGuilds(n)) {
+    const cand = landProvs().filter(p => canFoundGuild(n.id, p.id)).map(p => ({ p, v: guildIncome({ owner: n.id, pid: p.id }) })).sort((a, b) => b.v - a.v);
+    if (cand.length) foundGuild(n.id, cand[0].p.id);
   }
   // 入植
   if (!war && n.gold > colonizeCost(n) + 40 && !S.provinces.some(p => p.colonizing && p.colonizing.by === n.id)) {
@@ -191,12 +204,12 @@ function aiEconomy(n) {
 
 function aiDiplomacy(n) {
   const war = warsOf(n.id).length > 0;
-  if (n.dip > 150 && Math.random() < 0.2) {
+  if (n.gov > 200 && Math.random() < 0.2) {
     const cand = n.allies.length ? n.allies : S.nations.filter(o => o.alive && !o.isMonster && o.id !== n.id).map(o => o.id);
     improveRel(n, pick(cand));
   }
   // 属国の併合
-  for (const v of vassalsOf(n.id)) if (canAnnex(n, v) && n.dip >= annexCost(n, v)) annex(n, v);
+  for (const v of vassalsOf(n.id)) if (canAnnex(n, v) && n.gov >= annexCost(n, v)) annex(n, v);
   if (n.overlord) return; // 属国は独自外交をしない
   // 外交的属国化
   if (!war && Math.random() < 0.03) {

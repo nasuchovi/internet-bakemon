@@ -126,12 +126,12 @@ const RACES = {
 };
 
 const CHEATS = [
-  { id: 'admin', name: '内政チート', desc: '統治点+3/月、税収+15%', mods: { admPts: 3, taxMod: 0.15 } },
-  { id: 'knowledge', name: '現代知識', desc: '技術コスト-30%、開発コスト-20%', mods: { techCost: -0.3, devCost: -0.2 } },
+  { id: 'admin', name: '内政チート', desc: '政務+3/月、税収+15%', mods: { govPts: 3, taxMod: 0.15 } },
+  { id: 'knowledge', name: '現代知識', desc: '前世の知識+1.5/月、発明コスト-20%', mods: { knowPts: 1.5, inventCost: -0.2 } },
   { id: 'alchemy', name: '錬金術', desc: '生産収入+30%、建設費-30%', mods: { prodMod: 0.3, buildCost: -0.3 } },
   { id: 'strategist', name: '軍略の天才', desc: '戦闘力+20%、士気+1.0', mods: { combat: 0.2, morale: 1.0 } },
   { id: 'hero', name: '勇者召喚', desc: '開始時に勇者の精鋭軍(戦闘力+30%)を得る。人的資源+30%', mods: { mpMod: 0.3 } },
-  { id: 'charisma', name: '人たらし', desc: '外交点+3/月、関係改善2倍、同盟を組みやすい', mods: { dipPts: 3, relMult: 1, allyAccept: 30 } },
+  { id: 'charisma', name: '人たらし', desc: '政務+2/月、関係改善2倍、同盟を組みやすい', mods: { govPts: 2, relMult: 1, allyAccept: 30 } },
 ];
 const CHEAT_BY_ID = Object.fromEntries(CHEATS.map(c => [c.id, c]));
 
@@ -204,12 +204,12 @@ const SHIPS = {
 const SKILL_BRANCHES = { adm: '内政', dip: '外交', mil: '武勇', mag: '魔導' };
 const SKILLS = [
   { id: 'k1', br: 'adm', name: '鑑定眼', desc: '税収+10%', mods: { taxMod: 0.1 } },
-  { id: 'k2', br: 'adm', name: '経営学', desc: '生産収入+10%', mods: { prodMod: 0.1 }, req: 'k1' },
-  { id: 'k3', br: 'adm', name: '都市計画', desc: '開発コスト-15%、反乱-1', mods: { devCost: -0.15, unrest: -1 }, req: 'k2' },
+  { id: 'k2', br: 'adm', name: '経営学', desc: '代官による発展+30%、生産+10%', mods: { devGrowth: 0.3, prodMod: 0.1 }, req: 'k1' },
+  { id: 'k3', br: 'adm', name: '都市計画', desc: '開拓コスト-20%、反乱-1', mods: { devCost: -0.2, unrest: -1 }, req: 'k2' },
   { id: 'k4', br: 'adm', name: '黄金律', desc: '建設費-20%、税収+10%', mods: { buildCost: -0.2, taxMod: 0.1 }, req: 'k3' },
-  { id: 'd1', br: 'dip', name: '交渉術', desc: '外交点+1/月', mods: { dipPts: 1 } },
+  { id: 'd1', br: 'dip', name: '交渉術', desc: '政務+1/月', mods: { govPts: 1 } },
   { id: 'd2', br: 'dip', name: '魅了', desc: '関係改善+50%、同盟受諾+10', mods: { relMult: 0.5, allyAccept: 10 }, req: 'd1' },
-  { id: 'd3', br: 'dip', name: '交易網', desc: '交易収入+20%、商人+1', mods: { tradeMod: 0.2, merchants: 1 }, req: 'd2' },
+  { id: 'd3', br: 'dip', name: '商会網', desc: '商会収入+20%、商会枠+1', mods: { tradeMod: 0.2, guilds: 1 }, req: 'd2' },
   { id: 'd4', br: 'dip', name: '宗主の威光', desc: '外交併合コスト-30%', mods: { annexCost: -0.3 }, req: 'd3' },
   { id: 'm1', br: 'mil', name: '剣術', desc: '戦闘力+5%', mods: { combat: 0.05 } },
   { id: 'm2', br: 'mil', name: '統率', desc: '士気+0.5', mods: { morale: 0.5 }, req: 'm1' },
@@ -235,15 +235,15 @@ const SUMMON_POOL = [
   { id: 'tactician', title: '軍師', role: 'general', desc: '戦史オタクの大学院生', stats: [2, 3, 4, 3], mods: { moveSpeed: 0.15, siege: 0.25 } },
   { id: 'tamer', title: '魔物使い', role: 'general', desc: '魔物の言葉がわかる', stats: [2, 2, 3, 1], mods: { combat: 0.08, vsMonster: 0.6 } },
   { id: 'archmage', title: '殲滅魔導士', role: 'general', desc: '詠唱破棄で戦略級魔法を撃つ', stats: [5, 1, 1, 3], mods: { combat: 0.12, siege: 0.3 } },
-  { id: 'sage', title: '大賢者', role: 'advisor', desc: '理系の院卒。知識チート', mods: { techCost: -0.15, manaPts: 1 } },
+  { id: 'sage', title: '大賢者', role: 'advisor', desc: '理系の院卒。知識チート', mods: { inventCost: -0.15, knowPts: 0.6, manaPts: 1 } },
   { id: 'saint', title: '聖女', role: 'advisor', desc: '癒しの奇跡で民を導く', mods: { unrest: -2, morale: 0.3 } },
-  { id: 'merchant', title: '商人', role: 'advisor', desc: '前世はコンビニ店長', mods: { tradeMod: 0.25, merchants: 1 } },
+  { id: 'merchant', title: '商人', role: 'advisor', desc: '前世はコンビニ店長', mods: { tradeMod: 0.25, guilds: 1 } },
   { id: 'cook', title: '料理人', role: 'advisor', desc: 'マヨネーズで外交を制す', mods: { mpMod: 0.15, relMult: 0.5 } },
   { id: 'architect', title: '建築士', role: 'advisor', desc: '一級建築士。耐震設計で城を建てる', mods: { buildCost: -0.25 } },
   { id: 'alchemist', title: '錬金術師', role: 'advisor', desc: '化学の知識で錬金術を極めた', mods: { prodMod: 0.2 } },
-  { id: 'salaryman', title: '元営業マン', role: 'advisor', desc: '接待と根回しのプロ', mods: { dipPts: 2, allyAccept: 15 } },
-  { id: 'clerk', title: '元公務員', role: 'advisor', desc: '書類仕事で国が回り出す', mods: { admPts: 2, unrest: -1 } },
-  { id: 'otaku', title: 'ミリオタ', role: 'advisor', desc: '近代戦術を持ち込んだ', mods: { milPts: 2, combat: 0.05 } },
+  { id: 'salaryman', title: '元営業マン', role: 'advisor', desc: '接待と根回しのプロ', mods: { govPts: 1.5, allyAccept: 15 } },
+  { id: 'clerk', title: '元公務員', role: 'advisor', desc: '書類仕事で国が回り出す', mods: { govPts: 2, unrest: -1 } },
+  { id: 'otaku', title: 'ミリオタ', role: 'advisor', desc: '近代戦術を持ち込んだ', mods: { govPts: 1, combat: 0.08 } },
   { id: 'farmer', title: '農業チート', role: 'advisor', desc: '輪作と肥料で収穫倍増', mods: { taxMod: 0.15 } },
 ];
 const JP_SURNAMES = ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '山本', '中村', '小林', '加藤', '吉田', '山田', '佐々木', '松本', '井上', '木村', '清水', '山崎', '森', '池田'];
@@ -251,32 +251,32 @@ const JP_GIVEN = ['ユウキ', 'ハルト', 'ソウタ', 'レン', 'ミナト', 
 const GEN_STAT_NAMES = ['攻撃', '防御', '機動', '包囲'];
 
 const ARTIFACTS = [
-  { id: 'orb', name: '星詠みの宝珠', desc: '技術コスト-10%', mods: { techCost: -0.1 } },
+  { id: 'orb', name: '星詠みの宝珠', desc: '前世の知識+1/月', mods: { knowPts: 1 } },
   { id: 'shield', name: '竜王の鱗盾', desc: '戦闘力+8%', mods: { combat: 0.08 } },
   { id: 'horn', name: '豊穣の角杯', desc: '税収+10%', mods: { taxMod: 0.1 } },
   { id: 'feather', name: '風精の羽', desc: '移動速度+10%', mods: { moveSpeed: 0.1 } },
   { id: 'scale', name: '黄金の天秤', desc: '交易収入+15%', mods: { tradeMod: 0.15 } },
   { id: 'shard', name: '魔王の欠片', desc: '魔力+2/月', mods: { manaPts: 2 } },
   { id: 'banner', name: '不屈の軍旗', desc: '士気+0.5', mods: { morale: 0.5 } },
-  { id: 'crown', name: '古王の冠', desc: '統治点+1/月、反乱-1', mods: { admPts: 1, unrest: -1 } },
+  { id: 'crown', name: '古王の冠', desc: '政務+1/月、反乱-1', mods: { govPts: 1, unrest: -1 } },
   { id: 'grimoire', name: '禁書グリモワール', desc: '召喚コスト-20%', mods: { summonCost: -0.2 } },
 ];
 const ARTIFACT_BY_ID = Object.fromEntries(ARTIFACTS.map(a => [a.id, a]));
 
 // ===== 種族特性（長所・短所・時代成長）=====
 const ERAS = ['黎明期', '興隆期', '動乱期', '魔導期', '終末期'];
-Object.assign(RACES.human, { mods: { taxMod: 0.10, techCost: -0.10, combat: -0.05 }, grow: { techCost: -0.05, taxMod: 0.05 },
-  pros: '税収+10%、技術コスト-10%', cons: '戦闘力-5%', growDesc: '時代ごとに技術コスト-5%・税収+5%（適応力）' });
-Object.assign(RACES.elf, { mods: { forestCombat: 0.30, dipPts: 1, mpMod: -0.30, prodMod: -0.10 }, grow: { forestCombat: 0.10, dipPts: 0.5 },
-  pros: '森林・湿地で戦闘力+30%、外交点+1/月', cons: '人的資源-30%、生産-10%', growDesc: '時代ごとに森での戦闘力+10%・外交点+0.5' });
+Object.assign(RACES.human, { mods: { taxMod: 0.10, inventCost: -0.10, combat: -0.05 }, grow: { inventCost: -0.05, taxMod: 0.05 },
+  pros: '税収+10%、発明コスト-10%', cons: '戦闘力-5%', growDesc: '時代ごとに発明コスト-5%・税収+5%（適応力）' });
+Object.assign(RACES.elf, { mods: { forestCombat: 0.30, govPts: 1, mpMod: -0.30, prodMod: -0.10 }, grow: { forestCombat: 0.10, manaPts: 0.5 },
+  pros: '森林・湿地で戦闘力+30%、政務+1/月', cons: '人的資源-30%、生産-10%', growDesc: '時代ごとに森での戦闘力+10%・魔力+0.5/月' });
 Object.assign(RACES.dwarf, { mods: { prodMod: 0.20, siege: 0.20, moveSpeed: -0.15 }, grow: { prodMod: 0.05, siege: 0.10 },
   pros: '生産+20%、包囲速度+20%、首都の要塞+1', cons: '移動速度-15%', growDesc: '時代ごとに生産+5%・包囲速度+10%' });
-Object.assign(RACES.beast, { mods: { mpMod: 0.40, moveSpeed: 0.15, techCost: 0.15 }, grow: { mpMod: 0.10, combat: 0.03 },
-  pros: '人的資源+40%、移動速度+15%', cons: '技術コスト+15%', growDesc: '時代ごとに人的資源+10%・戦闘力+3%' });
+Object.assign(RACES.beast, { mods: { mpMod: 0.40, moveSpeed: 0.15, inventCost: 0.15 }, grow: { mpMod: 0.10, combat: 0.03 },
+  pros: '人的資源+40%、移動速度+15%', cons: '発明コスト+15%', growDesc: '時代ごとに人的資源+10%・戦闘力+3%' });
 Object.assign(RACES.demon, { mods: { combat: 0.15, morale: 0.5, unrest: 1 }, grow: { combat: 0.05 },
   pros: '戦闘力+15%、士気+0.5', cons: '反乱+1、他種族から警戒される', growDesc: '時代ごとに戦闘力+5%' });
-Object.assign(RACES.dragon, { mods: { cavPower: 0.40, morale: 0.5, mpMod: -0.25, devCost: 0.15 }, grow: { cavPower: 0.15, morale: 0.25 },
-  pros: '竜騎兵の戦闘力+40%、士気+0.5', cons: '人的資源-25%、開発コスト+15%', growDesc: '時代ごとに竜騎兵+15%・士気+0.25' });
+Object.assign(RACES.dragon, { mods: { cavPower: 0.40, morale: 0.5, mpMod: -0.25, devCost: 0.20 }, grow: { cavPower: 0.15, morale: 0.25 },
+  pros: '竜騎兵の戦闘力+40%、士気+0.5', cons: '人的資源-25%、開拓コスト+20%', growDesc: '時代ごとに竜騎兵+15%・士気+0.25' });
 for (const r of Object.values(RACES)) r.desc = `${r.pros}／短所：${r.cons}`;
 
 const DIFFICULTY = {
@@ -284,3 +284,43 @@ const DIFFICULTY = {
   normal: { name: 'ふつう',   aggr: 1.0, rogue: 1.0, grace: 360 * 2, desc: '標準的な難易度' },
   hard:   { name: 'むずかしい', aggr: 1.5, rogue: 1.3, grace: 360, desc: 'AIは好戦的、魔物・反乱も多い' },
 };
+
+// ===== 前世の知識（発明ツリー） =====
+const INVENTION_COST = [0, 60, 130, 230, 380];
+const INVENTIONS = [
+  { id: 'rotation', tier: 1, icon: '🌾', name: '輪作農法', desc: '税収+10%', mods: { taxMod: 0.1 } },
+  { id: 'mayo', tier: 1, icon: '🥚', name: 'マヨネーズ', desc: '関係改善+50%、人的資源+5%', mods: { relMult: 0.5, mpMod: 0.05 } },
+  { id: 'soap', tier: 1, icon: '🧼', name: '石鹸と衛生', desc: '人的資源+10%、反乱-1', mods: { mpMod: 0.1, unrest: -1 } },
+  { id: 'bookkeeping', tier: 1, icon: '📒', name: '複式簿記', desc: '商会収入+15%、政務+1/月', mods: { tradeMod: 0.15, govPts: 1 } },
+  { id: 'crossbow', tier: 1, icon: '🏹', name: '改良クロスボウ', desc: '戦闘力+6%', mods: { combat: 0.06 } },
+  { id: 'printing', tier: 2, icon: '📰', name: '活版印刷', req: 'bookkeeping', desc: '政務+1/月、前世の知識+0.5/月', mods: { govPts: 1, knowPts: 0.5 } },
+  { id: 'compass', tier: 2, icon: '🧭', name: '羅針盤', desc: '造船費-25%、入植費-30%', mods: { shipCost: -0.25, colonizeCost: -0.3 } },
+  { id: 'gunpowder', tier: 2, icon: '💥', name: '火薬', req: 'crossbow', desc: '戦闘力+10%、包囲速度+20%', mods: { combat: 0.1, siege: 0.2 } },
+  { id: 'stock', tier: 2, icon: '🏦', name: '株式会社', req: 'bookkeeping', desc: '商会収入+15%、商会枠+1', mods: { tradeMod: 0.15, guilds: 1 } },
+  { id: 'irrigation', tier: 2, icon: '💧', name: '灌漑', req: 'rotation', desc: '代官による発展+40%', mods: { devGrowth: 0.4 } },
+  { id: 'steam', tier: 3, icon: '⚙', name: '蒸気機関', req: 'printing', desc: '生産+25%', mods: { prodMod: 0.25 } },
+  { id: 'medicine', tier: 3, icon: '💊', name: '近代医学', req: 'soap', desc: '人的資源+20%、士気+0.5', mods: { mpMod: 0.2, morale: 0.5 } },
+  { id: 'rifle', tier: 3, icon: '🔫', name: 'ライフル', req: 'gunpowder', desc: '戦闘力+12%、士気+0.3', mods: { combat: 0.12, morale: 0.3 } },
+  { id: 'newspaper', tier: 3, icon: '🗞', name: '新聞', req: 'printing', desc: '反乱-1、安定度の費用-25%', mods: { unrest: -1, stabCost: -0.25 } },
+  { id: 'railway', tier: 4, icon: '🚂', name: '鉄道', req: 'steam', desc: '移動速度+25%、商会収入+15%', mods: { moveSpeed: 0.25, tradeMod: 0.15 } },
+  { id: 'telegraph', tier: 4, icon: '📡', name: '電信', req: 'newspaper', desc: '政務+2/月', mods: { govPts: 2 } },
+  { id: 'magitech', tier: 4, icon: '🔮', name: '魔導工学', req: 'steam', desc: '魔力+2/月、魔導兵の戦闘力+40%', mods: { manaPts: 2, magePower: 0.4 } },
+  { id: 'constitution', tier: 4, icon: '📜', name: '憲法', req: 'newspaper', desc: '税収+15%、反乱-2', mods: { taxMod: 0.15, unrest: -2 } },
+];
+const INVENTION_BY_ID = Object.fromEntries(INVENTIONS.map(i => [i.id, i]));
+
+// ===== 代官（州に派遣する人物の効果） =====
+const GOV_EFFECTS = {
+  native:    { growth: 1.0, tax: 0.10, desc: '発展、税+10%' },
+  sage:      { growth: 1.5, know: 0.4, desc: '発展+、前世の知識+0.4/月' },
+  saint:     { growth: 1.0, unrest: -3, mp: 0.2, desc: '不穏-3、兵力+20%' },
+  merchant:  { growth: 1.0, prod: 0.3, guild: 0.5, desc: '生産+30%、この州の商会+50%' },
+  cook:      { growth: 1.2, mp: 0.3, unrest: -1, desc: '兵力+30%、不穏-1' },
+  architect: { growth: 1.5, fort: 1, desc: '発展+、要塞Lv+1' },
+  alchemist: { growth: 1.0, prod: 0.6, desc: '生産+60%' },
+  salaryman: { growth: 1.0, tax: 0.3, guild: 0.3, desc: '税+30%、商会+30%' },
+  clerk:     { growth: 1.2, tax: 0.4, unrest: -1, desc: '税+40%、不穏-1' },
+  otaku:     { growth: 1.0, mp: 0.4, fort: 1, desc: '兵力+40%、要塞Lv+1' },
+  farmer:    { growth: 2.0, tax: 0.6, desc: '発展++、税+60%' },
+};
+const NATIVE_GOV_COST = 40;

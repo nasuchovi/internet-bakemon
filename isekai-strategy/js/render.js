@@ -94,7 +94,11 @@ function provColor(p) {
     case 'terrain': return T.color;
     case 'goods': return GOODS[p.good].color;
     case 'religion': return RELIGIONS[p.religion].color;
-    case 'trade': { const c = S.nodes[p.node].color; const me = S.player >= 0 ? nat(S.player) : null; return me && me.merchants.includes(p.node) ? [Math.min(255, c[0] + 50), Math.min(255, c[1] + 50), Math.min(255, c[2] + 50)] : c; }
+    case 'guild': {
+      const gs = S.guilds.filter(g => g.pid === p.id);
+      if (gs.length) { const c = nat(gs[0].owner).color; return [c[0] * 0.7 + 70, c[1] * 0.7 + 70, c[2] * 0.7 + 70]; }
+      return [p.owner >= 0 ? 150 : 175, p.owner >= 0 ? 146 : 170, p.owner >= 0 ? 136 : 160];
+    }
     case 'unrest': {
       if (p.owner <= 0) return [190, 186, 176];
       const u = provUnrest(p);
@@ -244,10 +248,21 @@ function drawLabels() {
     ctx.font = `italic 600 11px "Shippori Mincho", serif`; ctx.fillStyle = 'rgba(190,220,240,.55)';
     for (const p of S.provinces) if (p.sea && p.name !== '外洋') ctx.fillText(p.name, sx(p.x), sy(p.y) + 16);
   }
-  if (mapMode === 'trade') {
-    const T = computeTrade();
-    ctx.font = `700 13px "Shippori Mincho", serif`; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(20,12,6,.8)'; ctx.fillStyle = '#fff3c8';
-    for (const nd of S.nodes) { const t = `${nd.name} ${T.val[nd.id].toFixed(1)}`; ctx.strokeText(t, sx(nd.x), sy(nd.y)); ctx.fillText(t, sx(nd.x), sy(nd.y)); }
+  if (mapMode === 'guild') {
+    // 商会網：同じ国の近い商会同士を線で結ぶ
+    ctx.lineWidth = 2.5;
+    for (const g of S.guilds) for (const o of S.guilds) {
+      if (o.id <= g.id || o.owner !== g.owner || !near2(g.pid, o.pid)) continue;
+      const a = prov(g.pid), b = prov(o.pid);
+      ctx.strokeStyle = rgb(nat(g.owner).color, 0.85); ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y)); ctx.lineTo(sx(b.x), sy(b.y)); ctx.stroke();
+    }
+    ctx.font = '700 12px system-ui, sans-serif';
+    for (const g of S.guilds) {
+      const p = prov(g.pid), x = sx(p.x), y = sy(p.y);
+      ctx.beginPath(); ctx.arc(x, y, 9, 0, Math.PI * 2); ctx.fillStyle = rgb(nat(g.owner).color); ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = g.owner === S.player ? '#ffe9a0' : 'rgba(20,12,6,.8)'; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.fillText('⚖', x, y + 1);
+    }
   }
 }
 function drawSiegesAndColonies() {

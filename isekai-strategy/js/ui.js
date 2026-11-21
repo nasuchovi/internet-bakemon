@@ -81,7 +81,7 @@ function renderTop() {
   const set = (id, v, sm, cls) => { const el = $(id); el.querySelector('b').textContent = v; const s = el.querySelector('small'); if (s) { s.textContent = sm || ''; s.className = cls || ''; } };
   set('r-gold', fmt(Math.floor(n.gold)), (inc.net >= 0 ? '+' : '') + fmt(inc.net, 1), inc.net >= 0 ? 'pos' : 'neg');
   set('r-mp', fmtMen(n.manpower), '/' + fmtMen(maxManpower(n)));
-  set('r-adm', Math.floor(n.adm)); set('r-dip', Math.floor(n.dip)); set('r-mil', Math.floor(n.mil));
+  set('r-gov', Math.floor(n.gov), '+' + fmt(govIncome(n), 1), 'pos'); set('r-know', Math.floor(n.know), '+' + fmt(knowIncome(n), 1), 'pos');
   set('r-mana', Math.floor(n.mana), '+' + fmt(manaIncome(n), 1), 'pos');
   set('r-stab', (n.stab > 0 ? '+' : '') + (n.stab || 0));
   set('r-army', inc.regs, '/' + inc.fl, inc.regs > inc.fl ? 'neg' : '');
@@ -120,10 +120,10 @@ function relStatus(id) {
   return out.join('');
 }
 function relSpan(v) { v = Math.round(v); return `<span class="${v >= 0 ? 'rel-pos' : 'rel-neg'}">${v > 0 ? '+' : ''}${v}</span>`; }
-const MOD_LABELS = { taxMod: '税収', prodMod: '生産', tradeMod: '交易', combat: '戦闘力', morale: '士気', techCost: '技術コスト', devCost: '開発コスト', buildCost: '建設費', admPts: '統治点/月', dipPts: '外交点/月', milPts: '軍事点/月', manaPts: '魔力/月', mpMod: '人的資源', moveSpeed: '移動速度', siege: '包囲速度', unrest: '反乱', relMult: '関係改善', allyAccept: '同盟受諾', merchants: '商人', vsMonster: '対魔物', summonCost: '召喚コスト', annexCost: '併合コスト' };
+const MOD_LABELS = { taxMod: '税収', prodMod: '生産', tradeMod: '商会収入', combat: '戦闘力', morale: '士気', inventCost: '発明コスト', devCost: '開拓コスト', buildCost: '建設費', govPts: '政務/月', knowPts: '前世の知識/月', manaPts: '魔力/月', mpMod: '人的資源', moveSpeed: '移動速度', siege: '包囲速度', unrest: '反乱', relMult: '関係改善', allyAccept: '同盟受諾', guilds: '商会枠', vsMonster: '対魔物', summonCost: '召喚コスト', annexCost: '併合コスト', devGrowth: '代官の発展', shipCost: '造船費', colonizeCost: '入植費', stabCost: '安定度費用', magePower: '魔導兵' };
 function modsText(m) {
   return Object.entries(m || {}).map(([k, v]) => {
-    const pct = !['admPts', 'dipPts', 'milPts', 'manaPts', 'unrest', 'allyAccept', 'merchants', 'morale'].includes(k);
+    const pct = !['govPts', 'knowPts', 'manaPts', 'unrest', 'allyAccept', 'guilds', 'morale'].includes(k);
     return `${MOD_LABELS[k] || k}${v > 0 ? '+' : ''}${pct ? Math.round(v * 100) + '%' : Math.round(v * 10) / 10}`;
   }).join('、');
 }
@@ -162,16 +162,40 @@ function provPanel(p) {
   if (p.siege) h += `<div class="warn">🏰 ${esc(nat(p.siege.by).name)}が包囲中 — ${Math.round(p.siege.prog / p.siege.need * 100)}%</div>`;
   if (p.coreUntil > S.day && p.owner >= 0) h += `<div class="note">未統合地（${START_YEAR + Math.floor(p.coreUntil / 360)}年まで収入・兵力半減）</div>`;
   if (p.owner > 0 && p.religion !== nat(p.owner).religion) h += `<div class="note">異教徒の州（収入-25%、不穏+3）</div>`;
-  h += `<h3>開発度 <small>合計 ${dev(p)}</small></h3><div class="devgrid">`;
-  for (const k in DEV_TYPES) {
-    const pt = DEV_TYPES[k].pt, c = devCost(n, p);
-    h += `<div class="devbox"><div class="lbl">${DEV_TYPES[k].name}</div><div class="val">${p[k]}</div>${mine ? btn('dev', k, `+1 <small class="cost-${pt}">${c}</small>`, { disabled: n[pt] < c, title: `${PT_NAMES[pt]}点${c}で${DEV_TYPES[k].name}+1`, why: need(n[pt], c, PT_NAMES[pt] + '点') }) : ''}</div>`;
+  const capD = DEV_CAP + (p.owner > 0 && nat(p.owner).capital === p.id ? 10 : 0);
+  h += `<h3>発展度 <small>${dev(p)} / ${capD}</small></h3><div class="meter"><i style="width:${dev(p) / capD * 100}%;background:var(--gold)"></i></div>`;
+  if (mine) {
+    const c = devCost(n, p), ci = investCost(n, p), full = p.dev >= capD;
+    h += `<div class="btns full">${btn('dev', p.id, `🏗 開拓 <small class="cost-adm">政${c}</small>`, { disabled: n.gov < c || full, why: full ? '上限' : need(n.gov, c, '政務') })}${btn('invest', p.id, `💰 投資 <small>${ci}</small>`, { disabled: n.gold < ci || full || !ctrl, why: full ? '上限' : !ctrl ? '占領されている' : need(n.gold, ci, '金貨') })}</div><p class="note">発展度は代官を置くと毎月少しずつ伸びる。開拓（政務）や投資（金貨）で即座に上げることもできる。</p>`;
   }
-  h += `</div>`;
   if (p.owner >= 0) {
     const inc = provIncome(p, nat(p.owner)), u = provUnrest(p);
-    h += `<div class="kv" style="margin-top:8px"><span>要塞</span><span>${p.fort > 0 ? 'Lv' + p.fort : 'なし'}</span><span>月収（税＋生産）</span><span>${fmt(inc.tax + inc.prod, 2)}</span><span>不穏度</span><span class="${u > 0 ? 'rel-neg' : 'rel-pos'}">${u.toFixed(1)}${u > 0 ? '（反乱の危険）' : ''}</span><span>交易圏</span><span>${esc(S.nodes[p.node].name)}</span></div>`;
-  } else h += `<div class="kv" style="margin-top:8px"><span>交易圏</span><span>${esc(S.nodes[p.node].name)}</span></div>`;
+    h += `<div class="kv" style="margin-top:8px"><span>要塞</span><span>${effFort(p) > 0 ? 'Lv' + effFort(p) : 'なし'}</span><span>月収（税＋生産）</span><span>${fmt(inc.tax + inc.prod, 2)}</span><span>不穏度</span><span class="${u > 0 ? 'rel-neg' : 'rel-pos'}">${u.toFixed(1)}${u > 0 ? '（反乱の危険）' : ''}</span></div>`;
+  }
+  // 代官
+  if (p.owner > 0) {
+    const gv = governorAt(p);
+    h += `<h3>代官</h3>`;
+    if (gv) h += charHTML(gv, `<div class="md">代官としての効果：${govEffect(gv).desc}${gv.rarity && gv.rarity !== 'R' && gv.rarity !== 'SR' ? '' : ''}</div>`);
+    else h += `<p class="note" style="margin-top:0">代官がいない。${mine ? '異世界人や現地の人材を派遣すると、州が発展し特別な効果が得られる。' : ''}</p>`;
+    if (mine) {
+      const cands = [...n.bench, ...n.governors.filter(c => c !== gv), ...n.advisors];
+      if (cands.length) h += `<select class="sel" data-change="gov" data-arg="${p.id}"><option value="">${gv ? '（代官を外す）' : '（派遣する人物を選ぶ）'}</option>${cands.map(c => `<option value="${c.id}">${c.rarity ? '[' + c.rarity + '] ' : ''}${esc(c.title)} ${esc(c.name)} — ${govEffect(c).desc}${c.pid != null ? '（' + esc(prov(c.pid).name) + 'から異動）' : n.advisors.includes(c) ? '（顧問から異動）' : ''}</option>`).join('')}</select>`;
+      h += `<div class="btns" style="margin-top:5px">${btn('gov-native', p.id, `現地の代官を登用 <small class="cost-adm">政${NATIVE_GOV_COST}</small>`, { disabled: n.gov < NATIVE_GOV_COST, why: need(n.gov, NATIVE_GOV_COST, '政務') })}</div>`;
+    }
+  }
+  // 商会
+  if (p.owner >= 0) {
+    const here = S.guilds.filter(g => g.pid === p.id);
+    h += `<h3>商会 <small>自国 ${guildsOf(S.player).length} / ${maxGuilds(n)}</small></h3>`;
+    if (here.length) h += here.map(g => `<div class="row" style="cursor:default"><i class="dot" style="background:${rgb(nat(g.owner).color)}"></i><span class="nm">⚖ ${esc(nat(g.owner).short)}の商会</span><span class="num">+${fmt(guildIncome(g), 2)}/月${guildLinks(g) ? '・連携' + guildLinks(g) : ''}</span></div>`).join('');
+    if (!S.guilds.some(g => g.pid === p.id && g.owner === S.player)) {
+      const est = guildIncome({ owner: S.player, pid: p.id }), c = guildCost(n), ok = canFoundGuild(S.player, p.id);
+      const why = ok ? need(n.gold, c, '金貨') : guildsOf(S.player).length >= maxGuilds(n) ? '商会枠が足りない' : p.owner !== S.player ? (hostile(S.player, p.owner) ? '敵国' : '関係値25以上か同盟が必要') : '占領されている';
+      h += `<div class="btns full" style="margin-top:4px">${btn('guild', p.id, `⚖ 商会を設立 <small>💰${c}・見込み+${fmt(est, 1)}/月</small>`, { cls: 'blue', disabled: !ok || n.gold < c, why })}</div>`;
+    }
+    h += `<p class="note">近く（2州以内か同じ海に面した港）にある自国の商会と連携すると収入が増える。他国の商会と隣り合うと競合で減る。友好国の州にも出店でき、相手国も税収を得る。開戦すると敵国内の商会は接収される。</p>`;
+  }
   if (p.dungeon) {
     h += `<h3>ダンジョン <small>Lv${p.dungeon.lv}</small></h3>`;
     h += p.dungeon.cleared ? `<div class="okbox">🏆 攻略済み — 冒険者ギルドが生産収入+1/月をもたらす</div>`
@@ -261,10 +285,10 @@ function diploButtons(id) {
   const P = S.player, n = me(), o = nat(id);
   if (id === P || id < 0 || isRogue(id) || !o.alive) return '';
   let h = '';
-  h += btn('improve', id, `関係改善 <small class="cost-dip">${improveRelCost()}</small>`, { disabled: n.dip < improveRelCost(), title: '外交点を使って関係値を上げる', why: need(n.dip, improveRelCost(), '外交点') });
+  h += btn('improve', id, `関係改善 <small class="cost-adm">政${improveRelCost()}</small>`, { disabled: n.gov < improveRelCost(), title: '政務を使って関係値を上げる', why: need(n.gov, improveRelCost(), '政務') });
   if (o.overlord === P) {
     const c = annexCost(n, o), ok = canAnnex(n, o);
-    h += btn('annex', id, `👑 外交併合 <small class="cost-dip">${c}</small>`, { cls: 'gold', disabled: !ok || n.dip < c, why: !ok ? (S.day - o.vassalSince < 360 * ANNEX_YEARS ? `${START_YEAR + Math.ceil((o.vassalSince + 360 * ANNEX_YEARS) / 360)}年から可能` : getRel(n.id, o.id) < 30 ? '関係値30以上が必要' : '戦争中は不可') : need(n.dip, c, '外交点') });
+    h += btn('annex', id, `👑 外交併合 <small class="cost-adm">政${c}</small>`, { cls: 'gold', disabled: !ok || n.gov < c, why: !ok ? (S.day - o.vassalSince < 360 * ANNEX_YEARS ? `${START_YEAR + Math.ceil((o.vassalSince + 360 * ANNEX_YEARS) / 360)}年から可能` : getRel(n.id, o.id) < 30 ? '関係値30以上が必要' : '戦争中は不可') : need(n.gov, c, '政務') });
   } else if (isAlly(P, id)) h += btn('unally', id, '同盟破棄');
   else if (!o.overlord) h += btn('ally', id, '同盟提案', { cls: 'blue', disabled: atWar(P, id) });
   if (!o.overlord && !isAlly(P, id) && !atWar(P, id)) h += btn('reqvassal', id, '属国化要求', { title: '国力差が4倍以上・開発度差が3倍以上・関係値30以上で受諾される' });
@@ -276,7 +300,7 @@ function diploButtons(id) {
 function nationPanel() {
   const n = me(), inc = calcIncome(n), c = CHEAT_BY_ID[n.cheat];
   let h = `<h2><i class="dot" style="background:${rgb(n.color)};width:16px;height:16px;margin-right:6px"></i>${esc(n.name)}</h2><div class="sub"><span>${RACES[n.race].name}</span><span>・${n.gov}</span><span>・${RELIGIONS[n.religion].name}</span><span>・首都 ${esc(prov(n.capital).name)}</span></div>`;
-  h += `<h3>君主</h3><div class="ruler"><div class="portrait">👑</div><div><b style="font-family:var(--serif);font-size:15px">${esc(n.ruler.name)}</b> <span class="chip me">転生者 Lv${n.ruler.lv}</span><div class="stats3"><span class="cost-adm">統 ${n.ruler.adm}</span><span class="cost-dip">外 ${n.ruler.dip}</span><span class="cost-mil">軍 ${n.ruler.mil}</span></div><div class="note" style="margin-top:2px">チート：<b style="color:var(--gold-2)">${c.name}</b> — ${c.desc}</div></div></div>`;
+  h += `<h3>君主</h3><div class="ruler"><div class="portrait">👑</div><div><b style="font-family:var(--serif);font-size:15px">${esc(n.ruler.name)}</b> <span class="chip me">転生者 Lv${n.ruler.lv}</span><div class="stats3"><span>器量 ${n.ruler.cap}</span><span class="cost-adm">政務 +${fmt(govIncome(n), 1)}/月</span><span>📚 +${fmt(knowIncome(n), 1)}/月</span></div><div class="note" style="margin-top:2px">チート：<b style="color:var(--gold-2)">${c.name}</b> — ${c.desc}</div></div></div>`;
   const R = RACES[n.race];
   h += `<h3>種族特性 <small>${R.name}・${ERAS[eraOf()]}（第${eraOf() + 1}時代）</small></h3><div class="kv"><span>長所</span><span style="text-align:left">${R.pros}</span><span>短所</span><span style="text-align:left">${R.cons}</span></div><div class="note">${R.growDesc}。20年ごとに時代が進み、種族の差が広がっていく。</div>`;
   const co = coalitionOf(n.id);
@@ -284,8 +308,8 @@ function nationPanel() {
   if (aeList.length) h += `<h3>警戒度 <small>50以上で対抗同盟に参加</small></h3>${co.length >= 2 ? `<div class="warn">⚠ ${co.length}か国が対抗同盟を組める状態にある。国力で上回られると一斉に宣戦される。</div>` : ''}<div class="btns" style="margin-top:4px">${aeList.slice(0, 10).map(o => `<span class="ae ${getAE(n.id, o.id) >= 50 ? 'hi' : ''}">${esc(o.short)} ${Math.round(getAE(n.id, o.id))}</span>`).join('')}</div><p class="note">警戒度は毎月少しずつ下がる。領土を奪うほど（特に近隣・同種族から）上がる。</p>`;
   if (n.timed.length) h += `<div class="note">一時効果：${n.timed.map(m => `${esc(m.label || m.key)}（${START_YEAR + Math.floor(m.until / 360)}年まで）`).join('、')}</div>`;
   h += `<h3>目標</h3>${objectives(n)}`;
-  h += `<h3>安定度 <small>${n.stab > 0 ? '+' : ''}${n.stab}</small></h3><div class="note" style="margin-top:0">安定度が高いほど税収が増え、反乱が起きにくい。</div><div class="btns" style="margin-top:5px">${btn('stab', 0, `安定度を上げる <small class="cost-adm">${stabCost(n)}</small>`, { disabled: n.adm < stabCost(n) || n.stab >= 3, why: n.stab >= 3 ? '最大値' : need(n.adm, stabCost(n), '統治点') })}</div>`;
-  h += `<h3>月次収支</h3><div class="kv"><span>税収</span><span>+${fmt(inc.tax, 2)}</span><span>生産</span><span>+${fmt(inc.prod, 2)}</span><span>交易</span><span>+${fmt(inc.trade, 2)}</span>${inc.tribute ? `<span>貢納金</span><span>${inc.tribute > 0 ? '+' : ''}${fmt(inc.tribute, 2)}</span>` : ''}<span>陸軍の維持費</span><span>−${fmt(inc.maint, 2)}</span><span>海軍の維持費</span><span>−${fmt(inc.navy, 2)}</span><span>建物の維持費</span><span>−${fmt(inc.bmaint, 2)}</span><span class="tot">収支</span><span class="tot ${inc.net >= 0 ? 'rel-pos' : 'rel-neg'}">${inc.net >= 0 ? '+' : ''}${fmt(inc.net, 2)}</span></div>`;
+  h += `<h3>安定度 <small>${n.stab > 0 ? '+' : ''}${n.stab}</small></h3><div class="note" style="margin-top:0">安定度が高いほど税収が増え、反乱が起きにくい。</div><div class="btns" style="margin-top:5px">${btn('stab', 0, `安定度を上げる <small class="cost-adm">政${stabCost(n)}</small>`, { disabled: n.gov < stabCost(n) || n.stab >= 3, why: n.stab >= 3 ? '最大値' : need(n.gov, stabCost(n), '政務') })}</div>`;
+  h += `<h3>月次収支</h3><div class="kv"><span>税収</span><span>+${fmt(inc.tax, 2)}</span><span>生産</span><span>+${fmt(inc.prod, 2)}</span><span>商会</span><span>+${fmt(inc.trade, 2)}</span>${inc.tribute ? `<span>貢納金</span><span>${inc.tribute > 0 ? '+' : ''}${fmt(inc.tribute, 2)}</span>` : ''}<span>陸軍の維持費</span><span>−${fmt(inc.maint, 2)}</span><span>海軍の維持費</span><span>−${fmt(inc.navy, 2)}</span><span>建物の維持費</span><span>−${fmt(inc.bmaint, 2)}</span><span class="tot">収支</span><span class="tot ${inc.net >= 0 ? 'rel-pos' : 'rel-neg'}">${inc.net >= 0 ? '+' : ''}${fmt(inc.net, 2)}</span></div>`;
   if (inc.regs > inc.fl) h += `<div class="warn">維持限界を超えている：維持費が増大中</div>`;
   if (n.gold < 0) h += `<div class="warn">財政赤字：士気・人的資源の回復が低下し、不穏度+2</div>`;
   const vs = vassalsOf(n.id);
@@ -320,7 +344,7 @@ function diploPanel() {
     h += `<div class="row ${diploSel === n.id ? 'on' : ''}" data-act="dsel" data-arg="${n.id}"><i class="dot" style="background:${rgb(n.color)}"></i><span class="nm">${esc(n.name)}</span>${relStatus(n.id)}${getAE(S.player, n.id) >= 10 ? `<span class="ae ${getAE(S.player, n.id) >= 50 ? 'hi' : ''}" title="我が国への警戒度">警戒${Math.round(getAE(S.player, n.id))}</span>` : ''}<span class="num">${relSpan(getRel(S.player, n.id))}</span></div>`;
     if (diploSel === n.id) {
       const pw = nationPower(n.id), mp = nationPower(S.player);
-      h += `<div class="detail"><div class="kv"><span>種族・宗教</span><span>${RACES[n.race].name}・${RELIGIONS[n.religion].name}</span><span>君主</span><span>${esc(n.ruler.name)}（${n.ruler.adm}/${n.ruler.dip}/${n.ruler.mil}）</span><span>総開発度</span><span>${d}</span><span>軍勢</span><span>約${fmtMen(S.armies.filter(a => a.owner === n.id).reduce((s, a) => s + armyMen(a), 0))}（自国比 ${mp > 0 ? Math.round(pw / mp * 100) : '—'}%）</span><span>同盟国</span><span>${n.allies.map(i => esc(nat(i).short)).join('、') || 'なし'}</span><span>異世界人</span><span>${n.generals.filter(g => g.summoned).length + n.advisors.filter(c => c.summoned).length}人</span><span>戦争</span><span>${warsOf(n.id).length ? warsOf(n.id).map(w => esc(w.name)).join('、') : 'なし'}</span></div><div class="btns" style="margin-top:8px">${btn('goto', n.capital, '📍 首都へ')}${diploButtons(n.id)}</div></div>`;
+      h += `<div class="detail"><div class="kv"><span>種族・宗教</span><span>${RACES[n.race].name}・${RELIGIONS[n.religion].name}</span><span>君主</span><span>${esc(n.ruler.name)}（器量${n.ruler.cap}）</span><span>発明</span><span>${n.inventions.length}種</span><span>商会</span><span>${guildsOf(n.id).length}軒</span><span>総開発度</span><span>${d}</span><span>軍勢</span><span>約${fmtMen(S.armies.filter(a => a.owner === n.id).reduce((s, a) => s + armyMen(a), 0))}（自国比 ${mp > 0 ? Math.round(pw / mp * 100) : '—'}%）</span><span>同盟国</span><span>${n.allies.map(i => esc(nat(i).short)).join('、') || 'なし'}</span><span>異世界人</span><span>${n.generals.filter(g => g.summoned).length + n.advisors.filter(c => c.summoned).length}人</span><span>戦争</span><span>${warsOf(n.id).length ? warsOf(n.id).map(w => esc(w.name)).join('、') : 'なし'}</span></div><div class="btns" style="margin-top:8px">${btn('goto', n.capital, '📍 首都へ')}${diploButtons(n.id)}</div></div>`;
     }
   }
   return h + `</div>`;
@@ -349,22 +373,24 @@ function warCard(w, mine) {
   return h + `</div>`;
 }
 
-// ---------- 経済（技術・交易） ----------
+// ---------- 経済（前世の知識・商会） ----------
 function econPanel() {
   const n = me();
-  let h = `<h2>経済</h2><h3>技術</h3>`;
-  for (const t in TECHS) {
-    const c = techCost(n, t);
-    h += `<div class="techrow"><div class="lv">${n.tech[t]}</div><div class="info"><b class="cost-${t}">${TECHS[t].name}</b><small>${TECHS[t].desc}</small><small>所持 ${Math.floor(n[t])} / 必要 ${c}</small></div>${btn('tech', t, '研究', { cls: 'gold', disabled: n[t] < c, why: need(n[t], c, PT_NAMES[t] + '点') })}</div>`;
+  let h = `<h2>経済</h2><h3>前世の知識 <small>📚 ${Math.floor(n.know)}（+${fmt(knowIncome(n), 1)}/月）</small></h3><p class="note" style="margin-top:0">前世の記憶をもとに、この世界にない技術を「発明」する。転生者の国は知識が貯まりやすい。上の段に進むには、発明の総数が一定以上必要。</p>`;
+  for (let tier = 1; tier <= 4; tier++) {
+    const needN = (tier - 1) * 2, locked = n.inventions.length < needN;
+    h += `<div class="note" style="margin:8px 0 3px;color:var(--gold)">第${tier}段 — 各 📚${inventCost(n, { tier })}${locked ? `（発明${needN}種で解放）` : ''}</div><div class="blist">`;
+    for (const inv of INVENTIONS.filter(i => i.tier === tier)) {
+      const got = n.inventions.includes(inv.id), can = canInvent(n, inv.id), c = inventCost(n, inv);
+      const why = got ? null : !can ? (inv.req && !n.inventions.includes(inv.req) ? `「${INVENTION_BY_ID[inv.req].name}」が必要` : `発明${needN}種で解放`) : need(n.know, c, '前世の知識');
+      h += `<div class="bitem ${got ? 'done' : ''}"><b>${inv.icon} ${got ? '✓ ' : ''}${inv.name}</b><small>${inv.desc}</small>${got ? '' : btn('invent', inv.id, `発明 📚${c}`, { cls: 'gold', disabled: !can || n.know < c, why })}</div>`;
+    }
+    h += `</div>`;
   }
-  const T = computeTrade(), maxM = maxMerchants(n);
-  h += `<h3>交易 <small>商人 ${n.merchants.length} / ${maxM}　交易収入 +${fmt(tradeIncome(n), 2)}/月</small></h3><p class="note" style="margin-top:0">各交易圏の富は「交易力」（その地域に持つ州の開発度）の比率で分配される。商人を送ると交易力が1.5倍＋10になる。</p><div class="rows" style="margin-top:6px">`;
-  for (const nd of S.nodes) {
-    const share = T.tot[nd.id] > 0 ? T.pow[nd.id][n.id] / T.tot[nd.id] : 0, has = n.merchants.includes(nd.id);
-    let topId = -1, topV = 0; S.nations.forEach(o => { if (T.pow[nd.id][o.id] > topV) { topV = T.pow[nd.id][o.id]; topId = o.id; } });
-    h += `<div class="row" style="cursor:default"><i class="dot" style="background:${rgb(nd.color)}"></i><span class="nm">${esc(nd.name)}<br><small style="color:var(--ink-3);font-family:var(--sans);font-weight:400">価値 ${T.val[nd.id].toFixed(1)}・自国 ${Math.round(share * 100)}%${topId > 0 ? '・首位 ' + esc(nat(topId).short) : ''}</small></span>${has ? btn('merchant-off', nd.id, '商人を戻す') : btn('merchant-on', nd.id, '商人派遣', { cls: 'blue', disabled: n.merchants.length >= maxM, why: '商人が足りない' })}</div>`;
-  }
-  h += `</div><h3>点数の使い道</h3><p class="note"><span class="cost-adm">統治点</span>：統治技術、税の開発、安定度<br><span class="cost-dip">外交点</span>：外交技術、生産の開発、関係改善、外交併合<br><span class="cost-mil">軍事点</span>：軍事技術、兵力の開発、将軍の任命</p>`;
+  const mine = guildsOf(n.id);
+  h += `<h3>商会 <small>${mine.length} / ${maxGuilds(n)}軒　収入 +${fmt(tradeIncome(n), 2)}/月</small></h3><p class="note" style="margin-top:0">州の画面から設立する。近くの自国商会と連携するほど稼ぐ（地図モード「商会」で網を確認できる）。商会枠は発展度50ごとに+1。</p><div class="rows" style="margin-top:6px">`;
+  h += mine.map(g => `<div class="row" data-act="prov" data-arg="${g.pid}"><i class="dot" style="background:${rgb(nat(prov(g.pid).owner >= 0 ? prov(g.pid).owner : n.id).color)}"></i><span class="nm">⚖ ${esc(prov(g.pid).name)}${prov(g.pid).owner !== n.id ? ' <small style="color:var(--ink-3)">（' + esc(nat(prov(g.pid).owner).short) + '）</small>' : ''}</span><span class="num">+${fmt(guildIncome(g), 2)}${guildLinks(g) ? '・連携' + guildLinks(g) : ''}${guildRivals(g) ? '・競合' + guildRivals(g) : ''}</span></div>`).join('') || '<p class="note">商会がない。</p>';
+  h += `</div><h3>資源の使い道</h3><p class="note"><span class="cost-adm">政務</span>：開拓、代官・将軍の任命、安定度、関係改善、外交併合<br>📚 前世の知識：発明<br>🔮 魔力：召喚<br>💰 金貨：徴兵・建設・造船・商会・投資</p>`;
   return h;
 }
 
@@ -380,7 +406,9 @@ function heroPanel() {
   h += `<h3>顧問 <small>${n.advisors.length} / 3</small></h3>`;
   h += n.advisors.map(c => charHTML(c, `<div class="btns" style="margin-top:4px">${btn('adv-bench', c.id, '控えに回す')}</div>`)).join('') || '<p class="note">顧問がいない。召喚で異世界人を呼ぼう。</p>';
   if (n.bench.length) h += `<h3>控え</h3>` + n.bench.map(c => charHTML(c, `<div class="btns" style="margin-top:4px">${btn('adv-up', c.id, '顧問に任命', { disabled: n.advisors.length >= 3, why: '顧問の枠（3人）が埋まっている' })}${btn('adv-fire', c.id, '暇を出す', { cls: 'red' })}</div>`)).join('');
-  h += `<h3>将軍 <small>${n.generals.length}人</small></h3><div class="btns" style="margin-bottom:6px">${btn('gen-new', 0, `🎖 将軍を任命 <small class="cost-mil">${generalCost(n)}</small>`, { disabled: n.mil < generalCost(n), why: need(n.mil, generalCost(n), '軍事点') })}</div>`;
+  h += `<h3>代官 <small>${n.governors.filter(c => c.pid != null).length}人が州に赴任中</small></h3><p class="note" style="margin-top:0">顧問・控えの異世界人は、州の画面から代官として派遣できる。</p>`;
+  h += n.governors.map(c => charHTML(c, `<div class="ds">${c.pid != null ? `赴任先：<a data-act="prov" data-arg="${c.pid}" style="cursor:pointer;text-decoration:underline">${esc(prov(c.pid).name)}</a>` : '待機中'}・${govEffect(c).desc}</div>`)).join('') || '<p class="note">代官がいない。</p>';
+  h += `<h3>将軍 <small>${n.generals.length}人</small></h3><div class="btns" style="margin-bottom:6px">${btn('gen-new', 0, `🎖 将軍を任命 <small class="cost-adm">政${generalCost(n)}</small>`, { disabled: n.gov < generalCost(n), why: need(n.gov, generalCost(n), '政務') })}</div>`;
   h += n.generals.map(g => { const a = S.armies.find(a => a.owner === S.player && a.gen === g.id); return charHTML(g, `<div class="ds">${a ? `指揮：<a data-act="army" data-arg="${a.id}" style="cursor:pointer;text-decoration:underline">${esc(a.name)}</a>` : '待機中（軍の画面で配属できる）'}${g.summoned ? '' : `・${START_YEAR + Math.floor(g.until / 360)}年頃引退`}</div>`); }).join('') || '<p class="note">将軍がいない。</p>';
   h += `<h3>秘宝 <small>${n.artifacts.length}個</small></h3>`;
   h += n.artifacts.map(id => { const a = ARTIFACT_BY_ID[id]; return `<div class="char"><div class="av">🏺</div><div class="bd"><div class="nm2">${esc(a.name)}</div><div class="md">${esc(a.desc)}</div></div></div>`; }).join('') || '<p class="note">ダンジョンの奥深くには秘宝が眠っているという……</p>';
@@ -419,7 +447,11 @@ function act(name, arg, ev) {
     case 'nation': tab = 'diplo'; diploSel = +arg; break;
     case 'dsel': diploSel = diploSel === +arg ? -1 : +arg; break;
     case 'goto': { const p = prov(+arg); centerOn(p.x, p.y, Math.max(cam.s, 1.6)); select({ type: 'prov', id: +arg }, true); } break;
-    case 'dev': if (selProv) develop(n, selProv, arg); break;
+    case 'dev': if (develop(n, prov(+arg))) hooks.fx('win', +arg, '発展！'); break;
+    case 'invest': if (invest(n, prov(+arg))) hooks.fx('win', +arg, '発展！'); break;
+    case 'invent': if (invent(n, arg)) { const inv = INVENTION_BY_ID[arg]; hooks.fx('levelup', null, `${inv.icon} ${inv.name}`); hooks.log(`💡 前世の知識で「${inv.name}」を発明した！ — ${inv.desc}`, 'good'); } break;
+    case 'guild': if (foundGuild(S.player, +arg)) { hooks.fx('siege', +arg, '商会設立！'); hooks.log(`⚖ ${prov(+arg).name}に商会を設立した`, 'good'); } break;
+    case 'gov-native': { const c = recruitNativeGov(n); if (c) { assignGovernor(n, c, +arg); hooks.log(`🏛 ${c.name}を${prov(+arg).name}の代官に任命した`, 'good'); } } break;
     case 'build': if (selProv) build(n, selProv, arg); mapDirty = true; break;
     case 'recruit': if (selProv) { const k = ev && ev.shiftKey ? 5 : 1; let ok = 0; for (let i = 0; i < k; i++) if (recruit(S.player, selProv.id, arg)) ok++; if (!ok) hooks.log('金貨か人的資源が足りない', 'bad'); } break;
     case 'ship': if (selProv) { const k = ev && ev.shiftKey ? 5 : 1; for (let i = 0; i < k; i++) buildShip(S.player, selProv.id, arg); } break;
@@ -433,9 +465,6 @@ function act(name, arg, ev) {
     case 'annex': { const o = nat(+arg); if (!annex(n, o)) hooks.log('外交併合できない', 'bad'); } break;
     case 'declare': confirmDeclare(+arg); break;
     case 'peace': openPeace(S.wars.find(w => w.id === +arg)); break;
-    case 'tech': if (buyTech(n, arg)) hooks.log(`${TECHS[arg].name}がLv${n.tech[arg]}になった`, 'good'); break;
-    case 'merchant-on': if (n.merchants.length < maxMerchants(n) && !n.merchants.includes(+arg)) { n.merchants.push(+arg); S._trade = null; } break;
-    case 'merchant-off': n.merchants = n.merchants.filter(x => x !== +arg); S._trade = null; break;
     case 'summon': summonRitual(); break;
     case 'adv-bench': { const c = n.advisors.find(x => x.id === +arg); if (c) { n.advisors = n.advisors.filter(x => x !== c); n.bench.push(c); } } break;
     case 'adv-up': { const c = n.bench.find(x => x.id === +arg); if (c && n.advisors.length < 3) { n.bench = n.bench.filter(x => x !== c); n.advisors.push(c); } } break;
@@ -599,12 +628,18 @@ function initInput() {
 
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act]');
-    if (el && !el.disabled) { sfx(['dev', 'build', 'recruit', 'ship', 'tech', 'colonize', 'convert', 'stab', 'learn', 'gen-new'].includes(el.dataset.act) ? 'coin' : 'click'); act(el.dataset.act, el.dataset.arg, e); return; }
+    if (el && !el.disabled) { sfx(['dev', 'invest', 'build', 'recruit', 'ship', 'invent', 'guild', 'gov-native', 'colonize', 'convert', 'stab', 'learn', 'gen-new'].includes(el.dataset.act) ? 'coin' : 'click'); act(el.dataset.act, el.dataset.arg, e); return; }
     const m = e.target.closest('[data-mode]');
     if (m) { mapMode = m.dataset.mode; document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b === m)); mapDirty = true; }
   });
   document.addEventListener('change', e => {
     const el = e.target.closest('[data-change]'); if (!el) return;
+    if (el.dataset.change === 'gov') {
+      const n = me(), pid = +el.dataset.arg;
+      if (el.value === '') { const g = governorAt(prov(pid)); if (g) unassignGov(n, g); }
+      else { const c = [...n.bench, ...n.governors, ...n.advisors].find(x => x.id === +el.value); if (c) { assignGovernor(n, c, pid); hooks.fx('win', pid, '代官着任'); hooks.log(`🏛 ${c.title} ${c.name}が${prov(pid).name}の代官に着任した`, 'good'); } }
+      refresh(true); return;
+    }
     if (el.dataset.change === 'assign') { const a = S.armies.find(x => x.id === +el.dataset.arg); if (a) { if (el.value === '') a.gen = null; else assignGeneral(a, +el.value); } refresh(true); }
   });
   document.addEventListener('keydown', e => {

@@ -7,7 +7,7 @@ const hooks = { log: () => {}, modal: () => {}, gameOver: () => {}, fx: () => {}
 
 const nat = id => S.nations[id];
 const prov = id => S.provinces[id];
-const dev = p => p.tax + p.prod + p.mp;
+const dev = p => p.dev;
 const isRogue = id => id >= 0 && !!S.nations[id] && !!S.nations[id].isMonster; // 魔物・反乱軍
 const landProvs = () => S.provinces.slice(0, S.landCount);
 const adjOf = p => p.sea ? p.nb.concat(p.lnb) : p.nb.concat(p.snb);
@@ -25,10 +25,7 @@ function natMod(n, key) {
   if (n.skills) for (const s of n.skills) add(SKILL_BY_ID[s].mods);
   if (n.advisors) for (const c of n.advisors) add(c.mods);
   if (n.artifacts) for (const a of n.artifacts) add(ARTIFACT_BY_ID[a].mods);
-  if (key === 'taxMod' || key === 'prodMod') v += (n.tech.adm - 1) * 0.04;
-  if (key === 'prodMod') v += (n.tech.dip - 1) * 0.03;
-  if (key === 'combat') v += (n.tech.mil - 1) * 0.06;
-  if (key === 'morale') v += (n.tech.mil - 1) * 0.1;
+  if (n.inventions) for (const i of n.inventions) add(INVENTION_BY_ID[i].mods);
   if (key === 'taxMod') v += (n.stab || 0) * 0.03;
   return v;
 }
@@ -82,16 +79,30 @@ function canEnter(nid, pid, sea) {
 function ownedProvs(id) { return S.provinces.filter(p => p.owner === id); }
 function totalDev(id) { let d = 0; for (const p of S.provinces) if (p.owner === id) d += dev(p); return d; }
 function forceLimit(n) { return Math.floor(5 + totalDev(n.id) / 5); }
+// 代官
+function governorAt(p) { if (p.owner <= 0) return null; const n = nat(p.owner); return n.governors ? n.governors.find(c => c.pid === p.id) || null : null; }
+function govEffect(c) {
+  if (!c) return null;
+  const E = GOV_EFFECTS[c.arch] || GOV_EFFECTS.native, R = c.rarity ? RARITIES.find(r => r.id === c.rarity).mult : 1;
+  const o = { desc: E.desc };
+  for (const k of ['growth', 'tax', 'prod', 'mp', 'know', 'guild']) o[k] = (E[k] || 0) * R;
+  o.unrest = (E.unrest || 0) * R; o.fort = E.fort || 0;
+  return o;
+}
+function effFort(p) { const g = govEffect(governorAt(p)); return p.fort + (g ? g.fort : 0); }
 function maxManpower(n) {
   let m = 3000;
-  for (const p of S.provinces) if (p.owner === n.id)
-    m += p.mp * 400 * (1 + natMod(n, 'mpMod') + (p.b.barracks ? 0.5 : 0)) * (p.coreUntil > S.day ? 0.5 : 1);
+  for (const p of S.provinces) if (p.owner === n.id) {
+    const g = govEffect(governorAt(p));
+    m += p.dev * 140 * (1 + natMod(n, 'mpMod') + (p.b.barracks ? 0.5 : 0) + (g ? g.mp : 0)) * (p.coreUntil > S.day ? 0.5 : 1);
+  }
   return Math.round(m);
 }
 function provIncome(p, n) {
   if (p.owner !== n.id || p.controller !== n.id) return { tax: 0, prod: 0 };
-  let tax = p.tax * 0.22 * (1 + natMod(n, 'taxMod') + (p.b.temple ? 0.4 : 0));
-  let prod = p.prod * GOODS[p.good].price * 0.05 * (1 + natMod(n, 'prodMod') + (p.b.workshop ? 0.5 : 0)) + (p.dungeon && p.dungeon.cleared ? 1 : 0);
+  const g = govEffect(governorAt(p));
+  let tax = p.dev * 0.075 * (1 + natMod(n, 'taxMod') + (p.b.temple ? 0.4 : 0) + (g ? g.tax : 0));
+  let prod = p.dev * GOODS[p.good].price * 0.017 * (1 + natMod(n, 'prodMod') + (p.b.workshop ? 0.5 : 0) + (g ? g.prod : 0)) + (p.dungeon && p.dungeon.cleared ? 1 : 0);
   if (p.coreUntil > S.day) { tax *= 0.5; prod *= 0.5; }
   if (p.religion !== n.religion) { tax *= 0.75; prod *= 0.75; }
   if (p.id === n.capital) tax += 1;
@@ -104,33 +115,63 @@ function provUnrest(p) {
   if (p.religion !== n.religion) u += 3;
   if (n.gold < 0) u += 2;
   if (p.b.temple) u -= 1;
+  const g = govEffect(governorAt(p)); if (g) u += g.unrest;
   u -= n.stab || 0;
   u += natMod(n, 'unrest');
   return u;
 }
 
-// 交易
-function computeTrade() {
-  if (S._trade && S._trade.day === S.day) return S._trade;
-  const K = S.nodes.length, NN = S.nations.length;
-  const val = new Array(K).fill(0), pow = [];
-  for (let i = 0; i < K; i++) pow.push(new Float64Array(NN));
-  for (const p of S.provinces) {
-    if (p.sea) continue;
-    val[p.node] += (p.prod * GOODS[p.good].price * 0.035 + dev(p) * 0.02) * (p.owner >= 0 ? 1 : 0.4);
-    if (p.owner > 0 && p.controller === p.owner) pow[p.node][p.owner] += dev(p) * (p.coastal ? 1.2 : 1);
-  }
-  for (const n of S.nations) if (n.alive && n.merchants) for (const k of n.merchants) { pow[k][n.id] = pow[k][n.id] * 1.5 + 10; }
-  const tot = pow.map(a => a.reduce((s, v) => s + v, 0));
-  S._trade = { day: S.day, val, pow, tot };
-  return S._trade;
+// 商会
+function guildsOf(id) { return S.guilds.filter(g => g.owner === id); }
+function maxGuilds(n) { return 1 + Math.floor(natMod(n, 'guilds')) + Math.floor(totalDev(n.id) / 50); }
+function guildCost(n) { return 60 + 25 * guildsOf(n.id).length; }
+function near2(a, b) {
+  if (a === b) return true;
+  const pa = prov(a);
+  for (const q of pa.nb) { if (q === b) return true; if (prov(q).nb.includes(b)) return true; }
+  for (const z of pa.snb || []) if (prov(z).lnb.includes(b)) return true; // 同じ海に面した港同士
+  return false;
+}
+function guildLinks(g) { let k = 0; for (const o of S.guilds) if (o !== g && o.owner === g.owner && near2(g.pid, o.pid)) k++; return k; }
+function guildRivals(g) { let k = 0; for (const o of S.guilds) if (o.owner !== g.owner && (o.pid === g.pid || prov(g.pid).nb.includes(o.pid))) k++; return k; }
+function guildIncome(g) {
+  const p = prov(g.pid);
+  if (hostile(g.owner, p.controller)) return 0;
+  let v = 0.5 + p.dev * 0.06 + GOODS[p.good].price * 0.15 + (p.coastal ? 0.4 : 0);
+  if ([p.id, ...p.nb].some(q => prov(q).dungeon && prov(q).dungeon.cleared)) v += 0.8; // 冒険者の街
+  v += Math.min(6, guildLinks(g)) * 0.3;
+  v *= Math.max(0.3, 1 - 0.15 * guildRivals(g));
+  if (p.owner !== g.owner) v *= 1.2;
+  const gv = govEffect(governorAt(p)); if (gv && p.owner === g.owner) v *= 1 + gv.guild;
+  return v * (1 + natMod(nat(g.owner), 'tradeMod'));
 }
 function tradeIncome(n) {
-  const T = computeTrade(); let t = 0;
-  for (let i = 0; i < T.val.length; i++) if (T.tot[i] > 0) t += T.val[i] * T.pow[i][n.id] / T.tot[i];
-  return t * (1 + natMod(n, 'tradeMod'));
+  let t = 0;
+  for (const g of S.guilds) {
+    if (g.owner === n.id) t += guildIncome(g);
+    else if (prov(g.pid).owner === n.id) t += guildIncome(g) * 0.25; // 外国商会からの税
+  }
+  return t;
 }
-function maxMerchants(n) { return 1 + Math.floor(n.tech.dip / 2) + natMod(n, 'merchants'); }
+function canFoundGuild(nid, pid) {
+  const p = prov(pid), n = nat(nid);
+  if (p.sea || p.owner < 0 || S.guilds.some(g => g.owner === nid && g.pid === pid)) return false;
+  if (guildsOf(nid).length >= maxGuilds(n)) return false;
+  if (p.owner === nid) return p.controller === nid;
+  return !hostile(nid, p.owner) && (isAlly(nid, p.owner) || getRel(nid, p.owner) >= 25);
+}
+function foundGuild(nid, pid) {
+  const n = nat(nid), c = guildCost(n);
+  if (!canFoundGuild(nid, pid) || n.gold < c) return false;
+  n.gold -= c; S.guilds.push({ id: S.nextGuildId++, owner: nid, pid });
+  if (prov(pid).owner !== nid) addRel(nid, prov(pid).owner, 5);
+  mapDirty = true; return true;
+}
+function seizeGuilds(w) {
+  const before = S.guilds.length;
+  S.guilds = S.guilds.filter(g => { const o = prov(g.pid).owner; const sg = sideOf(w, g.owner), so = sideOf(w, o); return !(sg && so && sg !== so); });
+  return before - S.guilds.length;
+}
 
 function calcIncome(n) {
   let tax = 0, prod = 0, d = 0, bmaint = 0;
@@ -155,7 +196,26 @@ function manaIncome(n) {
   let m = 1;
   for (const p of S.provinces) if (p.owner === n.id && p.controller === n.id) { if (p.good === 'manastone') m += 1; if (p.terrain === 'miasma') m += 0.5; }
   for (const a of S.armies) if (a.owner === n.id) m += a.regs.mage * 0.05;
-  return (m + natMod(n, 'manaPts')) * (1 + eraOf() * 0.35); // 時代が進むほど世界に魔力が満ちる
+  return (m + natMod(n, 'manaPts')) * (1 + eraOf() * 0.35);
+}
+function knowIncome(n) {
+  let k = (n.isPlayer ? 2 : 0.8) + natMod(n, 'knowPts');
+  for (const c of n.governors || []) if (c.pid != null) { const g = govEffect(c); k += g.know; }
+  return k * (1 + eraOf() * 0.15);
+}
+function govIncome(n) { return 4 + (n.ruler.cap || 3) * 1.5 + natMod(n, 'govPts'); }
+// 発明
+function inventCost(n, inv) { return Math.round(INVENTION_COST[inv.tier] * Math.max(0.3, 1 + natMod(n, 'inventCost'))); }
+function canInvent(n, id) {
+  const inv = INVENTION_BY_ID[id];
+  if (n.inventions.includes(id)) return false;
+  if (inv.req && !n.inventions.includes(inv.req)) return false;
+  return n.inventions.length >= (inv.tier - 1) * 2;
+}
+function invent(n, id) {
+  const inv = INVENTION_BY_ID[id], c = inventCost(n, inv);
+  if (!canInvent(n, id) || n.know < c) return false;
+  n.know -= c; n.inventions.push(id); return true;
 }
 function nationPower(id) {
   let p = 0; for (const a of S.armies) if (a.owner === id) p += armyPower(a);
@@ -168,11 +228,11 @@ function coalitionPower(id) { let p = nationPower(id); for (const al of nat(id).
 function newChar(opts) { return Object.assign({ id: S.nextCharId++, att: 0, def: 0, man: 0, sie: 0, mods: {}, summoned: false, until: S.day + 360 * 20 }, opts); }
 function findGeneral(n, id) { return id == null || !n.generals ? null : n.generals.find(g => g.id === id) || null; }
 function genOf(a) { return isRogue(a.owner) ? null : findGeneral(nat(a.owner), a.gen); }
-function generalCost(n) { return 50; }
+function generalCost(n) { return 40; }
 function recruitGeneral(n) {
-  if (n.mil < generalCost(n)) return null;
-  n.mil -= generalCost(n);
-  let pips = 2 + rint(0, 4) + Math.floor((n.tech.mil - 1) / 2);
+  if (n.gov < generalCost(n)) return null;
+  n.gov -= generalCost(n);
+  let pips = 2 + rint(0, 4) + Math.floor(n.inventions.length / 4);
   const st = [0, 0, 0, 0]; while (pips-- > 0) st[rint(0, 3)]++;
   const g = newChar({ name: pick(RACES[n.race].rulers), title: '将軍', role: 'general', att: Math.min(6, st[0]), def: Math.min(6, st[1]), man: Math.min(6, st[2]), sie: Math.min(6, st[3]), until: S.day + 360 * rint(12, 25) });
   n.generals.push(g); return g;
@@ -185,6 +245,23 @@ function removeGeneral(n, g, reason) {
   n.generals = n.generals.filter(x => x !== g);
   for (const a of S.armies) if (a.owner === n.id && a.gen === g.id) a.gen = null;
   if (n.id === S.player && reason) hooks.log(`⚰ ${g.title} ${g.name}が${reason}`, 'bad');
+}
+function recruitNativeGov(n) {
+  if (n.gov < NATIVE_GOV_COST) return null;
+  n.gov -= NATIVE_GOV_COST;
+  const c = newChar({ name: pick(RACES[n.race].rulers), title: '代官', role: 'governor', arch: 'native', pid: null, until: S.day + 360 * rint(20, 35) });
+  n.governors.push(c); return c;
+}
+function unassignGov(n, c) {
+  c.pid = null;
+  if (c.summoned) { n.governors = n.governors.filter(x => x !== c); if (!n.bench.includes(c)) n.bench.push(c); }
+}
+function assignGovernor(n, c, pid) {
+  const p = prov(pid); if (p.owner !== n.id) return false;
+  const old = governorAt(p); if (old && old !== c) unassignGov(n, old);
+  n.advisors = n.advisors.filter(x => x !== c); n.bench = n.bench.filter(x => x !== c);
+  if (!n.governors.includes(c)) n.governors.push(c);
+  c.pid = pid; return true;
 }
 function charMod(c, key) { return c && c.mods && c.mods[key] ? c.mods[key] : 0; }
 
@@ -255,7 +332,8 @@ function combatMod(a, pid, vsRogue) {
 }
 function rawPower(a) {
   const cavP = UNITS.cav.power + (!isRogue(a.owner) ? natMod(nat(a.owner), 'cavPower') : 0);
-  return (a.men.inf * UNITS.inf.power + a.men.cav * cavP + a.men.mage * UNITS.mage.power) / 1000;
+  const mageP = UNITS.mage.power * (1 + (!isRogue(a.owner) ? natMod(nat(a.owner), 'magePower') : 0));
+  return (a.men.inf * UNITS.inf.power + a.men.cav * cavP + a.men.mage * mageP) / 1000;
 }
 function armyPower(a) { const g = genOf(a); return rawPower(a) * (1 + combatMod(a)) * (0.5 + 0.5 * a.morale / maxMorale(a.owner)) * (g ? 1 + (g.att + g.def) * 0.04 : 1); }
 function unitName(nid, t) { return nid > 0 && !isRogue(nid) ? RACES[nat(nid).race].units[t] : UNITS[t].name; }
@@ -384,7 +462,7 @@ function createFleet(owner, pid, war, trans) {
 }
 function destroyFleet(f) { S.fleets = S.fleets.filter(x => x !== f); if (S.sel && S.sel.type === 'fleet' && S.sel.id === f.id) S.sel = { type: 'prov', id: f.prov }; }
 function buildShip(nid, pid, type) {
-  const n = nat(nid), p = prov(pid), c = SHIPS[type].cost;
+  const n = nat(nid), p = prov(pid), c = shipCost(n, type);
   if (p.sea || p.owner !== nid || p.controller !== nid || !p.coastal || n.gold < c) return null;
   n.gold -= c;
   const z = p.snb[0];
@@ -393,6 +471,7 @@ function buildShip(nid, pid, type) {
   f[type]++;
   return f;
 }
+function shipCost(n, type) { return Math.round(SHIPS[type].cost * Math.max(0.3, 1 + natMod(n, 'shipCost'))); }
 function findFleetPath(nid, from, to) {
   if (from === to) return [];
   if (!prov(to).sea) return null;
@@ -529,7 +608,7 @@ function battleEnded(bt, aWon, sA, sB) {
   const loserSide = aWon ? sB : sA, winnerSide = aWon ? sA : sB;
   if (winnerSide.some(a => a.owner === S.player)) {
     gainXP(nat(S.player), loserSide.some(a => isRogue(a.owner)) ? 3 : 5);
-    if (loserSide.some(a => a.bounty)) { nat(S.player).mil += 50; hooks.log('🎖 魔物の討伐に成功！ 軍事点+50', 'good'); }
+    if (loserSide.some(a => a.bounty)) { nat(S.player).gov += 40; hooks.log('🎖 魔物の討伐に成功！ 政務+40', 'good'); }
   }
   if (pInA || pInB) {
     const won = (pInA && aWon) || (pInB && !aWon);
@@ -578,7 +657,7 @@ function seaHazards() {
   }
 }
 
-function siegeNeed(p) { return p.fort <= 0 ? 10 : 30 * p.fort; }
+function siegeNeed(p) { const f = effFort(p); return f <= 0 ? 10 : 30 * f; }
 function processSieges() {
   const byProv = new Map();
   for (const a of S.armies) { if (a.retreat || a.inBattle || a.delve) continue; let l = byProv.get(a.prov); if (!l) byProv.set(a.prov, l = []); l.push(a); }
@@ -592,7 +671,7 @@ function processSieges() {
     if (!p.siege || p.siege.by !== lead) p.siege = { by: lead, prog: 0, need: siegeNeed(p) };
     let men = 0, mages = 0, gs = 0, bonus = 0;
     for (const a of bes) { men += armyMen(a); mages += a.regs.mage; const g = genOf(a); if (g) { gs = Math.max(gs, g.sie); bonus = Math.max(bonus, charMod(g, 'siege')); } }
-    if (men < 1000 * Math.max(1, p.fort)) continue;
+    if (men < 1000 * Math.max(1, effFort(p))) continue;
     let rate = (1 + 0.2 * mages) * (1 + gs * 0.1 + bonus + (isRogue(lead) ? 0 : natMod(nat(lead), 'siege'))) * (0.6 + Math.random() * 0.8);
     if (p.coastal && p.snb.some(z => S.fleets.some(f => f.prov === z && f.war > 0 && hostile(f.owner, p.controller)))) rate *= 1.25; // 海上封鎖
     p.siege.prog += rate;
@@ -618,7 +697,7 @@ function processColonies() {
       if (p.owner >= 0 || !nat(p.colonizing.by).alive) p.colonizing = null;
       else if (S.day >= p.colonizing.until) {
         const by = p.colonizing.by; p.colonizing = null;
-        p.owner = p.controller = by; p.tax = p.prod = p.mp = 1; p.coreUntil = 0; mapDirty = true;
+        p.owner = p.controller = by; p.dev = 3; p.coreUntil = 0; mapDirty = true;
         if (by === S.player) hooks.log(`⛺ ${p.name}への入植が完了した`, 'good');
       }
     }
@@ -631,7 +710,7 @@ function processColonies() {
     }
   }
 }
-function colonizeCost(n) { return Math.round(50 * (1 - 0.05 * (n.tech.dip - 1))); }
+function colonizeCost(n) { return Math.round(50 * Math.max(0.3, 1 + natMod(n, 'colonizeCost'))); }
 function canColonize(nid, pid) {
   const p = prov(pid);
   if (p.sea || p.owner >= 0 || p.colonizing) return false;
@@ -701,11 +780,18 @@ function delveModal(r) {
 }
 
 // ---------- 内政 ----------
-function devCost(n, p) { return Math.round((25 + dev(p) * 6) * (1 + natMod(n, 'devCost'))); }
-function develop(n, p, type) {
-  const pt = DEV_TYPES[type].pt, c = devCost(n, p);
-  if (p.owner !== n.id || n[pt] < c) return false;
-  n[pt] -= c; p[type]++; mapDirty = true; return true;
+const DEV_CAP = 25;
+function devCost(n, p) { return Math.round((20 + dev(p) * 4) * Math.max(0.3, 1 + natMod(n, 'devCost'))); }
+function investCost(n, p) { return Math.round((40 + dev(p) * 10) * Math.max(0.3, 1 + natMod(n, 'devCost'))); }
+function invest(n, p) {
+  const c = investCost(n, p);
+  if (p.owner !== n.id || p.controller !== n.id || n.gold < c || p.dev >= DEV_CAP + (p.id === n.capital ? 10 : 0)) return false;
+  n.gold -= c; p.dev++; mapDirty = true; return true;
+}
+function develop(n, p) {
+  const c = devCost(n, p);
+  if (p.owner !== n.id || n.gov < c || p.dev >= DEV_CAP + (p.id === n.capital ? 10 : 0)) return false;
+  n.gov -= c; p.dev++; mapDirty = true; return true;
 }
 function buildCost(n, k) { return Math.round(BUILDINGS[k].cost * (1 + natMod(n, 'buildCost'))); }
 function build(n, p, k) {
@@ -714,20 +800,18 @@ function build(n, p, k) {
   n.gold -= c; p.b[k] = true; if (k === 'walls') p.fort++;
   return true;
 }
-function techCost(n, t) { return Math.round((200 + 80 * n.tech[t]) * (1 + natMod(n, 'techCost'))); }
-function buyTech(n, t) { const c = techCost(n, t); if (n[t] < c) return false; n[t] -= c; n.tech[t]++; return true; }
-function improveRelCost() { return 25; }
-function improveRel(n, other) { if (n.dip < 25) return false; n.dip -= 25; addRel(n.id, other, 20 * (1 + natMod(n, 'relMult'))); return true; }
-function stabCost(n) { return 100 + Math.max(0, n.stab || 0) * 50; }
-function raiseStab(n) { const c = stabCost(n); if (n.adm < c || (n.stab || 0) >= 3) return false; n.adm -= c; n.stab = (n.stab || 0) + 1; return true; }
+function improveRelCost() { return 20; }
+function improveRel(n, other) { if (n.gov < 20) return false; n.gov -= 20; addRel(n.id, other, 20 * (1 + natMod(n, 'relMult'))); return true; }
+function stabCost(n) { return Math.round((80 + Math.max(0, n.stab || 0) * 50) * Math.max(0.3, 1 + natMod(n, 'stabCost'))); }
+function raiseStab(n) { const c = stabCost(n); if (n.gov < c || (n.stab || 0) >= 3) return false; n.gov -= c; n.stab = (n.stab || 0) + 1; return true; }
 
 // 属国
-function annexCost(o, v) { return Math.round(totalDev(v.id) * 8 * Math.max(0.3, 1 + natMod(o, 'annexCost'))); }
+function annexCost(o, v) { return Math.round(totalDev(v.id) * 5 * Math.max(0.3, 1 + natMod(o, 'annexCost'))); }
 const ANNEX_YEARS = 5;
 function canAnnex(o, v) { return v.overlord === o.id && S.day - v.vassalSince >= 360 * ANNEX_YEARS && getRel(o.id, v.id) >= 30 && !warsOf(v.id).length; }
 function annex(o, v) {
-  if (!canAnnex(o, v) || o.dip < annexCost(o, v)) return false;
-  o.dip -= annexCost(o, v);
+  if (!canAnnex(o, v) || o.gov < annexCost(o, v)) return false;
+  o.gov -= annexCost(o, v);
   addAE(o.id, ownedProvs(v.id).map(p => ({ p, from: v.id })), 0.4);
   for (const p of ownedProvs(v.id)) { p.owner = p.controller = o.id; p.coreUntil = 0; p.siege = null; }
   for (const a of S.armies.filter(a => a.owner === v.id)) destroyArmy(a);
@@ -740,7 +824,7 @@ function annex(o, v) {
 function makeVassal(o, v) {
   for (const a of [...v.allies]) breakAlliance(v.id, a);
   for (const sub of vassalsOf(v.id)) sub.overlord = null;
-  v.overlord = o.id; v.vassalSince = S.day; v.merchants = [];
+  v.overlord = o.id; v.vassalSince = S.day;
   addAlliance(o.id, v.id); addRel(o.id, v.id, 30);
   mapDirty = true;
 }
@@ -769,6 +853,8 @@ function declareWar(att, def, opts = {}) {
     if (nat(al).overlord === att || Math.random() < 0.6) w.att.push(al);
   }
   S.wars.push(w);
+  const seized = seizeGuilds(w);
+  if (seized && w.att.concat(w.def).includes(S.player)) hooks.log(`⚖ 開戦により敵国内の商会${seized}軒が接収された`, 'war');
   addRel(att, def, -60);
   for (const n of S.nations) if (n.id > 0 && !n.isMonster && n.id !== att && n.id !== def) addRel(n.id, att, -4);
   nat(att).lastWar = S.day; nat(def).lastWar = S.day;
@@ -810,6 +896,7 @@ function pickDemands(w, winSide, score) {
 }
 function transferProvince(p, to) {
   const from = p.owner;
+  if (from > 0) { const c = governorAt(p); if (c) unassignGov(nat(from), c); }
   p.owner = p.controller = to; p.coreUntil = S.day + 360 * 3; p.siege = null; p.colonizing = null; p.converting = null;
   if (from > 0 && nat(from).capital === p.id) {
     const rest = ownedProvs(from);
@@ -935,11 +1022,21 @@ function monthlyTick() {
     const inc = calcIncome(n);
     n._lastBase = inc.base;
     n.gold += inc.net;
+    if (n.gold < -200) bankrupt(n);
     const mm = maxManpower(n);
     n.manpower = Math.min(mm, n.manpower + mm / 40 * (n.gold < 0 ? 0.5 : 1));
-    n.adm = Math.min(999, n.adm + 3 + n.ruler.adm + natMod(n, 'admPts'));
-    n.dip = Math.min(999, n.dip + 3 + n.ruler.dip + natMod(n, 'dipPts'));
-    n.mil = Math.min(999, n.mil + 3 + n.ruler.mil + natMod(n, 'milPts'));
+    n.gov = Math.min(999, n.gov + govIncome(n));
+    n.know = Math.min(999, (n.know || 0) + knowIncome(n));
+    // 代官による発展
+    for (const c of [...n.governors]) {
+      if (c.until <= S.day) { n.governors = n.governors.filter(x => x !== c); if (n.id === S.player) hooks.log(`👋 代官${c.name}が${c.summoned ? '元の世界へ帰還した' : '引退した'}`, 'info'); continue; }
+      if (c.pid == null) continue;
+      const p = prov(c.pid);
+      if (p.owner !== n.id) { unassignGov(n, c); continue; }
+      const g = govEffect(c);
+      const cap = DEV_CAP + (p.id === n.capital ? 10 : 0);
+      if (p.controller === n.id && p.dev < cap && Math.random() < 0.035 * g.growth * (1 + natMod(n, 'devGrowth')) * Math.max(0.1, 1 - p.dev / cap)) { p.dev++; mapDirty = true; }
+    }
     n.mana = Math.min(999, (n.mana || 0) + manaIncome(n));
     n.timed = n.timed.filter(m => m.until > S.day);
     for (const g of [...n.generals]) if (g.until <= S.day) removeGeneral(n, g, g.summoned ? '元の世界へ帰還した' : '老齢で引退した');
@@ -968,6 +1065,17 @@ function monthlyTick() {
   if (typeof playerEvents === 'function') playerEvents();
   if (S.day % 360 === 0) { mapDirty = true; if (typeof autosave === 'function') autosave(); }
   if (START_YEAR + S.day / 360 >= END_YEAR) hooks.gameOver(true);
+}
+function bankrupt(n) {
+  for (const a of [...S.armies]) {
+    if (a.owner !== n.id) continue;
+    for (const t in UNITS) { const k = Math.ceil(a.regs[t] * 0.35); if (a.regs[t]) { a.men[t] -= a.men[t] * k / a.regs[t]; a.regs[t] -= k; } }
+    if (armyRegs(a) <= 0) destroyArmy(a);
+  }
+  for (const f of [...S.fleets]) if (f.owner === n.id) { f.war = Math.floor(f.war * 0.6); f.trans = Math.floor(f.trans * 0.6); if (f.war + f.trans <= 0) destroyFleet(f); }
+  n.gold = -20; n.stab = Math.max(-3, (n.stab || 0) - 1);
+  if (n.id === S.player) hooks.modal({ title: '💸 国家破産', body: '借金が膨らみ、国庫が破綻した。<br>軍の3分の1以上が解散し、安定度が1下がった。<br><span class="note">軍の維持費・維持限界・建物の維持費に注意しよう。</span>', buttons: [{ label: '立て直す' }] });
+  else hooks.log(`💸 ${n.name}が財政破綻した`, 'info');
 }
 function spawnMonsters(p, men) {
   const a = createArmy(MONSTER, p.id, Math.max(1, Math.round(men / 1000)), 0, 0, { name: pick(MONSTER_NAMES), expire: S.day + rint(540, 1080) });

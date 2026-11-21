@@ -212,10 +212,8 @@ function generateWorld(seed) {
     p.good = pick(TERRAIN_GOODS[p.terrain], R);
     const f = TERRAIN[p.terrain].dev;
     if (p.owner > 0) {
-      p.tax = Math.max(1, Math.round((1 + R() * 3) * f));
-      p.prod = Math.max(1, Math.round((1 + R() * 3) * f));
-      p.mp = Math.max(1, Math.round((1 + R() * 2.2) * f));
-    } else { p.tax = 1; p.prod = 1; p.mp = 1; }
+      p.dev = Math.max(3, Math.round((3 + R() * 8) * f));
+    } else p.dev = 3;
     p.controller = p.owner;
     p.fort = 0; p.b = {}; p.siege = null; p.colonizing = null; p.converting = null; p.coreUntil = 0; p.dungeon = null;
   }
@@ -224,7 +222,7 @@ function generateWorld(seed) {
   dcand.slice(0, 12).forEach(p => { p.dungeon = { lv: 1 + Math.floor(R() * (p.terrain === 'miasma' ? 5 : 3.5)), cleared: false }; });
   // 海域の名前
   for (const p of provinces) if (p.sea) {
-    p.owner = -1; p.controller = -1; p.tax = p.prod = p.mp = 0; p.terrain = 'sea'; p.b = {}; p.fort = 0; p.siege = null; p.colonizing = null; p.converting = null; p.coreUntil = 0; p.dungeon = null;
+    p.owner = -1; p.controller = -1; p.dev = 0; p.terrain = 'sea'; p.b = {}; p.fort = 0; p.siege = null; p.colonizing = null; p.converting = null; p.coreUntil = 0; p.dungeon = null;
     if (p.lnb.length) {
       const near = provinces[p.lnb[0]];
       p.name = near.name + (p.lnb.length >= 3 ? '湾' : '沖');
@@ -249,7 +247,7 @@ function generateWorld(seed) {
 
   NATION_TEMPLATES.forEach((T, i) => {
     const id = i + 1, cap = provinces[capitals[i]];
-    cap.tax += 3; cap.prod += 3; cap.mp += 2;
+    cap.dev += 8;
     cap.fort = T.race === 'dwarf' ? 3 : 2;
     if (T.size === 'big') shuffle(owned[i].filter(p => p !== cap.id), R).slice(0, 2).forEach(pid => provinces[pid].fort = 1);
     const root = genName(T.race);
@@ -257,10 +255,10 @@ function generateWorld(seed) {
     nations.push({
       id, name: root + T.gov, short: root, race: T.race, religion: RACE_RELIGION[T.race], gov: T.gov, size: T.size, color: T.color, demonKing: !!T.demonKing,
       capital: cap.id, alive: true, isMonster: false, isPlayer: false,
-      gold: big ? 150 : 80, manpower: 0, adm: 50, dip: 50, mil: 50, mana: 20, stab: 1,
-      ruler: { name: pick(RACES[T.race].rulers, R), adm: 1 + Math.floor(R() * 5), dip: 1 + Math.floor(R() * 5), mil: 1 + Math.floor(R() * 5) },
+      gold: big ? 150 : 80, manpower: 0, gov: 50, know: 0, mana: 20, stab: 1, inventions: [], governors: [], guildCount: 0,
+      ruler: { name: pick(RACES[T.race].rulers, R), cap: 1 + Math.floor(R() * 5) },
       tech: { adm: 1, dip: 1, mil: 1 }, allies: [], truces: {}, timed: [], cheat: null, lastWar: -9999, armyCount: 0, fleetCount: 0, evCD: {},
-      generals: [], advisors: [], bench: [], artifacts: [], skills: [], merchants: [], overlord: null, vassalSince: 0, summonCount: 0,
+      generals: [], advisors: [], bench: [], artifacts: [], skills: [], overlord: null, vassalSince: 0, summonCount: 0,
     });
   });
   nations.push({ id: REBEL, name: '反乱軍', short: '反乱軍', race: 'human', color: REBEL_COLOR, isMonster: true, isRebel: true, alive: true, allies: [], truces: {}, timed: [], tech: { adm: 1, dip: 1, mil: 1 } });
