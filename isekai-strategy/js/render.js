@@ -112,9 +112,21 @@ function prepareStatic() {
       if (gx < 2 || gy < 2 || gx >= MAP_W - 2 || gy >= MAP_H - 2 || g[gy * MAP_W + gx] !== p.id) continue;
       if (Math.hypot(gx - p.x, gy - p.y) < 15) continue;
       if (provBorder[gy * MAP_W + gx] || mine.some(o => Math.hypot(o.x - gx, o.y - gy) < 10)) continue;
-      mine.push({ x: gx, y: gy, t, r: R() });
+      mine.push({ x: gx, y: gy, t, r: R(), pid: p.id, k: mine.length });
     }
     glyphs.push(...mine);
+    // 発展用の区画（集落・畑・鉱山など）：中心寄りから
+    const slots = [];
+    for (let k = 0; k < 90 && slots.length < 8; k++) {
+      const rr = rad * (0.25 + 0.75 * Math.sqrt(R())), an = R() * Math.PI * 2;
+      const gx = Math.round(p.x + Math.cos(an) * rr), gy = Math.round(p.y + Math.sin(an) * rr);
+      if (gx < 3 || gy < 3 || gx >= MAP_W - 3 || gy >= MAP_H - 3 || g[gy * MAP_W + gx] !== p.id) continue;
+      if (Math.hypot(gx - p.x, gy - (p.y + 14)) < 16 || Math.hypot(gx - p.x, gy - p.y) < 14) continue;
+      if (provBorder[gy * MAP_W + gx] || slots.some(o => Math.hypot(o.x - gx, o.y - gy) < 15)) continue;
+      slots.push({ x: gx, y: gy, r: R() });
+    }
+    slots.sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y));
+    p._slots = slots; p._wild = mine.length;
   }
   mapDirty = true;
 }
@@ -227,6 +239,8 @@ function renderBase() {
   }
   baseCtx.putImageData(baseImg, 0, 0);
   computeNationLabels();
+  for (const p of S.provinces) if (!p.sea) p._feats = devFeatures(p);
+  computeRoads();
   mapDirty = false;
 }
 function computeNationLabels() {
@@ -346,7 +360,9 @@ function drawMapSheet(exporting) {
   ctx.restore();
   ctx.imageSmoothingEnabled = cam.s < 2.5;
   ctx.drawImage(baseCanvas, sx(0), sy(0), MAP_W * cam.s, MAP_H * cam.s);
+  drawRoads();
   drawTerrainGlyphs();
+  drawDevelopment();
   drawDecor(exporting);
   drawCities();
   drawLabels(exporting);
@@ -362,6 +378,8 @@ function drawTerrainGlyphs() {
   for (const G of glyphs) {
     const x = sx(G.x), y = sy(G.y);
     if (!visible(x, y, 20)) continue;
+    if (G.k >= wildKeep(prov(G.pid))) continue; // 開発で自然が減る
+    if (devNear(G)) continue;
     const k = s * (0.8 + G.r * 0.45);
     switch (G.t) {
       case 'm': // 山：三角の峰と陰影
@@ -390,7 +408,7 @@ function drawCities() {
   for (const p of S.provinces) {
     if (p.sea || p.owner < 0) continue;
     const isCap = p.owner > 0 && nat(p.owner).capital === p.id;
-    if (!isCap && p.dev < 14) continue;
+    if (!isCap) continue;
     const x = sx(p.x), y = sy(p.y) + 14;
     if (!visible(x, y, 30)) continue;
     if (isCap) { // 小さな城
@@ -756,5 +774,137 @@ function drawFx(now) {
     ctx.lineWidth = size * 0.22; ctx.strokeStyle = 'rgba(20,10,4,.9)'; ctx.strokeText(f.text, 0, 0);
     ctx.fillStyle = `rgb(${col})`; ctx.fillText(f.text, 0, 0);
     ctx.restore();
+  }
+}
+
+// ---------- 発展の書き込み（集落・畑・鉱山・街道・鉄道） ----------
+function wildKeep(p) {
+  const n = p._wild || 0, d = p.dev;
+  if (p.terrain === 'forest' || p.terrain === 'hills' || p.terrain === 'marsh') return Math.max(1, n - Math.max(0, Math.floor((d - 5) / 3)));
+  if (p.terrain === 'plains') return d >= 9 ? 0 : n;
+  return n;
+}
+// 州ごとの発展物の一覧（区画の順に割り当て）
+function devFeatures(p) {
+  if (p.owner < 0 || !p._slots) return [];
+  const d = p.dev, out = [];
+  if (d >= 20) out.push('city');
+  if (d >= 10) out.push('town');
+  if (d >= 6) out.push('village');
+  if (d >= 15) out.push('village');
+  if (d >= 25) out.push('town');
+  const t = p.terrain;
+  if (t === 'mountains' && d >= 9) out.push('mine'); if (t === 'mountains' && d >= 17) out.push('mine');
+  if (t === 'hills' && d >= 12) out.push('mine');
+  if (t === 'desert' && d >= 9) out.push('oasis');
+  if (t === 'marsh' && d >= 9) out.push('polder');
+  if (t === 'plains' || t === 'hills' || t === 'forest' || t === 'marsh') { const f = clamp(Math.floor((d - 5) / 3), 0, 4); for (let i = 0; i < f; i++) out.push('field'); }
+  return out.slice(0, p._slots.length);
+}
+function devNear(G) {
+  const p = prov(G.pid), n = (p._feats || []).length;
+  for (let i = 0; i < n; i++) { const sl = p._slots[i]; if (Math.abs(sl.x - G.x) < 9 && Math.abs(sl.y - G.y) < 9) return true; }
+  return false;
+}
+function settlePoint(p) { const f = p._feats || devFeatures(p); const i = f.findIndex(x => x === 'city' || x === 'town' || x === 'village'); return i >= 0 ? p._slots[i] : { x: p.x, y: p.y }; }
+let roadCache = null;
+function computeRoads() {
+  const roads = [], rails = [];
+  for (const p of S.provinces) {
+    if (p.sea || p.owner < 0) continue;
+    for (const qid of p.nb) {
+      if (qid < p.id) continue;
+      const q = prov(qid); if (q.owner < 0) continue;
+      const lo = Math.min(p.dev, q.dev), sum = p.dev + q.dev;
+      if (lo < 6) continue;
+      const tier = sum >= 36 && lo >= 14 ? 3 : sum >= 24 ? 2 : 1;
+      const a = settlePoint(p), b = settlePoint(q);
+      const h = ((p.id * 73856093) ^ (q.id * 19349663)) >>> 0, off = ((h % 1000) / 1000 - 0.5) * 0.35;
+      const mx = (a.x + b.x) / 2 - (b.y - a.y) * off, my = (a.y + b.y) / 2 + (b.x - a.x) * off;
+      roads.push({ a, b, mx, my, tier });
+      if (p.owner === q.owner && lo >= 16 && nat(p.owner).inventions && nat(p.owner).inventions.includes('railway')) rails.push({ a, b });
+    }
+  }
+  roadCache = { roads, rails, day: S.day };
+}
+function drawRoads() {
+  if (cam.s < 0.55) return;
+  if (!roadCache) computeRoads();
+  const a = clamp((cam.s - 0.55) / 0.3, 0, 1);
+  ctx.lineCap = 'round';
+  const paths = [new Path2D(), new Path2D(), new Path2D(), new Path2D()];
+  for (const R of roadCache.roads) {
+    const ax = sx(R.a.x), ay = sy(R.a.y), bx = sx(R.b.x), by = sy(R.b.y);
+    if (!visible((ax + bx) / 2, (ay + by) / 2, Math.abs(ax - bx) + Math.abs(ay - by) + 30)) continue;
+    const P = paths[R.tier]; P.moveTo(ax, ay); P.quadraticCurveTo(sx(R.mx), sy(R.my), bx, by);
+  }
+  // 小道：点線 / 街道：実線 / 大街道：二重線
+  ctx.setLineDash([2.5, 3.5]); ctx.lineWidth = Math.max(0.8, cam.s * 0.7); ctx.strokeStyle = `rgba(110,72,36,${0.6 * a})`; ctx.stroke(paths[1]); ctx.setLineDash([]);
+  ctx.lineWidth = Math.max(1, cam.s * 1.1); ctx.strokeStyle = `rgba(110,68,30,${0.7 * a})`; ctx.stroke(paths[2]);
+  ctx.lineWidth = Math.max(2.2, cam.s * 2.6); ctx.strokeStyle = `rgba(100,62,28,${0.75 * a})`; ctx.stroke(paths[3]);
+  ctx.lineWidth = Math.max(0.8, cam.s * 1.1); ctx.strokeStyle = `rgba(236,222,188,${0.9 * a})`; ctx.stroke(paths[3]);
+  // 鉄道：線路と枕木
+  if (roadCache.rails.length) {
+    const rail = new Path2D(), ties = new Path2D(), tl = Math.max(2, cam.s * 2.2);
+    for (const R of roadCache.rails) {
+      const ax = sx(R.a.x), ay = sy(R.a.y), bx = sx(R.b.x), by = sy(R.b.y);
+      if (!visible((ax + bx) / 2, (ay + by) / 2, Math.abs(ax - bx) + Math.abs(ay - by) + 30)) continue;
+      rail.moveTo(ax, ay); rail.lineTo(bx, by);
+      const len = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / len, uy = (by - ay) / len, step = Math.max(5, cam.s * 5);
+      for (let t = step / 2; t < len; t += step) { const cx = ax + ux * t, cy = ay + uy * t; ties.moveTo(cx - uy * tl, cy + ux * tl); ties.lineTo(cx + uy * tl, cy - ux * tl); }
+    }
+    ctx.lineWidth = Math.max(1, cam.s * 0.9); ctx.strokeStyle = `rgba(40,26,14,${0.85 * a})`; ctx.stroke(rail); ctx.lineWidth = Math.max(0.6, cam.s * 0.6); ctx.stroke(ties);
+  }
+}
+function drawDevelopment() {
+  if (cam.s < 0.55) return;
+  const a = clamp((cam.s - 0.55) / 0.3, 0, 1), s = clamp(5 * cam.s, 3.5, 12);
+  ctx.lineWidth = Math.max(0.8, Math.min(1.5, cam.s * 0.6)); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const ink = `rgba(58,36,18,${0.85 * a})`, paperFill = `rgba(242,230,204,${0.95 * a})`, roof = `rgba(150,60,40,${0.75 * a})`;
+  const house = (x, y, k) => {
+    ctx.beginPath(); ctx.rect(x - k * 0.45, y - k * 0.1, k * 0.9, k * 0.6); ctx.fillStyle = paperFill; ctx.fill(); ctx.strokeStyle = ink; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - k * 0.6, y - k * 0.1); ctx.lineTo(x, y - k * 0.65); ctx.lineTo(x + k * 0.6, y - k * 0.1); ctx.closePath(); ctx.fillStyle = roof; ctx.fill(); ctx.stroke();
+  };
+  for (const p of S.provinces) {
+    if (p.sea || p.owner < 0 || !p._slots) continue;
+    if (!visible(sx(p.x), sy(p.y), Math.sqrt(p.area) * cam.s + 30)) continue;
+    const feats = p._feats || [];
+    feats.forEach((f, i) => {
+      const sl = p._slots[i], x = sx(sl.x), y = sy(sl.y), k = s * (0.9 + sl.r * 0.25);
+      switch (f) {
+        case 'village': house(x - k * 0.45, y + k * 0.15, k * 0.8); house(x + k * 0.5, y - k * 0.1, k * 0.7); break;
+        case 'town':
+          house(x - k * 0.75, y + k * 0.2, k * 0.8); house(x + k * 0.75, y + k * 0.25, k * 0.8); house(x, y + k * 0.35, k * 0.75);
+          ctx.beginPath(); ctx.rect(x - k * 0.18, y - k * 0.7, k * 0.36, k * 0.85); ctx.fillStyle = paperFill; ctx.fill(); ctx.strokeStyle = ink; ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x - k * 0.26, y - k * 0.7); ctx.lineTo(x, y - k * 1.35); ctx.lineTo(x + k * 0.26, y - k * 0.7); ctx.closePath(); ctx.fillStyle = roof; ctx.fill(); ctx.stroke();
+          break;
+        case 'city': {
+          const r = k * 1.25;
+          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = paperFill; ctx.fill(); ctx.lineWidth = Math.max(1.2, cam.s * 1.0); ctx.strokeStyle = ink; ctx.stroke(); ctx.lineWidth = Math.max(0.8, Math.min(1.5, cam.s * 0.6));
+          for (let t = 0; t < 6; t++) { const an = t / 6 * Math.PI * 2, tx = x + Math.cos(an) * r, ty = y + Math.sin(an) * r; ctx.beginPath(); ctx.rect(tx - k * 0.16, ty - k * 0.16, k * 0.32, k * 0.32); ctx.fillStyle = paperFill; ctx.fill(); ctx.stroke(); }
+          house(x - k * 0.4, y + k * 0.15, k * 0.65); house(x + k * 0.4, y + k * 0.2, k * 0.65); house(x, y - k * 0.3, k * 0.7);
+          break;
+        }
+        case 'field': { // 畝の入った畑
+          ctx.save(); ctx.translate(x, y); ctx.rotate((sl.r - 0.5) * 0.8);
+          ctx.beginPath(); ctx.rect(-k * 0.8, -k * 0.5, k * 1.6, k); ctx.fillStyle = `rgba(196,170,96,${0.35 * a})`; ctx.fill(); ctx.strokeStyle = `rgba(90,60,26,${0.6 * a})`; ctx.stroke();
+          ctx.beginPath(); for (let j = -2; j <= 2; j++) { ctx.moveTo(-k * 0.8, j * k * 0.2); ctx.lineTo(k * 0.8, j * k * 0.2); } ctx.strokeStyle = `rgba(90,60,26,${0.4 * a})`; ctx.stroke();
+          ctx.restore(); break;
+        }
+        case 'mine': // 坑道の入口とつるはし
+          ctx.beginPath(); ctx.arc(x, y + k * 0.3, k * 0.5, Math.PI, 0); ctx.lineTo(x + k * 0.5, y + k * 0.3); ctx.closePath(); ctx.fillStyle = `rgba(40,26,14,${0.8 * a})`; ctx.fill();
+          ctx.beginPath(); ctx.moveTo(x - k * 0.6, y - k * 0.7); ctx.lineTo(x + k * 0.3, y + k * 0.1); ctx.moveTo(x + k * 0.6, y - k * 0.7); ctx.lineTo(x - k * 0.3, y + k * 0.1);
+          ctx.moveTo(x - k * 0.85, y - k * 0.45); ctx.quadraticCurveTo(x - k * 0.6, y - k * 0.95, x - k * 0.3, y - k * 0.85); ctx.moveTo(x + k * 0.85, y - k * 0.45); ctx.quadraticCurveTo(x + k * 0.6, y - k * 0.95, x + k * 0.3, y - k * 0.85);
+          ctx.strokeStyle = ink; ctx.stroke(); break;
+        case 'oasis': // 泉とヤシ
+          ctx.beginPath(); ctx.ellipse(x, y + k * 0.4, k * 0.8, k * 0.3, 0, 0, Math.PI * 2); ctx.fillStyle = `rgba(110,150,160,${0.6 * a})`; ctx.fill(); ctx.strokeStyle = ink; ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x, y + k * 0.3); ctx.quadraticCurveTo(x + k * 0.15, y - k * 0.3, x, y - k * 0.9);
+          for (const d of [-1, 1]) { ctx.moveTo(x, y - k * 0.9); ctx.quadraticCurveTo(x + d * k * 0.5, y - k * 1.1, x + d * k * 0.8, y - k * 0.6); }
+          ctx.stroke(); break;
+        case 'polder': // 干拓地：堤防で囲んだ区画
+          ctx.beginPath(); ctx.rect(x - k * 0.8, y - k * 0.5, k * 1.6, k); ctx.fillStyle = `rgba(150,170,110,${0.35 * a})`; ctx.fill(); ctx.strokeStyle = ink; ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x, y - k * 0.5); ctx.lineTo(x, y + k * 0.5); ctx.moveTo(x - k * 0.8, y); ctx.lineTo(x + k * 0.8, y); ctx.strokeStyle = `rgba(70,100,110,${0.6 * a})`; ctx.stroke(); break;
+      }
+    });
   }
 }
