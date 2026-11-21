@@ -1160,6 +1160,7 @@ function monthlyTick() {
   coalitionMonthly();
   aiMonthly();
   aiPeace();
+  if (typeof eraEvent === 'function') eraEvent();
   checkMissions();
   checkVictories();
   if (typeof playerEvents === 'function') playerEvents();

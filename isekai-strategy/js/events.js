@@ -193,7 +193,7 @@ function serialize() {
   return JSON.stringify({
     v: 4, seed: S.seed, day: S.day, speed: S.speed, player: S.player,
     nations: S.nations, rel: S.rel, relBase: S.relBase, armies: S.armies, fleets: S.fleets, guilds: S.guilds, nextGuildId: S.nextGuildId, wonders: S.wonders, aiCfg: S.aiCfg, wars: S.wars, victories: S.victories, demonKingSlayer: S.demonKingSlayer,
-    nextArmyId: S.nextArmyId, nextWarId: S.nextWarId, nextFleetId: S.nextFleetId, nextCharId: S.nextCharId, log: S.log.slice(-40), ae: S.ae, diff: S.diff, tut: S.tut, rebirths: S.rebirths,
+    nextArmyId: S.nextArmyId, nextWarId: S.nextWarId, nextFleetId: S.nextFleetId, nextCharId: S.nextCharId, log: S.log.slice(-40), ae: S.ae, diff: S.diff, tut: S.tut, rebirths: S.rebirths, eraDone: S.eraDone,
     provs: S.provinces.map(p => DYN_KEYS.map(k => p[k])),
   });
 }
@@ -205,7 +205,7 @@ function loadGame() {
   if (!d || d.v !== 4) return false;
   newWorld(d.seed);
   Object.assign(S, { day: d.day, speed: d.speed, player: d.player, nations: d.nations, rel: d.rel, relBase: d.relBase, armies: d.armies, fleets: d.fleets || [], guilds: d.guilds || [], nextGuildId: d.nextGuildId || 1, wonders: d.wonders || [], aiCfg: d.aiCfg || Object.assign({}, AI_PRESETS.normal), wars: d.wars, victories: d.victories || {}, demonKingSlayer: d.demonKingSlayer,
-    nextArmyId: d.nextArmyId, nextWarId: d.nextWarId, nextFleetId: d.nextFleetId || 1, nextCharId: d.nextCharId || 1, log: d.log || [], ae: d.ae || {}, diff: d.diff || 'normal', tut: d.tut || null, rebirths: d.rebirths || 0 });
+    nextArmyId: d.nextArmyId, nextWarId: d.nextWarId, nextFleetId: d.nextFleetId || 1, nextCharId: d.nextCharId || 1, log: d.log || [], ae: d.ae || {}, diff: d.diff || 'normal', tut: d.tut || null, rebirths: d.rebirths || 0, eraDone: d.eraDone || 0 });
   d.provs.forEach((vals, i) => DYN_KEYS.forEach((k, j) => S.provinces[i][k] = vals[j]));
   S.started = true; S.paused = true; S.battles = {};
   mapDirty = true;
@@ -226,4 +226,64 @@ function rebirth(newId) {
   mapDirty = true;
   hooks.log(`🔁 ${n.ruler.name}の魂は${n.name}の君主として再び転生した`, 'good');
   return true;
+}
+
+// ---------- 時代の節目の事件（20年ごと） ----------
+function spawnHorde(n, men, name) {
+  const c = landProvs().filter(p => p.owner > 0 && nat(p.owner).polity !== '魔王国' && !S.armies.some(a => a.prov === p.id));
+  for (let i = 0; i < n && c.length; i++) { const p = c.splice(Math.floor(Math.random() * c.length), 1)[0]; const a = spawnMonsters(p, men); a.name = name; a.expire = S.day + 720; }
+}
+const ERA_EVENTS = [
+  null,
+  {
+    title: '🌅 興隆期 — 大召喚時代の幕開け', fx: 'levelup',
+    text: '大陸の地脈が目覚め、各地で魔力が湧き出した。<br>異界との壁は薄くなり、王たちはこぞって召喚の儀に手を伸ばす。<br><br><b>全ての国：魔力+100、前世の知識+40、20年間 召喚コスト-25%</b>',
+    apply() { for (const n of S.nations) if (n.alive && !n.isMonster) { n.mana += 100; n.know += 40; addTimed(n, 'summonCost', -0.25, 360 * 20, '大召喚時代'); } },
+  },
+  {
+    title: '🌑 動乱期 — 魔王の覚醒', fx: 'war',
+    text: () => {
+      const dk = S.nations.find(n => n.demonKing);
+      return dk && dk.alive ? `長き眠りから、<b>${esc(dk.name)}</b>の魔王が完全に目覚めた。<br>魔界の軍勢が地の底から湧き上がり、魔王国は人の国々へ牙を剥く。<br><br><b>魔王国：大軍団が出現、20年間 戦闘力+20%・士気+0.5。最も強い隣国へ宣戦。<br>各地に魔物の大群が出現する。</b>`
+        : `魔王は既に討たれた——はずだった。<br>だが主を失った魔物たちは統率を失い、大陸中で暴れ始めた。<br><br><b>各地に魔王軍の残党（大群）が出現する。</b>`;
+    },
+    apply() {
+      const dk = S.nations.find(n => n.demonKing), men = Math.round(8 + S.day / 360 / 10);
+      if (dk && dk.alive) {
+        createArmy(dk.id, dk.capital, men, 4, 3, { name: '魔王親衛軍' }); createArmy(dk.id, dk.capital, men, 3, 2, { name: '魔界の尖兵' });
+        addTimed(dk, 'combat', 0.2, 360 * 20, '魔王の覚醒'); addTimed(dk, 'morale', 0.5, 360 * 20, '魔王の覚醒');
+        const neigh = new Set(); for (const p of ownedProvs(dk.id)) for (const q of p.nb) { const o = prov(q).owner; if (o > 0 && o !== dk.id && !isAlly(o, dk.id)) neigh.add(o); }
+        const t = [...neigh].sort((a, b) => totalDev(b) - totalDev(a))[0];
+        if (t && !atWar(dk.id, t)) { dk.truces[t] = 0; nat(t).truces[dk.id] = 0; declareWar(dk.id, t); }
+        spawnHorde(4, 6000 + S.day / 360 * 80, '魔王軍の先遣隊');
+      } else spawnHorde(7, 7000 + S.day / 360 * 80, '魔王軍の残党');
+    },
+  },
+  {
+    title: '🌀 魔導期 — 次元の大裂け目', fx: 'war',
+    text: '空に巨大な亀裂が走った。異界の魔力が奔流となって流れ込み、魔導の技は飛躍する——<br>同時に、裂け目からは見たこともない魔獣が溢れ出した。<br><br><b>全ての国：次元の歪み+35、20年間 魔力+3/月。魔境から魔獣が出現する。</b>',
+    apply() {
+      for (const n of S.nations) if (n.alive && !n.isMonster) { addRift(n, 35); addTimed(n, 'manaPts', 3, 360 * 20, '次元の大裂け目'); }
+      const m = landProvs().filter(p => p.terrain === 'miasma' && p.owner > 0 && nat(p.owner).polity !== '魔王国');
+      for (const p of shuffle(m).slice(0, 4)) { const a = spawnMonsters(p, 8000 + S.day / 360 * 80); a.name = '異界の魔獣'; }
+      spawnHorde(2, 7000, '裂け目の魔獣');
+    },
+  },
+  {
+    title: '🔥 終末期 — 終焉の兆し', fx: 'war',
+    text: '太陽は赤く濁り、作物は枯れ、疫病が街を覆った。<br>古き預言は告げる——「百年の終わりに、大陸の覇者が定まる」と。<br><br><b>全ての国：人的資源-30%、20年間 税収-10%・反乱+1。各地に魔物の大群が出現する。</b>',
+    apply() {
+      for (const n of S.nations) if (n.alive && !n.isMonster) { n.manpower *= 0.7; addTimed(n, 'taxMod', -0.1, 360 * 20, '終焉の兆し'); addTimed(n, 'unrest', 1, 360 * 20, '終焉の兆し'); }
+      spawnHorde(6, 8000 + S.day / 360 * 80, '終末の魔群');
+    },
+  },
+];
+function eraEvent() {
+  const e = ERA_EVENTS[eraOf()]; if (!e || (S.eraDone || 0) >= eraOf()) return;
+  S.eraDone = eraOf();
+  const text = typeof e.text === 'function' ? e.text() : e.text;
+  e.apply();
+  mapDirty = true;
+  hooks.log(`${e.title.split(' — ')[0]} の到来：${e.title.split(' — ')[1]}`, 'war');
+  if (S.player >= 0 && nat(S.player).alive) { hooks.fx(e.fx, null, e.title.split(' — ')[1]); hooks.modal({ title: e.title, body: text, sound: 'war', buttons: [{ label: '新たな時代へ' }] }); }
 }

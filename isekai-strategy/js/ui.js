@@ -76,6 +76,8 @@ function renderTop() {
   $('date').textContent = '王国暦 ' + dateStr(S.day) + (S.started ? '・' + ERAS[eraOf()] : '');
   if (S.started && document.body.dataset.era !== String(eraOf())) document.body.dataset.era = eraOf();
   $('btn-mute').textContent = muted ? '🔇' : '🔊';
+  $('btn-music').style.opacity = musicOn ? '1' : '.4';
+  if (S.started) setMusicState(eraOf(), warsOf(S.player).length > 0);
   if (!n) return;
   const inc = calcIncome(n);
   $('tb-flag').style.background = rgb(n.color); $('tb-name').textContent = n.name;
@@ -690,6 +692,10 @@ function initInput() {
     refresh(true);
   });
   $('btn-mute').onclick = () => { toggleMute(); refresh(true); };
+  $('btn-music').onclick = () => { toggleMusic(); refresh(true); };
+  // ブラウザは操作があるまで音を出せないので、最初の操作で音楽を始める
+  const kick = () => { if (S && S.started) startMusic(); };
+  document.addEventListener('pointerdown', kick); document.addEventListener('keydown', kick);
   $('btn-export').onclick = () => { if (!S) return; exportMap(); sfx('coin'); if (S.started) hooks.log(`🗺 王国暦${START_YEAR + Math.floor(S.day / 360)}年の勢力図を古地図として保存した`, 'info'); };
   $('btn-pause').onclick = () => { if (S.started && !S.over) S.paused = !S.paused; refresh(true); };
   $('btn-faster').onclick = () => { S.speed = Math.min(5, S.speed + 1); refresh(true); };
@@ -762,6 +768,7 @@ function chooseStartNation(id) {
 function beginPlay() {
   highlightNation = -1;
   const tut = $('st-tut').checked;
+  startMusic();
   startGame(startSel, startCheat, $('st-name').value.trim() || 'カイト', { diff: startDiff === 'custom' ? 'normal' : startDiff, aiCfg: startCfg });
   if (tut) S.tut = { step: 0, done: false };
   $('start').classList.add('hidden');
