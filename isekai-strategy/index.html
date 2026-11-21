@@ -21,6 +21,8 @@
     <div class="res pt" id="r-adm" title="統治点（技術・税の開発）"><i class="pt-adm">統</i><b>0</b></div>
     <div class="res pt" id="r-dip" title="外交点（技術・生産の開発・関係改善）"><i class="pt-dip">外</i><b>0</b></div>
     <div class="res pt" id="r-mil" title="軍事点（技術・兵力の開発）"><i class="pt-mil">軍</i><b>0</b></div>
+    <div class="res" id="r-mana" title="魔力（召喚魔法に使う）" data-act="tab" data-arg="hero"><i>🔮</i><b>0</b><small></small></div>
+    <div class="res" id="r-stab" title="安定度（-3〜+3）"><i>⚖</i><b>0</b></div>
     <div class="res" id="r-army" title="連隊数 / 維持限界"><i>⚔</i><b>0</b><small></small></div>
     <div class="spacer"></div>
     <div id="date">—</div>
@@ -39,7 +41,9 @@
         <button data-act="tab" data-arg="nation">国家</button>
         <button data-act="tab" data-arg="diplo">外交</button>
         <button data-act="tab" data-arg="war">戦争</button>
-        <button data-act="tab" data-arg="tech">技術</button>
+        <button data-act="tab" data-arg="econ">経済</button>
+        <button data-act="tab" data-arg="hero">英雄</button>
+        <button data-act="tab" data-arg="skill">技能<i id="sp-dot" class="hidden"></i></button>
         <button class="close" data-act="close" data-arg="0" title="閉じる">✕</button>
       </nav>
       <div id="panel-body"></div>
@@ -51,6 +55,9 @@
       <button data-mode="dev">開発度</button>
       <button data-mode="goods">交易品</button>
       <button data-mode="diplo">外交</button>
+      <button data-mode="religion">宗教</button>
+      <button data-mode="trade">交易</button>
+      <button data-mode="unrest">不穏</button>
     </div>
     <div id="banner" class="hidden"></div>
     <div id="pausedtag" class="hidden">一時停止中 — Spaceで再開</div>

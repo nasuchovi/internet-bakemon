@@ -16,6 +16,7 @@ function renderLog() {
 
 // ---------- モーダル ----------
 hooks.modal = (m) => { modalQueue.push(m); if (modalQueue.length === 1) showModal(); };
+function closeModal() { modalQueue.shift(); $('modal-wrap').classList.add('hidden'); mapDirty = true; refresh(true); if (modalQueue.length) showModal(); }
 function showModal() {
   const m = modalQueue[0];
   if (!m) { $('modal-wrap').classList.add('hidden'); return; }
@@ -25,7 +26,7 @@ function showModal() {
   if (m.mount) m.mount($('modal'));
   $('modal').querySelectorAll('[data-mi]').forEach(el => el.onclick = () => {
     const b = (m.buttons || [{}])[+el.dataset.mi];
-    if (b.keep && b.fn) { b.fn(); return; }
+    if (b.keep) { if (b.fn) b.fn(); return; }
     modalQueue.shift();
     $('modal-wrap').classList.add('hidden');
     if (b.fn) b.fn();
@@ -38,8 +39,9 @@ hooks.gameOver = (victory) => {
   S.over = true; S.paused = true;
   const ranks = S.nations.filter(n => !n.isMonster && n.alive).map(n => ({ n, d: totalDev(n.id) })).sort((a, b) => b.d - a.d);
   const me = ranks.findIndex(r => r.n.id === S.player);
+  const v = S.victories || {};
   const body = victory && me >= 0
-    ? `王国暦${END_YEAR}年。転生から百年、${esc(nat(S.player).ruler.name)}の物語は伝説となった。<br><br>最終順位：<b>第${me + 1}位</b>（総開発度 ${ranks[me].d}）<br><br>${ranks.slice(0, 5).map((r, i) => `${i + 1}. ${esc(r.n.name)}（${r.d}）`).join('<br>')}`
+    ? `王国暦${END_YEAR}年。転生から百年、${esc(nat(S.player).ruler.name)}の物語は伝説となった。<br><br>最終順位：<b>第${me + 1}位</b>（総開発度 ${ranks[me].d}）<br>達成：${[v.demon ? (nat(S.player).demonKing ? '魔界統一' : '魔王討伐') : null, v.hegemon ? '大陸の覇者' : null].filter(Boolean).join('、') || 'なし'}<br>君主レベル：${nat(S.player).ruler.lv}<br><br>${ranks.slice(0, 5).map((r, i) => `${i + 1}. ${esc(r.n.name)}（${r.d}）`).join('<br>')}`
     : `${esc(nat(S.player).name)}は滅亡した……。<br>転生者の物語はここで終わる。`;
   hooks.modal({ title: victory ? '👑 百年の覇道、完' : '☠ 滅亡', body, buttons: [{ label: '新しい大陸で転生しなおす', fn: () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); } }, { label: '地図を眺める' }] });
 };
@@ -55,23 +57,21 @@ function renderTop() {
   set('r-gold', fmt(Math.floor(n.gold)), (inc.net >= 0 ? '+' : '') + fmt(inc.net, 1), inc.net >= 0 ? 'pos' : 'neg');
   set('r-mp', fmtMen(n.manpower), '/' + fmtMen(maxManpower(n)));
   set('r-adm', Math.floor(n.adm)); set('r-dip', Math.floor(n.dip)); set('r-mil', Math.floor(n.mil));
+  set('r-mana', Math.floor(n.mana), '+' + fmt(manaIncome(n), 1), 'pos');
+  set('r-stab', (n.stab > 0 ? '+' : '') + (n.stab || 0));
   set('r-army', inc.regs, '/' + inc.fl, inc.regs > inc.fl ? 'neg' : '');
   $('btn-pause').classList.toggle('paused', S.paused);
   $('btn-pause').textContent = S.paused ? '▶' : '⏸';
   $('speed-dots').innerHTML = [1, 2, 3, 4, 5].map(i => `<i class="${i <= S.speed ? 'on' : ''}"></i>`).join('');
   $('pausedtag').classList.toggle('hidden', !S.paused || !S.started || S.over);
+  $('sp-dot').classList.toggle('hidden', !(n.sp > 0 && SKILLS.some(s => canLearn(n, s.id))));
 }
 
-// ---------- パネル ----------
+// ---------- パネル共通 ----------
 function renderPanel(force) {
   if (!S.started) return;
   document.querySelectorAll('.tabs button[data-act="tab"]').forEach(b => b.classList.toggle('on', b.dataset.arg === tab));
-  let html = '';
-  if (tab === 'sel') html = selPanel();
-  else if (tab === 'nation') html = nationPanel();
-  else if (tab === 'diplo') html = diploPanel();
-  else if (tab === 'war') html = warPanel();
-  else if (tab === 'tech') html = techPanel();
+  const html = ({ sel: selPanel, nation: nationPanel, diplo: diploPanel, war: warPanel, econ: econPanel, hero: heroPanel, skill: skillPanel }[tab] || selPanel)();
   if (force || html !== lastPanelHTML) {
     const body = $('panel-body'), st = body.scrollTop;
     body.innerHTML = html; body.scrollTop = st; lastPanelHTML = html;
@@ -86,27 +86,55 @@ function relStatus(id) {
   const P = S.player, out = [];
   if (id === P) return '<span class="chip me">自国</span>';
   if (atWar(P, id)) out.push('<span class="chip war">戦争中</span>');
-  if (isAlly(P, id)) out.push('<span class="chip ally">同盟</span>');
-  if (hasTruce(P, id)) out.push(`<span class="chip truce">休戦 ${START_YEAR + Math.floor(nat(P).truces[id] / 360)}年まで</span>`);
+  if (nat(id).overlord === P) out.push('<span class="chip ally">属国</span>');
+  else if (isAlly(P, id)) out.push('<span class="chip ally">同盟</span>');
+  if (nat(id).overlord && nat(id).overlord !== P) out.push(`<span class="chip">${esc(nat(nat(id).overlord).short)}の属国</span>`);
+  if (hasTruce(P, id)) out.push(`<span class="chip truce">休戦</span>`);
   return out.join('');
 }
 function relSpan(v) { v = Math.round(v); return `<span class="${v >= 0 ? 'rel-pos' : 'rel-neg'}">${v > 0 ? '+' : ''}${v}</span>`; }
+const MOD_LABELS = { taxMod: '税収', prodMod: '生産', tradeMod: '交易', combat: '戦闘力', morale: '士気', techCost: '技術コスト', devCost: '開発コスト', buildCost: '建設費', admPts: '統治点/月', dipPts: '外交点/月', milPts: '軍事点/月', manaPts: '魔力/月', mpMod: '人的資源', moveSpeed: '移動速度', siege: '包囲速度', unrest: '反乱', relMult: '関係改善', allyAccept: '同盟受諾', merchants: '商人', vsMonster: '対魔物', summonCost: '召喚コスト', annexCost: '併合コスト' };
+function modsText(m) {
+  return Object.entries(m || {}).map(([k, v]) => {
+    const pct = !['admPts', 'dipPts', 'milPts', 'manaPts', 'unrest', 'allyAccept', 'merchants', 'morale'].includes(k);
+    return `${MOD_LABELS[k] || k}${v > 0 ? '+' : ''}${pct ? Math.round(v * 100) + '%' : Math.round(v * 10) / 10}`;
+  }).join('、');
+}
+function rarTag(r) { const R = RARITIES.find(x => x.id === r); return R ? `<span class="rar" style="background:${R.color}">${r}</span>` : ''; }
+function charHTML(c, extra = '') {
+  const icon = c.role === 'general' ? (c.summoned ? '⚔' : '🎖') : '📜';
+  return `<div class="char"><div class="av">${icon}</div><div class="bd"><div class="nm2">${c.rarity ? rarTag(c.rarity) : ''}${esc(c.title)} ${esc(c.name)}</div>${c.desc ? `<div class="ds">${esc(c.desc)}</div>` : ''}${c.role === 'general' ? `<div class="pips">${['att', 'def', 'man', 'sie'].map((k, i) => `<span>${GEN_STAT_NAMES[i]}<b>${c[k]}</b></span>`).join('')}</div>` : ''}${Object.keys(c.mods || {}).length ? `<div class="md">${modsText(c.mods)}</div>` : ''}${extra}</div></div>`;
+}
 
+// ---------- 選択 ----------
 function selPanel() {
-  if (!S.sel) return `<p class="note" style="margin-top:20px;text-align:center">地図上の州や軍をクリックしてください。<br><br>自国の州では開発・建設・徴兵ができます。<br>軍を選んで右クリックで移動します。</p>`;
-  if (S.sel.type === 'army') {
-    const a = S.armies.find(x => x.id === S.sel.id);
-    if (a) return armyPanel(a);
-    S.sel = null; return selPanel();
-  }
-  return provPanel(prov(S.sel.id));
+  if (!S.sel) return `<p class="note" style="margin-top:20px;text-align:center">地図上の州・軍・艦隊をクリックしてください。<br><br>自国の州では開発・建設・徴兵・造船ができます。<br>軍を選んで右クリックで移動します。</p>`;
+  if (S.sel.type === 'army') { const a = S.armies.find(x => x.id === S.sel.id); if (a) return armyPanel(a); S.sel = null; return selPanel(); }
+  if (S.sel.type === 'fleet') { const f = S.fleets.find(x => x.id === S.sel.id); if (f) return fleetPanel(f); S.sel = null; return selPanel(); }
+  const p = prov(S.sel.id);
+  return p.sea ? seaPanel(p) : provPanel(p);
+}
+function presenceList(pid) {
+  const here = S.armies.filter(a => a.prov === pid), fl = S.fleets.filter(f => f.prov === pid);
+  if (!here.length && !fl.length) return '';
+  return `<h3>駐留部隊</h3><div class="rows">` +
+    here.map(a => `<div class="row" data-act="army" data-arg="${a.id}"><i class="dot" style="background:${rgb(nat(a.owner).color)}"></i><span class="nm">${esc(a.name)}${isRogue(a.owner) ? '' : ' <small style="color:var(--ink-3)">' + esc(nat(a.owner).short) + '</small>'}</span><span class="num">${fmtMen(armyMen(a))}</span></div>`).join('') +
+    fl.map(f => `<div class="row" data-act="fleet" data-arg="${f.id}"><i class="dot" style="background:${rgb(nat(f.owner).color)}"></i><span class="nm">⛵ ${esc(f.name)} <small style="color:var(--ink-3)">${esc(nat(f.owner).short)}</small></span><span class="num">戦${f.war} 輸${f.trans}</span></div>`).join('') + `</div>`;
+}
+function seaPanel(p) {
+  const n = me();
+  let h = `<h2>🌊 ${esc(p.name)}</h2><div class="sub"><span>海域</span>${p.lnb.length ? `<span>・沿岸 ${p.lnb.slice(0, 3).map(l => esc(prov(l).name)).join('、')}</span>` : ''}</div>`;
+  h += `<p class="note">軍は輸送艦の数（1隻＝1連隊）まで海を渡れる。敵の戦列艦がいる海域には、味方の戦列艦がいないと入れない。</p>`;
+  h += `<div class="kv" style="margin-top:6px"><span>自国の輸送能力</span><span>${regsAtSea(S.player)} / ${transportCap(S.player)} 連隊</span></div>`;
+  return h + presenceList(p.id);
 }
 function provPanel(p) {
   const n = me(), mine = p.owner === S.player, ctrl = p.controller === S.player;
-  let h = `<h2>${esc(p.name)}</h2><div class="sub">${natTag(p.owner)}<span>${TERRAIN[p.terrain].name}</span><span>・${GOODS[p.good].name}</span><span>・${RACES[p.race].name}</span>${p.id === (p.owner > 0 ? nat(p.owner).capital : -1) ? '<span class="chip">首都</span>' : ''}${p.dungeon ? '<span class="chip">ダンジョン</span>' : ''}</div>`;
-  if (p.owner >= 0 && p.controller !== p.owner) h += `<div class="warn">${p.controller === MONSTER ? '👹 魔物' : esc(nat(p.controller).name)}に占領されている</div>`;
-  if (p.siege) h += `<div class="warn">🏰 ${p.siege.by === MONSTER ? '魔物' : esc(nat(p.siege.by).name)}が包囲中 — ${Math.round(p.siege.prog / p.siege.need * 100)}%</div>`;
+  let h = `<h2>${esc(p.name)}</h2><div class="sub">${natTag(p.owner)}<span>${TERRAIN[p.terrain].name}</span><span>・${GOODS[p.good].name}</span><span>・${RACES[p.race].name}</span><span>・${RELIGIONS[p.religion].name}</span>${p.id === (p.owner > 0 ? nat(p.owner).capital : -1) ? '<span class="chip">首都</span>' : ''}${p.coastal ? '<span class="chip">沿岸</span>' : ''}</div>`;
+  if (p.owner >= 0 && p.controller !== p.owner) h += `<div class="warn">${esc(nat(p.controller).name)}に占領されている</div>`;
+  if (p.siege) h += `<div class="warn">🏰 ${esc(nat(p.siege.by).name)}が包囲中 — ${Math.round(p.siege.prog / p.siege.need * 100)}%</div>`;
   if (p.coreUntil > S.day && p.owner >= 0) h += `<div class="note">未統合地（${START_YEAR + Math.floor(p.coreUntil / 360)}年まで収入・兵力半減）</div>`;
+  if (p.owner > 0 && p.religion !== nat(p.owner).religion) h += `<div class="note">異教徒の州（収入-25%、不穏+3）</div>`;
   h += `<h3>開発度 <small>合計 ${dev(p)}</small></h3><div class="devgrid">`;
   for (const k in DEV_TYPES) {
     const pt = DEV_TYPES[k].pt, c = devCost(n, p);
@@ -114,106 +142,164 @@ function provPanel(p) {
   }
   h += `</div>`;
   if (p.owner >= 0) {
-    const inc = provIncome(p, nat(p.owner));
-    h += `<div class="kv" style="margin-top:8px"><span>要塞</span><span>${p.fort > 0 ? 'Lv' + p.fort : 'なし'}</span><span>月収（税＋生産）</span><span>${fmt(inc.tax + inc.prod, 2)}</span></div>`;
+    const inc = provIncome(p, nat(p.owner)), u = provUnrest(p);
+    h += `<div class="kv" style="margin-top:8px"><span>要塞</span><span>${p.fort > 0 ? 'Lv' + p.fort : 'なし'}</span><span>月収（税＋生産）</span><span>${fmt(inc.tax + inc.prod, 2)}</span><span>不穏度</span><span class="${u > 0 ? 'rel-neg' : 'rel-pos'}">${u.toFixed(1)}${u > 0 ? '（反乱の危険）' : ''}</span><span>交易圏</span><span>${esc(S.nodes[p.node].name)}</span></div>`;
+  } else h += `<div class="kv" style="margin-top:8px"><span>交易圏</span><span>${esc(S.nodes[p.node].name)}</span></div>`;
+  if (p.dungeon) {
+    h += `<h3>ダンジョン <small>Lv${p.dungeon.lv}</small></h3>`;
+    h += p.dungeon.cleared ? `<div class="okbox">🏆 攻略済み — 冒険者ギルドが生産収入+1/月をもたらす</div>`
+      : `<div class="note">🕳 未踏のダンジョン。軍をこの州に置き「ダンジョン攻略」を命じると、財宝・魔力・秘宝が手に入るかもしれない（攻略日数 ${delveNeed(p.dungeon.lv)}日）。</div>`;
   }
   if (mine) {
+    if (p.converting) h += `<div class="okbox">⛪ 改宗中（${dateStr(p.converting.until)}完了予定）</div>`;
+    else if (canConvert(S.player, p.id)) h += `<div style="margin-top:6px">${btn('convert', p.id, `⛪ 宣教師を派遣（改宗） 💰${CONVERT_COST}`, { disabled: n.gold < CONVERT_COST })}</div>`;
     h += `<h3>建物</h3><div class="blist">`;
     for (const k in BUILDINGS) {
       const B = BUILDINGS[k], c = buildCost(n, k);
       h += p.b[k] ? `<div class="bitem done"><b>✓ ${B.name}</b><small>${B.desc}</small></div>`
         : `<div class="bitem"><b>${B.name}</b><small>${B.desc}</small>${btn('build', k, `建設 💰${c}`, { disabled: n.gold < c || !ctrl })}</div>`;
     }
-    h += `</div>`;
-    h += `<h3>徴兵 <small>人的資源 ${fmtMen(n.manpower)}</small></h3>`;
+    h += `</div><h3>徴兵 <small>人的資源 ${fmtMen(n.manpower)}</small></h3>`;
     if (canRecruitAt(S.player, p.id)) {
       h += `<div class="btns full">`;
       for (const t in UNITS) h += btn('recruit', t, `${unitName(S.player, t)}<small>💰${UNITS[t].cost}</small>`, { disabled: n.gold < UNITS[t].cost || n.manpower < 1000, title: `1連隊(1000人) 維持費${UNITS[t].maint}/月 戦闘力${UNITS[t].power}` });
       h += `</div><p class="note">1連隊＝1000人。シフト＋クリックで5連隊まとめて徴兵。</p>`;
     } else h += `<p class="note">占領中または敵軍がいるため徴兵できない。</p>`;
+    if (p.coastal) {
+      h += `<h3>造船</h3><div class="btns full">${btn('ship', 'war', `戦列艦<small>💰${SHIPS.war.cost}</small>`, { disabled: n.gold < SHIPS.war.cost || !ctrl, title: '海戦・海上封鎖用。維持費0.5/月' })}${btn('ship', 'trans', `輸送艦<small>💰${SHIPS.trans.cost}</small>`, { disabled: n.gold < SHIPS.trans.cost || !ctrl, title: '1隻で1連隊を運べる。維持費0.15/月' })}</div><p class="note">完成した艦は隣接する海域（${esc(prov(p.snb[0]).name)}）に配置される。</p>`;
+    }
   } else if (p.owner < 0) {
     h += `<h3>入植</h3>`;
     if (p.colonizing) h += `<div class="okbox">⛺ ${esc(nat(p.colonizing.by).name)}が入植中（${dateStr(p.colonizing.until)}完了予定）</div>`;
     else if (canColonize(S.player, p.id)) { const c = colonizeCost(n); h += btn('colonize', p.id, `⛺ 入植する 💰${c}`, { cls: 'gold', disabled: n.gold < c }) + `<p class="note">150日後に自国領となる。</p>`; }
-    else h += `<p class="note">自国領に隣接する未開の地にのみ入植できる。</p>`;
+    else h += `<p class="note">自国領に隣接する（または同じ海に面した）未開の地にのみ入植できる。</p>`;
   } else {
     h += `<h3>外交</h3><div class="btns">${btn('nation', p.owner, '国を見る')}${diploButtons(p.owner)}</div>`;
   }
-  const here = S.armies.filter(a => a.prov === p.id);
-  if (here.length) {
-    h += `<h3>駐留軍</h3><div class="rows">` + here.map(a => `<div class="row" data-act="army" data-arg="${a.id}"><i class="dot" style="background:${rgb(nat(a.owner).color)}"></i><span class="nm">${esc(a.name)}${a.owner === MONSTER ? '' : ' <small style="color:var(--ink-3)">' + esc(nat(a.owner).short) + '</small>'}</span><span class="num">${fmtMen(armyMen(a))}</span></div>`).join('') + `</div>`;
-  }
-  return h;
+  return h + presenceList(p.id);
 }
 function armyStatus(a) {
   if (S.battles[a.prov] && a.inBattle) return '<span class="chip war">⚔ 交戦中</span>';
   if (a.retreat) return '<span class="chip war">退却中</span>';
+  if (a.delve) return `<span class="chip">🕳 ダンジョン攻略中 ${Math.round(a.delve.prog / a.delve.need * 100)}%</span>`;
   if (a.path.length) return `<span class="chip">→ ${esc(prov(a.path[a.path.length - 1]).name)}へ移動中</span>`;
   const p = prov(a.prov);
+  if (p.sea) return '<span class="chip">⛵ 洋上</span>';
   if (p.siege && p.siege.by === a.owner) return `<span class="chip">🏰 包囲中 ${Math.round(p.siege.prog / p.siege.need * 100)}%</span>`;
   return '<span class="chip">待機中</span>';
 }
 function armyPanel(a) {
   const mine = a.owner === S.player, mm = maxMorale(a.owner);
-  let h = `<h2>${a.hero ? '★ ' : ''}${esc(a.name)}</h2><div class="sub">${a.owner === MONSTER ? '<span class="chip war">👹 魔物</span>' : natTag(a.owner)}<span>📍 <a data-act="prov" data-arg="${a.prov}" style="cursor:pointer;text-decoration:underline">${esc(prov(a.prov).name)}</a></span>${armyStatus(a)}</div>`;
+  let h = `<h2>${a.hero ? '★ ' : ''}${esc(a.name)}</h2><div class="sub">${isRogue(a.owner) ? `<span class="chip war">${a.owner === REBEL ? '✊ 反乱軍' : '👹 魔物'}</span>` : natTag(a.owner)}<span>📍 <a data-act="prov" data-arg="${a.prov}" style="cursor:pointer;text-decoration:underline">${esc(prov(a.prov).name)}</a></span>${armyStatus(a)}</div>`;
   h += `<h3>士気 <small>${a.morale.toFixed(2)} / ${mm.toFixed(1)}</small></h3><div class="meter"><i style="width:${clamp(a.morale / mm, 0, 1) * 100}%;background:${a.morale / mm > .5 ? 'var(--good)' : 'var(--war)'}"></i></div>`;
   h += `<h3>編成 <small>総兵力 ${fmt(Math.round(armyMen(a)))}</small></h3><table class="unit-tbl"><tr><td style="color:var(--ink-3)">兵種</td><td style="color:var(--ink-3)">連隊</td><td style="color:var(--ink-3)">兵数</td></tr>`;
-  for (const t in UNITS) if (a.regs[t] || a.men[t]) h += `<tr><td>${a.owner === MONSTER ? '魔物' : unitName(a.owner, t)}</td><td>${a.regs[t]}</td><td>${fmt(Math.round(a.men[t]))}</td></tr>`;
+  for (const t in UNITS) if (a.regs[t] || a.men[t] > 1) h += `<tr><td>${isRogue(a.owner) ? '雑兵' : unitName(a.owner, t)}</td><td>${a.regs[t]}</td><td>${fmt(Math.round(a.men[t]))}</td></tr>`;
   h += `</table>`;
-  if (a.owner !== MONSTER) h += `<div class="kv" style="margin-top:8px"><span>推定戦闘力</span><span>${armyPower(a).toFixed(1)}</span><span>戦闘力補正</span><span>${Math.round(combatMod(a, a.prov) * 100)}%</span></div>`;
-  if (a.expire && a.owner === MONSTER) h += `<p class="note">${dateStr(a.expire)}頃に散り散りになる。</p>`;
+  if (!isRogue(a.owner)) h += `<div class="kv" style="margin-top:8px"><span>推定戦闘力</span><span>${armyPower(a).toFixed(1)}</span><span>戦闘力補正</span><span>${Math.round(combatMod(a, a.prov) * 100)}%</span></div>`;
+  if (a.expire && isRogue(a.owner)) h += `<p class="note">${dateStr(a.expire)}頃に散り散りになる。</p>`;
+  const g = genOf(a);
+  if (!isRogue(a.owner)) {
+    h += `<h3>指揮官</h3>`;
+    if (mine) {
+      const n = me();
+      h += `<select class="sel" data-change="assign" data-arg="${a.id}"><option value="">（なし）</option>${n.generals.map(x => { const used = S.armies.find(b => b.gen === x.id && b.owner === S.player && b !== a); return `<option value="${x.id}" ${a.gen === x.id ? 'selected' : ''}>${x.rarity ? '[' + x.rarity + '] ' : ''}${esc(x.title)} ${esc(x.name)}（${x.att}/${x.def}/${x.man}/${x.sie}）${used ? ' ※' + esc(used.name) + 'から異動' : ''}</option>`; }).join('')}</select>`;
+      if (!n.generals.length) h += `<p class="note">将軍がいない。「英雄」タブで任命・召喚できる。</p>`;
+    }
+    if (g) h += charHTML(g);
+    else if (!mine) h += `<p class="note">指揮官なし</p>`;
+  }
   if (mine) {
     const others = S.armies.filter(b => b !== a && b.owner === a.owner && b.prov === a.prov && !b.inBattle && !b.retreat);
-    h += `<h3>命令</h3><div class="btns full">${btn('army-move', a.id, moveMode ? '移動先を選択中…' : '🚩 移動', { cls: 'gold', disabled: a.inBattle || a.retreat })}${btn('army-stop', a.id, '停止', { disabled: !a.path.length || a.retreat })}</div>
-      <div class="btns full" style="margin-top:5px">${btn('army-split', a.id, '分割', { disabled: armyRegs(a) < 2 || a.inBattle })}${btn('army-merge', a.id, `統合${others.length ? '(' + others.length + ')' : ''}`, { disabled: !others.length || a.inBattle })}${btn('army-disband', a.id, '解散', { cls: 'red', disabled: a.inBattle })}</div>
-      <p class="note">右クリック（スマホは「移動」→タップ）で移動先を指定。自国が支配する州にいると毎月兵が補充される。</p>`;
+    h += `<h3>命令</h3><div class="btns full">${btn('army-move', a.id, moveMode ? '移動先を選択中…' : '🚩 移動', { cls: 'gold', disabled: a.inBattle || a.retreat })}${btn('army-stop', a.id, '停止', { disabled: (!a.path.length && !a.delve) || a.retreat })}</div>
+      <div class="btns full" style="margin-top:5px">${btn('army-split', a.id, '分割', { disabled: armyRegs(a) < 2 || a.inBattle })}${btn('army-merge', a.id, `統合${others.length ? '(' + others.length + ')' : ''}`, { disabled: !others.length || a.inBattle })}${btn('army-disband', a.id, '解散', { cls: 'red', disabled: a.inBattle })}</div>`;
+    const p = prov(a.prov);
+    if (p.dungeon && !p.dungeon.cleared) h += `<div class="btns full" style="margin-top:5px">${btn('delve', a.id, `🕳 ダンジョン攻略（Lv${p.dungeon.lv}・${delveNeed(p.dungeon.lv)}日）`, { cls: 'gold', disabled: !canDelve(a) })}</div>`;
+    h += `<p class="note">右クリック（スマホは「移動」→タップ）で移動先を指定。海域を指定すると輸送艦で渡海する。自国が支配する州にいると毎月兵が補充される。</p>`;
+  }
+  return h;
+}
+function fleetPanel(f) {
+  const mine = f.owner === S.player;
+  let h = `<h2>⛵ ${esc(f.name)}</h2><div class="sub">${natTag(f.owner)}<span>📍 ${esc(prov(f.prov).name)}</span>${f.inBattle ? '<span class="chip war">⚓ 海戦中</span>' : f.retreat ? '<span class="chip war">退却中</span>' : f.path.length ? `<span class="chip">→ ${esc(prov(f.path[f.path.length - 1]).name)}</span>` : '<span class="chip">停泊中</span>'}</div>`;
+  h += `<h3>艦の状態 <small>${Math.round(f.str * 100)}%</small></h3><div class="meter"><i style="width:${f.str * 100}%;background:#7fc8f0"></i></div>`;
+  h += `<table class="unit-tbl"><tr><td>${SHIPS.war.name}</td><td>${f.war}隻</td></tr><tr><td>${SHIPS.trans.name}</td><td>${f.trans}隻（${f.trans}連隊分）</td></tr></table>`;
+  if (mine) {
+    const others = S.fleets.filter(x => x !== f && x.owner === f.owner && x.prov === f.prov);
+    h += `<h3>命令</h3><div class="btns full">${btn('fleet-move', f.id, moveMode ? '移動先を選択中…' : '🚩 移動', { cls: 'gold', disabled: f.retreat })}${btn('fleet-stop', f.id, '停止', { disabled: !f.path.length })}${btn('fleet-merge', f.id, '統合', { disabled: !others.length })}${btn('fleet-disband', f.id, '解体', { cls: 'red' })}</div>
+      <p class="note">戦列艦は敵艦隊と戦い、隣接する敵の州を海上封鎖する（包囲速度+25%）。輸送艦は国全体の渡海能力になる。自国の沿岸にいると修理される。</p>`;
   }
   return h;
 }
 function diploButtons(id) {
-  const P = S.player, n = me();
-  if (id === P || id < 0 || id === MONSTER || !nat(id).alive) return '';
+  const P = S.player, n = me(), o = nat(id);
+  if (id === P || id < 0 || isRogue(id) || !o.alive) return '';
   let h = '';
   h += btn('improve', id, `関係改善 <small class="cost-dip">${improveRelCost()}</small>`, { disabled: n.dip < improveRelCost(), title: '外交点を使って関係値を上げる' });
-  if (isAlly(P, id)) h += btn('unally', id, '同盟破棄');
-  else h += btn('ally', id, '同盟提案', { cls: 'blue', disabled: atWar(P, id) });
-  if (!atWar(P, id)) h += btn('declare', id, '⚔ 宣戦布告', { cls: 'red', disabled: isAlly(P, id) || hasTruce(P, id), title: hasTruce(P, id) ? '休戦中は宣戦できない' : '' });
+  if (o.overlord === P) {
+    const c = annexCost(n, o), ok = canAnnex(n, o);
+    h += btn('annex', id, `👑 外交併合 <small class="cost-dip">${c}</small>`, { cls: 'gold', disabled: !ok || n.dip < c, title: ok ? '属国の全領土を併合する' : `属国化から${ANNEX_YEARS}年経過・関係値30以上・平時が必要（${START_YEAR + Math.floor((o.vassalSince + 360 * ANNEX_YEARS) / 360)}年〜）` });
+  } else if (isAlly(P, id)) h += btn('unally', id, '同盟破棄');
+  else if (!o.overlord) h += btn('ally', id, '同盟提案', { cls: 'blue', disabled: atWar(P, id) });
+  if (!o.overlord && !isAlly(P, id) && !atWar(P, id)) h += btn('reqvassal', id, '属国化要求', { title: '国力差が4倍以上・開発度差が3倍以上・関係値30以上で受諾される' });
+  if (!atWar(P, id) && o.overlord !== P) h += btn('declare', id, '⚔ 宣戦布告', { cls: 'red', disabled: isAlly(P, id) || hasTruce(P, id), title: hasTruce(P, id) ? '休戦中は宣戦できない' : '' });
   return h;
 }
+
+// ---------- 国家 ----------
 function nationPanel() {
   const n = me(), inc = calcIncome(n), c = CHEAT_BY_ID[n.cheat];
-  let h = `<h2><i class="dot" style="background:${rgb(n.color)};width:16px;height:16px;margin-right:6px"></i>${esc(n.name)}</h2><div class="sub"><span>${RACES[n.race].name}</span><span>・${n.gov}</span><span>・首都 ${esc(prov(n.capital).name)}</span></div>`;
-  h += `<h3>君主</h3><div class="ruler"><div class="portrait">👑</div><div><b style="font-family:var(--serif);font-size:15px">${esc(n.ruler.name)}</b> <span class="chip me">転生者</span><div class="stats3"><span class="cost-adm">統 ${n.ruler.adm}</span><span class="cost-dip">外 ${n.ruler.dip}</span><span class="cost-mil">軍 ${n.ruler.mil}</span></div><div class="note" style="margin-top:2px">チート：<b style="color:var(--gold-2)">${c.name}</b> — ${c.desc}</div></div></div>`;
+  let h = `<h2><i class="dot" style="background:${rgb(n.color)};width:16px;height:16px;margin-right:6px"></i>${esc(n.name)}</h2><div class="sub"><span>${RACES[n.race].name}</span><span>・${n.gov}</span><span>・${RELIGIONS[n.religion].name}</span><span>・首都 ${esc(prov(n.capital).name)}</span></div>`;
+  h += `<h3>君主</h3><div class="ruler"><div class="portrait">👑</div><div><b style="font-family:var(--serif);font-size:15px">${esc(n.ruler.name)}</b> <span class="chip me">転生者 Lv${n.ruler.lv}</span><div class="stats3"><span class="cost-adm">統 ${n.ruler.adm}</span><span class="cost-dip">外 ${n.ruler.dip}</span><span class="cost-mil">軍 ${n.ruler.mil}</span></div><div class="note" style="margin-top:2px">チート：<b style="color:var(--gold-2)">${c.name}</b> — ${c.desc}</div></div></div>`;
   h += `<div class="note">種族特性（${RACES[n.race].name}）：${RACES[n.race].desc}</div>`;
   if (n.timed.length) h += `<div class="note">一時効果：${n.timed.map(m => `${esc(m.label || m.key)}（${START_YEAR + Math.floor(m.until / 360)}年まで）`).join('、')}</div>`;
-  h += `<h3>月次収支</h3><div class="kv"><span>税収</span><span>+${fmt(inc.tax, 2)}</span><span>生産</span><span>+${fmt(inc.prod, 2)}</span><span>軍の維持費</span><span>−${fmt(inc.maint, 2)}</span><span>建物の維持費</span><span>−${fmt(inc.bmaint, 2)}</span><span class="tot">収支</span><span class="tot ${inc.net >= 0 ? 'rel-pos' : 'rel-neg'}">${inc.net >= 0 ? '+' : ''}${fmt(inc.net, 2)}</span></div>`;
+  h += `<h3>目標</h3>${objectives(n)}`;
+  h += `<h3>安定度 <small>${n.stab > 0 ? '+' : ''}${n.stab}</small></h3><div class="note" style="margin-top:0">安定度が高いほど税収が増え、反乱が起きにくい。</div><div class="btns" style="margin-top:5px">${btn('stab', 0, `安定度を上げる <small class="cost-adm">${stabCost(n)}</small>`, { disabled: n.adm < stabCost(n) || n.stab >= 3 })}</div>`;
+  h += `<h3>月次収支</h3><div class="kv"><span>税収</span><span>+${fmt(inc.tax, 2)}</span><span>生産</span><span>+${fmt(inc.prod, 2)}</span><span>交易</span><span>+${fmt(inc.trade, 2)}</span>${inc.tribute ? `<span>貢納金</span><span>${inc.tribute > 0 ? '+' : ''}${fmt(inc.tribute, 2)}</span>` : ''}<span>陸軍の維持費</span><span>−${fmt(inc.maint, 2)}</span><span>海軍の維持費</span><span>−${fmt(inc.navy, 2)}</span><span>建物の維持費</span><span>−${fmt(inc.bmaint, 2)}</span><span class="tot">収支</span><span class="tot ${inc.net >= 0 ? 'rel-pos' : 'rel-neg'}">${inc.net >= 0 ? '+' : ''}${fmt(inc.net, 2)}</span></div>`;
   if (inc.regs > inc.fl) h += `<div class="warn">維持限界を超えている：維持費が増大中</div>`;
-  if (n.gold < 0) h += `<div class="warn">財政赤字：軍の士気と人的資源の回復が低下</div>`;
-  h += `<h3>国力</h3><div class="kv"><span>州数</span><span>${ownedProvs(n.id).length}</span><span>総開発度</span><span>${inc.dev}</span><span>連隊 / 維持限界</span><span>${inc.regs} / ${inc.fl}</span><span>人的資源</span><span>${fmt(Math.round(n.manpower))} / ${fmt(maxManpower(n))}</span><span>月間獲得点</span><span><span class="cost-adm">${3 + n.ruler.adm + natMod(n, 'admPts')}</span> / <span class="cost-dip">${3 + n.ruler.dip + natMod(n, 'dipPts')}</span> / <span class="cost-mil">${3 + n.ruler.mil + natMod(n, 'milPts')}</span></span><span>世界順位（開発度）</span><span>${worldRank()}位</span></div>`;
-  h += `<h3>自軍一覧</h3><div class="rows">` + (S.armies.filter(a => a.owner === S.player).map(a => `<div class="row" data-act="army" data-arg="${a.id}"><span class="nm">${a.hero ? '★' : ''}${esc(a.name)} <small style="color:var(--ink-3)">${esc(prov(a.prov).name)}</small></span><span class="num">${fmtMen(armyMen(a))}</span></div>`).join('') || '<p class="note">軍がない。州を選んで徴兵しよう。</p>') + `</div>`;
+  if (n.gold < 0) h += `<div class="warn">財政赤字：士気・人的資源の回復が低下し、不穏度+2</div>`;
+  const vs = vassalsOf(n.id);
+  h += `<h3>国力</h3><div class="kv"><span>州数</span><span>${ownedProvs(n.id).length}</span><span>総開発度</span><span>${inc.dev}</span><span>連隊 / 維持限界</span><span>${inc.regs} / ${inc.fl}</span><span>人的資源</span><span>${fmt(Math.round(n.manpower))} / ${fmt(maxManpower(n))}</span><span>属国</span><span>${vs.map(v => esc(v.short)).join('、') || 'なし'}</span><span>世界順位（開発度）</span><span>${worldRank()}位</span></div>`;
+  h += `<h3>自軍・艦隊</h3><div class="rows">` + (S.armies.filter(a => a.owner === S.player).map(a => `<div class="row" data-act="army" data-arg="${a.id}"><span class="nm">${a.gen != null || a.hero ? '★' : ''}${esc(a.name)} <small style="color:var(--ink-3)">${esc(prov(a.prov).name)}</small></span><span class="num">${fmtMen(armyMen(a))}</span></div>`).join('') +
+    S.fleets.filter(f => f.owner === S.player).map(f => `<div class="row" data-act="fleet" data-arg="${f.id}"><span class="nm">⛵ ${esc(f.name)} <small style="color:var(--ink-3)">${esc(prov(f.prov).name)}</small></span><span class="num">戦${f.war} 輸${f.trans}</span></div>`).join('') || '<p class="note">軍がない。州を選んで徴兵しよう。</p>') + `</div>`;
   h += `<h3>システム</h3><div class="btns full">${btn('save', 0, '💾 セーブ')}${btn('load', 0, '📂 ロード', { disabled: !hasSave() })}${btn('newgame', 0, '最初から', { cls: 'red' })}</div><p class="note">毎年1月1日に自動セーブされる。</p>`;
   return h;
+}
+function objectives(n) {
+  const v = S.victories || {};
+  let all = 0; for (const p of S.provinces) if (p.owner > 0) all += dev(p);
+  const share = Math.round(totalDev(n.id) / Math.max(1, all) * 100);
+  const dk = S.nations.find(o => o.demonKing);
+  const items = n.demonKing
+    ? [[v.demon, '魔界統一', `人族の国家をすべて滅ぼす（残り${S.nations.filter(o => o.alive && !o.isMonster && o.race === 'human').length}国）`]]
+    : [[v.demon, '魔王討伐', dk.alive ? `${esc(dk.name)}を自らの手で滅ぼす` : (S.demonKingSlayer === S.player ? '達成' : '魔王国は他国に滅ぼされた')]];
+  items.push([v.hegemon, '大陸の覇者', `大陸の開発度の50%を支配する（現在${share}%）`]);
+  items.push([false, '百年の繁栄', `${END_YEAR}年まで国を存続させ、上位を目指す`]);
+  return items.map(([done, t, d]) => `<div class="objective ${done ? 'done' : ''}"><span class="ck">${done ? '✔' : '◇'}</span><span><b>${t}</b> <span class="note">${d}</span></span></div>`).join('');
 }
 function worldRank() {
   const r = S.nations.filter(n => !n.isMonster && n.alive).map(n => ({ id: n.id, d: totalDev(n.id) })).sort((a, b) => b.d - a.d);
   return r.findIndex(x => x.id === S.player) + 1;
 }
+
+// ---------- 外交 ----------
 function diploPanel() {
   const list = S.nations.filter(n => !n.isMonster && n.alive && n.id !== S.player).map(n => ({ n, d: totalDev(n.id) })).sort((a, b) => b.d - a.d);
-  let h = `<h2>外交</h2><p class="note">関係値が高い国ほど同盟を受け入れやすい。同盟国は防衛戦争に参戦する。</p><div class="rows" style="margin-top:8px">`;
+  let h = `<h2>外交</h2><p class="note">関係値が高い国ほど同盟を受け入れやすい。同盟国は防衛戦争に参戦する。属国は貢納金（収入の15%）を納め、${ANNEX_YEARS}年後に外交併合できる。</p><div class="rows" style="margin-top:8px">`;
   for (const { n, d } of list) {
     h += `<div class="row ${diploSel === n.id ? 'on' : ''}" data-act="dsel" data-arg="${n.id}"><i class="dot" style="background:${rgb(n.color)}"></i><span class="nm">${esc(n.name)}</span>${relStatus(n.id)}<span class="num">${relSpan(getRel(S.player, n.id))}</span></div>`;
     if (diploSel === n.id) {
       const pw = nationPower(n.id), mp = nationPower(S.player);
-      h += `<div class="detail"><div class="kv"><span>種族・政体</span><span>${RACES[n.race].name}・${n.gov}</span><span>君主</span><span>${esc(n.ruler.name)}（${n.ruler.adm}/${n.ruler.dip}/${n.ruler.mil}）</span><span>総開発度</span><span>${d}</span><span>軍勢</span><span>約${fmtMen(S.armies.filter(a => a.owner === n.id).reduce((s, a) => s + armyMen(a), 0))}（自国比 ${mp > 0 ? Math.round(pw / mp * 100) : '—'}%）</span><span>同盟国</span><span>${n.allies.map(i => esc(nat(i).short)).join('、') || 'なし'}</span><span>戦争</span><span>${warsOf(n.id).length ? warsOf(n.id).map(w => esc(w.name)).join('、') : 'なし'}</span></div><div class="btns" style="margin-top:8px">${btn('goto', n.capital, '📍 首都へ')}${diploButtons(n.id)}</div></div>`;
+      h += `<div class="detail"><div class="kv"><span>種族・宗教</span><span>${RACES[n.race].name}・${RELIGIONS[n.religion].name}</span><span>君主</span><span>${esc(n.ruler.name)}（${n.ruler.adm}/${n.ruler.dip}/${n.ruler.mil}）</span><span>総開発度</span><span>${d}</span><span>軍勢</span><span>約${fmtMen(S.armies.filter(a => a.owner === n.id).reduce((s, a) => s + armyMen(a), 0))}（自国比 ${mp > 0 ? Math.round(pw / mp * 100) : '—'}%）</span><span>同盟国</span><span>${n.allies.map(i => esc(nat(i).short)).join('、') || 'なし'}</span><span>異世界人</span><span>${n.generals.filter(g => g.summoned).length + n.advisors.filter(c => c.summoned).length}人</span><span>戦争</span><span>${warsOf(n.id).length ? warsOf(n.id).map(w => esc(w.name)).join('、') : 'なし'}</span></div><div class="btns" style="margin-top:8px">${btn('goto', n.capital, '📍 首都へ')}${diploButtons(n.id)}</div></div>`;
     }
   }
   return h + `</div>`;
 }
+
+// ---------- 戦争 ----------
 function warPanel() {
   const mine = warsOf(S.player), others = S.wars.filter(w => !sideOf(w, S.player));
   let h = `<h2>戦争</h2>`;
-  if (!mine.length) h += `<p class="note">我が国は平和だ。他国の州を選ぶか外交タブから宣戦布告できる。<br>敵の州を包囲・占領し、会戦に勝利すると戦勝点が貯まる。戦勝点の分だけ占領地を割譲させられる。</p>`;
+  if (!mine.length) h += `<p class="note">我が国は平和だ。他国の州を選ぶか外交タブから宣戦布告できる。<br>敵の州を包囲・占領し、会戦に勝利すると戦勝点が貯まる。戦勝点で占領地の割譲や属国化を要求できる。</p>`;
   for (const w of mine) h += warCard(w, true);
   if (others.length) { h += `<h3>世界の戦争</h3>`; for (const w of others) h += warCard(w, false); }
   return h;
@@ -231,15 +317,58 @@ function warCard(w, mine) {
   if (mine) h += leader ? `<div class="btns full" style="margin-top:8px">${btn('peace', w.id, '🕊 講和交渉', { cls: 'gold' })}</div>` : `<p class="note">講和は戦争指導国（${esc(nat(w[side][0]).short)}）が行う。</p>`;
   return h + `</div>`;
 }
-function techPanel() {
+
+// ---------- 経済（技術・交易） ----------
+function econPanel() {
   const n = me();
-  let h = `<h2>技術</h2><p class="note">君主の点数を使って技術を研究する。技術が上がるほど国は豊かに、軍は強くなる。</p><div style="margin-top:10px">`;
+  let h = `<h2>経済</h2><h3>技術</h3>`;
   for (const t in TECHS) {
     const c = techCost(n, t);
     h += `<div class="techrow"><div class="lv">${n.tech[t]}</div><div class="info"><b class="cost-${t}">${TECHS[t].name}</b><small>${TECHS[t].desc}</small><small>所持 ${Math.floor(n[t])} / 必要 ${c}</small></div>${btn('tech', t, '研究', { cls: 'gold', disabled: n[t] < c })}</div>`;
   }
-  h += `</div><h3>点数の使い道</h3><p class="note"><span class="cost-adm">統治点</span>：統治技術、州の「税」開発<br><span class="cost-dip">外交点</span>：外交技術、州の「生産」開発、関係改善<br><span class="cost-mil">軍事点</span>：軍事技術、州の「兵力」開発</p>`;
+  const T = computeTrade(), maxM = maxMerchants(n);
+  h += `<h3>交易 <small>商人 ${n.merchants.length} / ${maxM}　交易収入 +${fmt(tradeIncome(n), 2)}/月</small></h3><p class="note" style="margin-top:0">各交易圏の富は「交易力」（その地域に持つ州の開発度）の比率で分配される。商人を送ると交易力が1.5倍＋10になる。</p><div class="rows" style="margin-top:6px">`;
+  for (const nd of S.nodes) {
+    const share = T.tot[nd.id] > 0 ? T.pow[nd.id][n.id] / T.tot[nd.id] : 0, has = n.merchants.includes(nd.id);
+    let topId = -1, topV = 0; S.nations.forEach(o => { if (T.pow[nd.id][o.id] > topV) { topV = T.pow[nd.id][o.id]; topId = o.id; } });
+    h += `<div class="row" style="cursor:default"><i class="dot" style="background:${rgb(nd.color)}"></i><span class="nm">${esc(nd.name)}<br><small style="color:var(--ink-3);font-family:var(--sans);font-weight:400">価値 ${T.val[nd.id].toFixed(1)}・自国 ${Math.round(share * 100)}%${topId > 0 ? '・首位 ' + esc(nat(topId).short) : ''}</small></span>${has ? btn('merchant-off', nd.id, '商人を戻す') : btn('merchant-on', nd.id, '商人派遣', { cls: 'blue', disabled: n.merchants.length >= maxM })}</div>`;
+  }
+  h += `</div><h3>点数の使い道</h3><p class="note"><span class="cost-adm">統治点</span>：統治技術、税の開発、安定度<br><span class="cost-dip">外交点</span>：外交技術、生産の開発、関係改善、外交併合<br><span class="cost-mil">軍事点</span>：軍事技術、兵力の開発、将軍の任命</p>`;
   return h;
+}
+
+// ---------- 英雄（召喚・将軍・顧問・秘宝） ----------
+function heroPanel() {
+  const n = me(), sc = summonCost(n);
+  let h = `<h2>英雄</h2>`;
+  h += `<h3>召喚魔法 <small>魔力 ${Math.floor(n.mana)}（+${fmt(manaIncome(n), 1)}/月）</small></h3><p class="note" style="margin-top:0">異世界（日本）からチート能力者を呼び出す。将軍として軍を率いる者、顧問として国を支える者がいる。召喚するたびにコストが上がる。${natMod(n, 'noAccident') ? '' : '<br>⚠ 8%の確率で召喚事故（魔物が出現）が起きる。'}<br>魔力は魔石の州・魔境・魔導兵から得られる。</p>`;
+  h += `<div class="btns full" style="margin-top:6px">${btn('summon', 0, `✨ 召喚の儀を行う <small>🔮${sc} 💰${SUMMON_GOLD}</small>`, { cls: 'gold', disabled: !canSummon(n) })}</div>`;
+  h += `<p class="note">出現率：${RARITIES.map(r => `${r.id} ${natMod(n, 'rarityUp') ? r.w2 : r.w}%`).join(' / ')}</p>`;
+  h += `<h3>顧問 <small>${n.advisors.length} / 3</small></h3>`;
+  h += n.advisors.map(c => charHTML(c, `<div class="btns" style="margin-top:4px">${btn('adv-bench', c.id, '控えに回す')}</div>`)).join('') || '<p class="note">顧問がいない。召喚で異世界人を呼ぼう。</p>';
+  if (n.bench.length) h += `<h3>控え</h3>` + n.bench.map(c => charHTML(c, `<div class="btns" style="margin-top:4px">${btn('adv-up', c.id, '顧問に任命', { disabled: n.advisors.length >= 3 })}${btn('adv-fire', c.id, '暇を出す', { cls: 'red' })}</div>`)).join('');
+  h += `<h3>将軍 <small>${n.generals.length}人</small></h3><div class="btns" style="margin-bottom:6px">${btn('gen-new', 0, `🎖 将軍を任命 <small class="cost-mil">${generalCost(n)}</small>`, { disabled: n.mil < generalCost(n) })}</div>`;
+  h += n.generals.map(g => { const a = S.armies.find(a => a.owner === S.player && a.gen === g.id); return charHTML(g, `<div class="ds">${a ? `指揮：<a data-act="army" data-arg="${a.id}" style="cursor:pointer;text-decoration:underline">${esc(a.name)}</a>` : '待機中（軍の画面で配属できる）'}${g.summoned ? '' : `・${START_YEAR + Math.floor(g.until / 360)}年頃引退`}</div>`); }).join('') || '<p class="note">将軍がいない。</p>';
+  h += `<h3>秘宝 <small>${n.artifacts.length}個</small></h3>`;
+  h += n.artifacts.map(id => { const a = ARTIFACT_BY_ID[id]; return `<div class="char"><div class="av">🏺</div><div class="bd"><div class="nm2">${esc(a.name)}</div><div class="md">${esc(a.desc)}</div></div></div>`; }).join('') || '<p class="note">ダンジョンの奥深くには秘宝が眠っているという……</p>';
+  return h;
+}
+
+// ---------- 技能（スキルツリー） ----------
+function skillPanel() {
+  const n = me(), r = n.ruler;
+  let h = `<h2>転生者の技能</h2><div class="sub"><span>${esc(r.name)}</span><span class="chip me">Lv${r.lv}</span><span>スキルポイント <b style="color:var(--gold-2)">${n.sp || 0}</b></span></div>`;
+  h += `<div class="xpbar" style="margin-top:8px"><i style="width:${(r.xp || 0) / xpNeed(r.lv) * 100}%"></i></div><p class="note">経験値 ${Math.floor(r.xp || 0)} / ${xpNeed(r.lv)}　— 時間経過・戦勝・ダンジョン攻略・イベントで得られる。</p>`;
+  h += `<div class="skilltree" style="margin-top:10px">`;
+  for (const br in SKILL_BRANCHES) {
+    h += `<div class="skcol"><h4>${SKILL_BRANCHES[br]}</h4>`;
+    for (const s of SKILLS.filter(s => s.br === br)) {
+      const got = n.skills.includes(s.id), can = canLearn(n, s.id);
+      h += `<button class="sk ${got ? 'got' : can ? 'can' : ''}" ${can ? `data-act="learn" data-arg="${s.id}"` : ''} title="${esc(s.desc)}"><b>${s.name}</b>${s.desc}</button>`;
+    }
+    h += `</div>`;
+  }
+  return h + `</div><p class="note" style="margin-top:6px">光っているスキルが習得可能。上から順に習得する。</p>`;
 }
 
 // ---------- 行動 ----------
@@ -247,82 +376,119 @@ function act(name, arg, ev) {
   const n = S.player >= 0 ? me() : null;
   const selProv = S.sel && S.sel.type === 'prov' ? prov(S.sel.id) : null;
   const selArmy = S.sel && S.sel.type === 'army' ? S.armies.find(a => a.id === S.sel.id) : null;
+  const selFleet = S.sel && S.sel.type === 'fleet' ? S.fleets.find(f => f.id === S.sel.id) : null;
   switch (name) {
     case 'tab': tab = arg; openPanel(); break;
     case 'close': $('panel').classList.add('hidden'); document.body.classList.remove('panel-open'); break;
     case 'prov': select({ type: 'prov', id: +arg }); { const p = prov(+arg); centerOn(p.x, p.y); } break;
     case 'army': select({ type: 'army', id: +arg }); break;
+    case 'fleet': select({ type: 'fleet', id: +arg }); break;
     case 'nation': tab = 'diplo'; diploSel = +arg; break;
     case 'dsel': diploSel = diploSel === +arg ? -1 : +arg; break;
     case 'goto': { const p = prov(+arg); centerOn(p.x, p.y, Math.max(cam.s, 1.6)); select({ type: 'prov', id: +arg }, true); } break;
     case 'dev': if (selProv) develop(n, selProv, arg); break;
     case 'build': if (selProv) build(n, selProv, arg); mapDirty = true; break;
     case 'recruit': if (selProv) { const k = ev && ev.shiftKey ? 5 : 1; let ok = 0; for (let i = 0; i < k; i++) if (recruit(S.player, selProv.id, arg)) ok++; if (!ok) hooks.log('金貨か人的資源が足りない', 'bad'); } break;
+    case 'ship': if (selProv) { const k = ev && ev.shiftKey ? 5 : 1; for (let i = 0; i < k; i++) buildShip(S.player, selProv.id, arg); } break;
     case 'colonize': if (colonize(S.player, +arg)) { hooks.log(`⛺ ${prov(+arg).name}への入植を開始した`, 'info'); mapDirty = true; } break;
+    case 'convert': if (convert(S.player, +arg)) hooks.log(`⛪ ${prov(+arg).name}に宣教師を派遣した`, 'info'); break;
+    case 'stab': if (raiseStab(n)) hooks.log(`⚖ 安定度が${n.stab}になった`, 'good'); break;
     case 'improve': if (improveRel(n, +arg)) hooks.log(`${nat(+arg).name}との関係が改善した`, 'good'); break;
     case 'ally': proposeAlliance(+arg); break;
     case 'unally': breakAlliance(S.player, +arg); addRel(S.player, +arg, -30); hooks.log(`${nat(+arg).name}との同盟を破棄した`, 'bad'); break;
+    case 'reqvassal': { const o = nat(+arg); if (vassalAccepts(n, o)) { makeVassal(n, o); hooks.log(`📜 ${o.name}が我が国の属国となった`, 'good'); } else hooks.log(`${o.name}は属国化を拒否した（国力差4倍・開発度差3倍・関係値30以上が必要）`, 'bad'); } break;
+    case 'annex': { const o = nat(+arg); if (!annex(n, o)) hooks.log('外交併合できない', 'bad'); } break;
     case 'declare': confirmDeclare(+arg); break;
     case 'peace': openPeace(S.wars.find(w => w.id === +arg)); break;
     case 'tech': if (buyTech(n, arg)) hooks.log(`${TECHS[arg].name}がLv${n.tech[arg]}になった`, 'good'); break;
-    case 'army-move': moveMode = !moveMode; updateBanner(); break;
-    case 'army-stop': if (selArmy) { selArmy.path = []; selArmy.prog = 0; } break;
+    case 'merchant-on': if (n.merchants.length < maxMerchants(n) && !n.merchants.includes(+arg)) { n.merchants.push(+arg); S._trade = null; } break;
+    case 'merchant-off': n.merchants = n.merchants.filter(x => x !== +arg); S._trade = null; break;
+    case 'summon': summonRitual(); break;
+    case 'adv-bench': { const c = n.advisors.find(x => x.id === +arg); if (c) { n.advisors = n.advisors.filter(x => x !== c); n.bench.push(c); } } break;
+    case 'adv-up': { const c = n.bench.find(x => x.id === +arg); if (c && n.advisors.length < 3) { n.bench = n.bench.filter(x => x !== c); n.advisors.push(c); } } break;
+    case 'adv-fire': n.bench = n.bench.filter(x => x.id !== +arg); break;
+    case 'gen-new': { const g = recruitGeneral(n); if (g) hooks.log(`🎖 ${g.name}を将軍に任命した（${g.att}/${g.def}/${g.man}/${g.sie}）`, 'good'); } break;
+    case 'learn': if (learnSkill(n, arg)) hooks.log(`📖 スキル「${SKILL_BY_ID[arg].name}」を習得した`, 'good'); break;
+    case 'army-move': case 'fleet-move': moveMode = !moveMode; updateBanner(); break;
+    case 'army-stop': if (selArmy) { selArmy.path = []; selArmy.prog = 0; selArmy.delve = null; } break;
     case 'army-split': if (selArmy) { const b = splitArmy(selArmy); if (b) select({ type: 'army', id: b.id }); } break;
     case 'army-merge': if (selArmy) mergeArmies([selArmy, ...S.armies.filter(b => b !== selArmy && b.owner === selArmy.owner && b.prov === selArmy.prov && !b.inBattle && !b.retreat)]); break;
     case 'army-disband': if (selArmy) hooks.modal({ title: '軍の解散', body: `${esc(selArmy.name)}（${fmtMen(armyMen(selArmy))}）を解散しますか？<br>兵の半数は人的資源に戻る。`, buttons: [{ label: '解散する', fn: () => { n.manpower = Math.min(maxManpower(n), n.manpower + armyMen(selArmy) / 2); destroyArmy(selArmy); S.sel = { type: 'prov', id: selArmy.prov }; } }, { label: 'やめる' }] }); break;
+    case 'delve': if (selArmy && startDelve(selArmy)) hooks.log(`🕳 ${selArmy.name}がダンジョンに突入した`, 'info'); break;
+    case 'fleet-stop': if (selFleet) { selFleet.path = []; selFleet.prog = 0; } break;
+    case 'fleet-merge': if (selFleet) { for (const o of S.fleets.filter(x => x !== selFleet && x.owner === selFleet.owner && x.prov === selFleet.prov)) { selFleet.war += o.war; selFleet.trans += o.trans; selFleet.str = Math.min(selFleet.str, o.str); destroyFleet(o); } } break;
+    case 'fleet-disband': if (selFleet) { destroyFleet(selFleet); S.sel = null; } break;
     case 'save': hooks.log(saveGame() ? '💾 セーブした' : 'セーブに失敗した', 'info'); break;
     case 'load': if (loadGame()) { afterLoad(); hooks.log('📂 ロードした', 'info'); } break;
     case 'newgame': hooks.modal({ title: '最初から', body: '現在のゲームを破棄して、新しい大陸で始めますか？', buttons: [{ label: '新しく始める', fn: () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); } }, { label: 'やめる' }] }); break;
   }
   refresh(true);
 }
+function summonRitual() {
+  const n = me();
+  const r = doSummon(n);
+  if (!r) return;
+  if (r.accident) {
+    hooks.modal({ title: '💥 召喚事故！', body: `魔法陣が不気味な紫に染まり、空間が裂けた——！<br>現れたのは異世界人ではなく、<b>${esc(r.army.name)}（${fmtMen(armyMen(r.army))}）</b>だった！<br><br><span class="note">首都${esc(prov(n.capital).name)}に魔物が出現した。急ぎ討伐せよ。</span>`, buttons: [{ label: '迎え撃て！' }] });
+    return;
+  }
+  const c = r.char, R = RARITIES.find(x => x.id === c.rarity);
+  gainXP(n, 5);
+  const where = c.role === 'general' ? '将軍として軍の指揮を任せられる（軍の画面で配属）。' : n.advisors.includes(c) ? '顧問として国政に参加した。' : '顧問の枠が埋まっているため、控えに回った。';
+  hooks.modal({
+    title: '✨ 召喚成功', body: `魔法陣がまばゆく輝き、光の中から一人の人物が現れた。<div class="summon-card" style="color:${R.color};border-color:${R.color}"><div class="big">${c.rarity}</div><div style="color:var(--ink);font-family:var(--serif);font-size:17px;font-weight:700;margin-top:2px">${esc(c.title)}　${esc(c.name)}</div><div class="note" style="color:var(--ink-2)">${esc(c.desc || '')}</div>${c.role === 'general' ? `<div class="pips" style="justify-content:center;margin-top:6px">${['att', 'def', 'man', 'sie'].map((k, i) => `<span>${GEN_STAT_NAMES[i]}<b>${c[k]}</b></span>`).join('')}</div>` : ''}<div class="md" style="color:var(--gold-2);margin-top:4px">${modsText(c.mods)}</div></div>「え、ここどこ……？ もしかして、異世界転生ってやつ？」<br><br>${where}`,
+    buttons: [{ label: '歓迎する' }],
+  });
+  hooks.log(`✨ ${c.title} ${c.name}（${c.rarity}）を召喚した`, 'good');
+}
 function proposeAlliance(id) {
   const o = nat(id), r = getRel(S.player, id) + natMod(me(), 'allyAccept');
-  const ok = r >= 40 && o.allies.length < 3 && !hostile(S.player, id);
+  const ok = r >= 40 && o.allies.length < 3 && !hostile(S.player, id) && !o.overlord;
   if (ok) { addAlliance(S.player, id); hooks.log(`🤝 ${o.name}と同盟を結んだ`, 'good'); }
   else hooks.log(`${o.name}は同盟を拒否した（関係値40以上が必要${o.allies.length >= 3 ? '、同盟枠が埋まっている' : ''}）`, 'bad');
 }
 function confirmDeclare(id) {
-  const o = nat(id);
-  const joiners = o.allies.filter(a => a !== S.player && !isAlly(a, S.player) && nat(a).alive);
+  let o = nat(id);
+  const real = o.overlord ? nat(o.overlord) : o;
+  const joiners = real.allies.filter(a => a !== S.player && !isAlly(a, S.player) && nat(a).alive);
   hooks.modal({
-    title: '⚔ 宣戦布告', body: `<b>${esc(o.name)}</b>に宣戦布告しますか？<br><br>敵の同盟国（参戦見込み）：${joiners.map(a => esc(nat(a).name)).join('、') || 'なし'}<br>我が同盟国は60%の確率で参戦する。<br><br>敵戦力：約${fmtMen(S.armies.filter(a => a.owner === id).reduce((s, a) => s + armyMen(a), 0))}　自軍：約${fmtMen(S.armies.filter(a => a.owner === S.player).reduce((s, a) => s + armyMen(a), 0))}`,
-    buttons: [{ label: '宣戦布告する', fn: () => { const w = declareWar(S.player, id); if (w) { for (const al of me().allies) { if (!sideOf(w, al)) continue; } hooks.log(`⚔ ${o.name}に宣戦布告した！ 参戦：${w.att.map(i => nat(i).short).join('・')} 対 ${w.def.map(i => nat(i).short).join('・')}`, 'war'); tab = 'war'; } } }, { label: 'やめる' }],
+    title: '⚔ 宣戦布告', body: `<b>${esc(real.name)}</b>に宣戦布告しますか？${real !== o ? `<br><span class="note">${esc(o.name)}は${esc(real.name)}の属国のため、宗主国との戦争になる。</span>` : ''}<br><br>敵の同盟国（参戦見込み）：${joiners.map(a => esc(nat(a).name)).join('、') || 'なし'}<br>我が同盟国は60%の確率で参戦する。<br><br>敵戦力：約${fmtMen(S.armies.filter(a => a.owner === real.id).reduce((s, a) => s + armyMen(a), 0))}　自軍：約${fmtMen(S.armies.filter(a => a.owner === S.player).reduce((s, a) => s + armyMen(a), 0))}`,
+    buttons: [{ label: '宣戦布告する', fn: () => { const w = declareWar(S.player, id); if (w) { hooks.log(`⚔ ${nat(w.def[0]).name}に宣戦布告した！ 参戦：${w.att.map(i => nat(i).short).join('・')} 対 ${w.def.map(i => nat(i).short).join('・')}`, 'war'); tab = 'war'; } } }, { label: 'やめる' }],
   });
 }
 function openPeace(w) {
   if (!w) return;
   const side = sideOf(w, S.player), lose = side === 'att' ? 'def' : 'att';
   const s = warScore(w), sP = side === 'att' ? s : -s;
-  const cand = S.provinces.filter(p => w[lose].includes(p.owner) && w[side].includes(p.controller)).sort((a, b) => dev(b) - dev(a));
   const enemy = nat(w[lose][0]);
+  const cand = S.provinces.filter(p => w[lose].includes(p.owner) && w[side].includes(p.controller)).sort((a, b) => dev(b) - dev(a));
+  const vCost = vassalPeaceCost(w, lose), canV = !enemy.demonKing && !enemy.overlord && totalDev(enemy.id) * 2 < totalDev(S.player);
   const body = `<div class="wsbar"><i style="left:${sP >= 0 ? 50 : 50 + sP / 2}%;width:${Math.abs(sP) / 2}%;background:${sP >= 0 ? 'var(--good)' : 'var(--bad)'}"></i><div class="mid"></div><span>戦勝点 ${Math.round(sP)}</span></div>
-    相手：<b>${esc(enemy.name)}</b><br>${cand.length ? '割譲を要求する州を選ぶ（合計コストが戦勝点以下なら受諾される）：' : '<span class="note">要求できる占領地がない。</span>'}
-    <div class="plist">${cand.map(p => `<label><input type="checkbox" data-pid="${p.id}"><span>${esc(p.name)} <small style="color:var(--ink-3)">${esc(nat(p.owner).short)}・開発${dev(p)}</small></span><em>${Math.round(provPeaceCost(w, p, lose))}</em></label>`).join('')}</div>
+    相手：<b>${esc(enemy.name)}</b><br>要求を選ぶ（合計コストが戦勝点以下なら受諾される）：
+    <div class="plist">${canV ? `<label style="border:1px solid var(--gold)"><input type="checkbox" data-vassal="1"><span>👑 <b>${esc(enemy.name)}を属国化</b> <small style="color:var(--ink-3)">（この国の州の割譲は含まれなくなる）</small></span><em>${Math.round(vCost)}</em></label>` : `<div class="note">属国化：${enemy.demonKing ? '魔王国は属国にできない' : '開発度が自国の半分未満の国のみ可能'}</div>`}
+    ${cand.map(p => `<label><input type="checkbox" data-pid="${p.id}"><span>${esc(p.name)} <small style="color:var(--ink-3)">${esc(nat(p.owner).short)}・開発${dev(p)}</small></span><em>${Math.round(provPeaceCost(w, p, lose))}</em></label>`).join('')}</div>
+    ${!cand.length ? '<div class="note">割譲を要求できる占領地がない。</div>' : ''}
     <div>選択コスト：<b id="pc-total">0</b> / ${Math.max(0, Math.round(sP))}</div>`;
+  const read = (el) => { const v = !!el.querySelector('[data-vassal]:checked'); const ids = [...el.querySelectorAll('[data-pid]:checked')].map(c => +c.dataset.pid); return { v, ids }; };
+  const cost = ({ v, ids }) => (v ? vCost : 0) + ids.reduce((t, i) => t + (v && prov(i).owner === enemy.id ? 0 : provPeaceCost(w, prov(i), lose)), 0);
   hooks.modal({
     title: '🕊 講和交渉', body,
     mount: (el) => {
-      const upd = () => { let t = 0; el.querySelectorAll('[data-pid]:checked').forEach(c => t += provPeaceCost(w, prov(+c.dataset.pid), lose)); el.querySelector('#pc-total').textContent = Math.round(t); el.querySelector('#pc-total').style.color = t <= sP + 0.01 ? 'var(--good)' : 'var(--bad)'; };
-      el.querySelectorAll('[data-pid]').forEach(c => c.onchange = upd);
+      const upd = () => { const t = cost(read(el)); const e = el.querySelector('#pc-total'); e.textContent = Math.round(t); e.style.color = t <= sP + 0.01 ? 'var(--good)' : 'var(--bad)'; };
+      el.querySelectorAll('input').forEach(c => c.onchange = upd);
     },
     buttons: [
-      { label: '割譲を要求する', desc: '選んだ州を割譲させる', fn: null, keep: true },
-      { label: '白紙和平を提案する', desc: '領土の変更なしで戦争を終える' },
+      { label: '要求を突きつける', desc: '選んだ条件で講和を提案する', keep: true, fn: () => {
+        const r = read($('modal'));
+        if (!r.ids.length && !r.v) return;
+        closeModal();
+        if (aiAcceptsPeace(w, side, r.ids, r.v)) makePeace(w, side, r.ids, r.v);
+        else hooks.log(`${enemy.name}は講和を拒否した（戦勝点が足りない）`, 'bad');
+      } },
+      { label: '白紙和平を提案する', desc: '領土の変更なしで戦争を終える', fn: () => { if (aiAcceptsPeace(w, side, [])) makePeace(w, null, []); else hooks.log(`${enemy.name}は白紙和平を拒否した`, 'bad'); } },
       { label: 'やめる' },
     ],
   });
-  const m = modalQueue[modalQueue.length - 1];
-  m.buttons[0].fn = () => {
-    const ids = [...$('modal').querySelectorAll('[data-pid]:checked')].map(c => +c.dataset.pid);
-    if (!ids.length) return;
-    modalQueue.shift(); $('modal-wrap').classList.add('hidden');
-    if (aiAcceptsPeace(w, side, ids)) makePeace(w, side, ids);
-    else hooks.log(`${enemy.name}は講和を拒否した（戦勝点が足りない）`, 'bad');
-    refresh(true); if (modalQueue.length) showModal();
-  };
-  m.buttons[1].fn = () => { if (aiAcceptsPeace(w, side, [])) makePeace(w, null, []); else hooks.log(`${enemy.name}は白紙和平を拒否した`, 'bad'); };
-  if (modalQueue.length === 1) showModal();
 }
 
 function select(sel, keepTab) {
@@ -333,14 +499,21 @@ function select(sel, keepTab) {
 function openPanel() { $('panel').classList.remove('hidden'); document.body.classList.add('panel-open'); }
 function updateBanner() {
   $('banner').classList.toggle('hidden', !moveMode);
-  $('banner').textContent = '🚩 移動先の州をクリック（Escでキャンセル）';
+  $('banner').textContent = '🚩 移動先をクリック（Escでキャンセル）';
   $('map').classList.toggle('targeting', moveMode);
 }
 function orderMove(a, pid) {
   if (a.inBattle) { hooks.log('交戦中の軍は移動できない', 'bad'); return; }
   if (a.retreat) { hooks.log('退却中の軍には命令できない', 'bad'); return; }
   if (pid === a.prov) { a.path = []; a.prog = 0; return; }
-  if (!moveArmyTo(a, pid)) hooks.log(`${prov(pid).name}へは進軍できない（通行権がない／経路がない）`, 'bad');
+  if (!moveArmyTo(a, pid)) {
+    const cap = transportCap(S.player) - regsAtSea(S.player, a), need = armyRegs(a);
+    hooks.log(`${prov(pid).name}へは進軍できない（${cap < need ? `海を渡るには輸送艦が${need}隻必要：現在${Math.max(0, cap)}隻／` : ''}通行権がない、または敵艦隊が封鎖中）`, 'bad');
+  }
+}
+function orderFleet(f, pid) {
+  if (!prov(pid).sea) { const z = prov(pid).snb && prov(pid).snb[0]; if (z == null) { hooks.log('艦隊は海域にしか移動できない', 'bad'); return; } pid = z; }
+  if (!moveFleetTo(f, pid)) hooks.log('そこへは航行できない', 'bad');
 }
 
 // ---------- 入力 ----------
@@ -359,8 +532,7 @@ function initInput() {
     pts.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
     if (pts.size === 2 && pinch) {
       const [a, b] = [...pts.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
-      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      zoomAt(mx, my, (pinch.s * d / pinch.d) / cam.s);
+      zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, (pinch.s * d / pinch.d) / cam.s);
     } else if (drag && pts.size === 1) {
       const dx = e.offsetX - drag.x, dy = e.offsetY - drag.y;
       if (Math.abs(dx) + Math.abs(dy) > 6) { drag.moved = true; cv.classList.add('dragging'); }
@@ -371,9 +543,7 @@ function initInput() {
     if (!pts.has(e.pointerId)) return;
     pts.delete(e.pointerId);
     if (pts.size < 2) pinch = null;
-    if (drag && !drag.moved && pts.size === 0) {
-      if (drag.button === 2) rightClick(e.offsetX, e.offsetY); else leftClick(e.offsetX, e.offsetY);
-    }
+    if (drag && !drag.moved && pts.size === 0) { if (drag.button === 2) rightClick(e.offsetX, e.offsetY); else leftClick(e.offsetX, e.offsetY); }
     if (pts.size === 0) { drag = null; cv.classList.remove('dragging'); }
   };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', e => { pts.delete(e.pointerId); drag = null; pinch = null; });
@@ -385,8 +555,12 @@ function initInput() {
     const m = e.target.closest('[data-mode]');
     if (m) { mapMode = m.dataset.mode; document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b === m)); mapDirty = true; }
   });
+  document.addEventListener('change', e => {
+    const el = e.target.closest('[data-change]'); if (!el) return;
+    if (el.dataset.change === 'assign') { const a = S.armies.find(x => x.id === +el.dataset.arg); if (a) { if (el.value === '') a.gen = null; else assignGeneral(a, +el.value); } refresh(true); }
+  });
   document.addEventListener('keydown', e => {
-    if (e.target.tagName === 'INPUT') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
     if (!S.started || S.over || modalQueue.length) return;
     if (e.code === 'Space') { e.preventDefault(); S.paused = !S.paused; }
     else if (e.key >= '1' && e.key <= '5') S.speed = +e.key;
@@ -406,16 +580,14 @@ function leftClick(x, y) {
     return;
   }
   const selArmy = S.sel && S.sel.type === 'army' ? S.armies.find(a => a.id === S.sel.id) : null;
-  if (moveMode && selArmy) {
+  const selFleet = S.sel && S.sel.type === 'fleet' ? S.fleets.find(f => f.id === S.sel.id) : null;
+  if (moveMode && (selArmy || selFleet)) {
     const pid = provAt(x, y);
-    if (pid >= 0) orderMove(selArmy, pid);
+    if (pid >= 0) { if (selArmy) orderMove(selArmy, pid); else orderFleet(selFleet, pid); }
     moveMode = false; updateBanner(); refresh(true); return;
   }
-  const bid = badgeAt(x, y);
-  if (bid >= 0) {
-    // 同じ場所の軍を順に選択
-    select({ type: 'army', id: bid }); refresh(true); return;
-  }
+  const b = badgeAt(x, y);
+  if (b) { select({ type: b.fleet ? 'fleet' : 'army', id: b.id }); refresh(true); return; }
   const pid = provAt(x, y);
   if (pid >= 0) select({ type: 'prov', id: pid });
   else { S.sel = null; mapDirty = true; }
@@ -423,10 +595,11 @@ function leftClick(x, y) {
 }
 function rightClick(x, y) {
   if (!S.started) return;
+  const pid = provAt(x, y); if (pid < 0) return;
   const selArmy = S.sel && S.sel.type === 'army' ? S.armies.find(a => a.id === S.sel.id) : null;
-  if (!selArmy || selArmy.owner !== S.player) return;
-  const pid = provAt(x, y);
-  if (pid >= 0) orderMove(selArmy, pid);
+  const selFleet = S.sel && S.sel.type === 'fleet' ? S.fleets.find(f => f.id === S.sel.id) : null;
+  if (selArmy && selArmy.owner === S.player) orderMove(selArmy, pid);
+  else if (selFleet && selFleet.owner === S.player) orderFleet(selFleet, pid);
   moveMode = false; updateBanner(); refresh(true);
 }
 
@@ -436,7 +609,7 @@ function renderStart() {
   $('st-nations').innerHTML = list.map(({ n, d, c }) => `<button class="ncard ${startSel === n.id ? 'on' : ''}" data-sn="${n.id}"><i class="dot" style="background:${rgb(n.color)}"></i><span class="nm">${esc(n.name)}<span class="diff ${n.size}">${SIZE_LABEL[n.size]}</span></span><span class="meta">${RACES[n.race].name}・${c}州<br>開発度 ${d}</span></button>`).join('');
   if (startSel > 0) {
     const n = nat(startSel);
-    $('st-nations').querySelector(`[data-sn="${startSel}"]`).insertAdjacentHTML('afterend', `<div class="detail" id="st-detail"><b>${RACES[n.race].name}</b>：${RACES[n.race].desc}<br><span class="note">同盟：${n.allies.map(i => esc(nat(i).name)).join('、') || 'なし'}${n.demonKing ? '<br>⚠ 魔王国は周辺国すべてから敵視されている。' : ''}</span></div>`);
+    $('st-nations').querySelector(`[data-sn="${startSel}"]`).insertAdjacentHTML('afterend', `<div class="detail" id="st-detail"><b>${RACES[n.race].name}</b>（${RELIGIONS[n.religion].name}）：${RACES[n.race].desc}<br><span class="note">同盟：${n.allies.map(i => esc(nat(i).name)).join('、') || 'なし'}${n.demonKing ? '<br>⚠ 魔王国は周辺国すべてから敵視されている。勝利条件は「魔界統一」。' : ''}</span></div>`);
   }
   $('st-cheats').innerHTML = CHEATS.map(c => `<button class="ccard ${startCheat === c.id ? 'on' : ''}" data-sc="${c.id}"><b>${c.name}</b><small>${c.desc}</small></button>`).join('');
   $('st-start').disabled = startSel < 0;
@@ -462,7 +635,7 @@ function beginPlay() {
   select({ type: 'prov', id: c.id });
   tab = 'nation';
   hooks.modal({
-    title: '✨ 転生', body: `目を覚ますと、豪奢な天蓋付きの寝台の上だった。<br>侍従が告げる——「陛下、${esc(nat(S.player).name)}の民がお待ちです」<br><br>あなたは<b>${esc(nat(S.player).ruler.name)}</b>として、この国を百年導くことになった。<br>授かったスキルは<b>「${CHEAT_BY_ID[startCheat].name}」</b>。<br><br><span class="note">▶ Spaceまたは右上の▶で時間が進む。<br>▶ まずは州を開発し、軍を整え、隣国の動きに注意しよう。<br>▶ 魔物の群れが各地に湧く。放置すると州を占領される。</span>`,
+    title: '✨ 転生', body: `目を覚ますと、豪奢な天蓋付きの寝台の上だった。<br>侍従が告げる——「陛下、${esc(nat(S.player).name)}の民がお待ちです」<br><br>あなたは<b>${esc(nat(S.player).ruler.name)}</b>として、この国を百年導くことになった。<br>授かったスキルは<b>「${CHEAT_BY_ID[startCheat].name}」</b>。<br><br><span class="note">▶ Spaceまたは右上の▶で時間が進む。<br>▶ 「技能」タブでスキルポイントを1つ使える。<br>▶ 魔力が貯まったら「英雄」タブで異世界人を召喚しよう。<br>▶ 地図上の🕳はダンジョン。軍を送り込むと財宝や秘宝が手に入る。<br>▶ 魔物の群れや反乱軍が各地に湧く。放置すると州を占領される。</span>`,
     buttons: [{ label: '覇道を歩み始める' }],
   });
   refresh(true);
@@ -495,7 +668,6 @@ function loop(t) {
   if (t - lastUI > 250) { lastUI = t; if (S && S.started) refresh(false); }
   requestAnimationFrame(loop);
 }
-
 function boot(seed) {
   $('loading').classList.remove('hidden');
   setTimeout(() => {

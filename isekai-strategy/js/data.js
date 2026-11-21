@@ -179,3 +179,86 @@ const SIZE_LABEL = { big: 'やさしい', mid: 'ふつう', small: 'むずかし
 const UNOWNED_COLOR = [206, 198, 178];
 const MONSTER_COLOR = [36, 18, 40];
 const MONSTER_NAMES = ['ゴブリンの大群', 'オークの軍勢', 'アンデッドの群れ', 'ワイバーンの群れ', '魔獣の群れ', 'トロールの一団', 'リザードマンの戦団'];
+
+// ===== 拡張データ =====
+const REBEL = NATION_TEMPLATES.length + 1;
+const REBEL_COLOR = [96, 20, 20];
+TERRAIN.sea = { name: '海', move: 1.2, def: 0, color: [40, 80, 120], dev: 0, shade: 1 };
+
+const RELIGIONS = {
+  light:    { name: '光輪教',   color: [240, 222, 140] },
+  spirit:   { name: '精霊信仰', color: [110, 200, 120] },
+  ancestor: { name: '祖霊信仰', color: [176, 120, 72] },
+  beastgod: { name: '獣神信仰', color: [222, 132, 60] },
+  abyss:    { name: '深淵教',   color: [120, 60, 160] },
+  dragon:   { name: '竜神信仰', color: [60, 170, 180] },
+};
+const RACE_RELIGION = { human: 'light', elf: 'spirit', dwarf: 'ancestor', beast: 'beastgod', demon: 'abyss', dragon: 'dragon' };
+
+const SHIPS = {
+  war:   { name: '戦列艦', cost: 40, maint: 0.5 },
+  trans: { name: '輸送艦', cost: 15, maint: 0.15 },
+};
+
+// 転生者のスキルツリー（4系統×4段）
+const SKILL_BRANCHES = { adm: '内政', dip: '外交', mil: '武勇', mag: '魔導' };
+const SKILLS = [
+  { id: 'k1', br: 'adm', name: '鑑定眼', desc: '税収+10%', mods: { taxMod: 0.1 } },
+  { id: 'k2', br: 'adm', name: '経営学', desc: '生産収入+10%', mods: { prodMod: 0.1 }, req: 'k1' },
+  { id: 'k3', br: 'adm', name: '都市計画', desc: '開発コスト-15%、反乱-1', mods: { devCost: -0.15, unrest: -1 }, req: 'k2' },
+  { id: 'k4', br: 'adm', name: '黄金律', desc: '建設費-20%、税収+10%', mods: { buildCost: -0.2, taxMod: 0.1 }, req: 'k3' },
+  { id: 'd1', br: 'dip', name: '交渉術', desc: '外交点+1/月', mods: { dipPts: 1 } },
+  { id: 'd2', br: 'dip', name: '魅了', desc: '関係改善+50%、同盟受諾+10', mods: { relMult: 0.5, allyAccept: 10 }, req: 'd1' },
+  { id: 'd3', br: 'dip', name: '交易網', desc: '交易収入+20%、商人+1', mods: { tradeMod: 0.2, merchants: 1 }, req: 'd2' },
+  { id: 'd4', br: 'dip', name: '宗主の威光', desc: '外交併合コスト-30%', mods: { annexCost: -0.3 }, req: 'd3' },
+  { id: 'm1', br: 'mil', name: '剣術', desc: '戦闘力+5%', mods: { combat: 0.05 } },
+  { id: 'm2', br: 'mil', name: '統率', desc: '士気+0.5', mods: { morale: 0.5 }, req: 'm1' },
+  { id: 'm3', br: 'mil', name: '攻城術', desc: '包囲速度+30%', mods: { siege: 0.3 }, req: 'm2' },
+  { id: 'm4', br: 'mil', name: '覇王の覇気', desc: '戦闘力+10%、人的資源+20%', mods: { combat: 0.1, mpMod: 0.2 }, req: 'm3' },
+  { id: 's1', br: 'mag', name: '魔力感知', desc: '魔力+1/月', mods: { manaPts: 1 } },
+  { id: 's2', br: 'mag', name: '召喚術', desc: '召喚コスト-25%', mods: { summonCost: -0.25 }, req: 's1' },
+  { id: 's3', br: 'mag', name: '大魔導', desc: '召喚のレア度が上がりやすい', mods: { rarityUp: 1 }, req: 's2' },
+  { id: 's4', br: 'mag', name: '次元干渉', desc: '召喚事故が起きなくなる、魔力+2/月', mods: { noAccident: 1, manaPts: 2 }, req: 's3' },
+];
+const SKILL_BY_ID = Object.fromEntries(SKILLS.map(s => [s.id, s]));
+
+// 召喚（異世界からチート能力者を呼ぶ）
+const RARITIES = [
+  { id: 'N', mult: 0.5, w: 50, w2: 30, color: '#b9b2a4' },
+  { id: 'R', mult: 0.75, w: 30, w2: 35, color: '#7ab8f0' },
+  { id: 'SR', mult: 1.0, w: 15, w2: 25, color: '#d58cf0' },
+  { id: 'SSR', mult: 1.5, w: 5, w2: 10, color: '#ffd45a' },
+];
+const SUMMON_POOL = [
+  { id: 'swordsaint', title: '剣聖', role: 'general', desc: '元剣道部主将。剣の極致に至った', stats: [4, 2, 2, 1], mods: { combat: 0.15 } },
+  { id: 'hero', title: '勇者', role: 'general', desc: '聖剣に選ばれし者', stats: [4, 3, 3, 2], mods: { combat: 0.2, morale: 0.5 }, minR: 2 },
+  { id: 'tactician', title: '軍師', role: 'general', desc: '戦史オタクの大学院生', stats: [2, 3, 4, 3], mods: { moveSpeed: 0.15, siege: 0.25 } },
+  { id: 'tamer', title: '魔物使い', role: 'general', desc: '魔物の言葉がわかる', stats: [2, 2, 3, 1], mods: { combat: 0.08, vsMonster: 0.6 } },
+  { id: 'archmage', title: '殲滅魔導士', role: 'general', desc: '詠唱破棄で戦略級魔法を撃つ', stats: [5, 1, 1, 3], mods: { combat: 0.12, siege: 0.3 } },
+  { id: 'sage', title: '大賢者', role: 'advisor', desc: '理系の院卒。知識チート', mods: { techCost: -0.15, manaPts: 1 } },
+  { id: 'saint', title: '聖女', role: 'advisor', desc: '癒しの奇跡で民を導く', mods: { unrest: -2, morale: 0.3 } },
+  { id: 'merchant', title: '商人', role: 'advisor', desc: '前世はコンビニ店長', mods: { tradeMod: 0.25, merchants: 1 } },
+  { id: 'cook', title: '料理人', role: 'advisor', desc: 'マヨネーズで外交を制す', mods: { mpMod: 0.15, relMult: 0.5 } },
+  { id: 'architect', title: '建築士', role: 'advisor', desc: '一級建築士。耐震設計で城を建てる', mods: { buildCost: -0.25 } },
+  { id: 'alchemist', title: '錬金術師', role: 'advisor', desc: '化学の知識で錬金術を極めた', mods: { prodMod: 0.2 } },
+  { id: 'salaryman', title: '元営業マン', role: 'advisor', desc: '接待と根回しのプロ', mods: { dipPts: 2, allyAccept: 15 } },
+  { id: 'clerk', title: '元公務員', role: 'advisor', desc: '書類仕事で国が回り出す', mods: { admPts: 2, unrest: -1 } },
+  { id: 'otaku', title: 'ミリオタ', role: 'advisor', desc: '近代戦術を持ち込んだ', mods: { milPts: 2, combat: 0.05 } },
+  { id: 'farmer', title: '農業チート', role: 'advisor', desc: '輪作と肥料で収穫倍増', mods: { taxMod: 0.15 } },
+];
+const JP_SURNAMES = ['佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '山本', '中村', '小林', '加藤', '吉田', '山田', '佐々木', '松本', '井上', '木村', '清水', '山崎', '森', '池田'];
+const JP_GIVEN = ['ユウキ', 'ハルト', 'ソウタ', 'レン', 'ミナト', 'アオイ', 'ヒナタ', 'サクラ', 'ユイ', 'リン', 'カナタ', 'ミオ', 'ツムギ', 'コハル', 'タクミ', 'ダイチ', 'シオン', 'メイ', 'ケンジ', 'マコト'];
+const GEN_STAT_NAMES = ['攻撃', '防御', '機動', '包囲'];
+
+const ARTIFACTS = [
+  { id: 'orb', name: '星詠みの宝珠', desc: '技術コスト-10%', mods: { techCost: -0.1 } },
+  { id: 'shield', name: '竜王の鱗盾', desc: '戦闘力+8%', mods: { combat: 0.08 } },
+  { id: 'horn', name: '豊穣の角杯', desc: '税収+10%', mods: { taxMod: 0.1 } },
+  { id: 'feather', name: '風精の羽', desc: '移動速度+10%', mods: { moveSpeed: 0.1 } },
+  { id: 'scale', name: '黄金の天秤', desc: '交易収入+15%', mods: { tradeMod: 0.15 } },
+  { id: 'shard', name: '魔王の欠片', desc: '魔力+2/月', mods: { manaPts: 2 } },
+  { id: 'banner', name: '不屈の軍旗', desc: '士気+0.5', mods: { morale: 0.5 } },
+  { id: 'crown', name: '古王の冠', desc: '統治点+1/月、反乱-1', mods: { admPts: 1, unrest: -1 } },
+  { id: 'grimoire', name: '禁書グリモワール', desc: '召喚コスト-20%', mods: { summonCost: -0.2 } },
+];
+const ARTIFACT_BY_ID = Object.fromEntries(ARTIFACTS.map(a => [a.id, a]));

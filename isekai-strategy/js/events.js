@@ -15,8 +15,8 @@ const EVENTS = [
     id: 'dungeon', title: 'ダンジョンの発見', prep: n => randomOwnProv(n, p => !p.dungeon),
     text: (n, p) => `${esc(p.name)}の地下深くで、古代のダンジョンへの入口が発見された。<br>中からは魔物の気配と、財宝の輝きが漏れている。`,
     options: [
-      { label: '冒険者ギルドを誘致する', desc: '金貨-30、この州の生産収入+1/月（恒久）', fx: (n, p) => { n.gold -= 30; p.dungeon = true; } },
-      { label: '財宝を回収して封印する', desc: '金貨+60', fx: n => { n.gold += 60; } },
+      { label: '自ら攻略する', desc: 'Lv2のダンジョンが出現（軍を送り込んで攻略できる）', fx: (n, p) => { p.dungeon = { lv: 2, cleared: false }; } },
+      { label: '冒険者ギルドに任せる', desc: '金貨-30、攻略済み扱いになり生産収入+1/月', fx: (n, p) => { n.gold -= 30; p.dungeon = { lv: 1, cleared: true }; } },
     ],
   },
   {
@@ -78,6 +78,39 @@ const EVENTS = [
     ],
   },
   {
+    id: 'lostsoul', title: '迷い込んだ異世界人',
+    text: () => `国境の森で、制服姿の少年少女が保護された。<br>「気づいたらここにいた」——どうやら召喚の儀を経ずに、こちらの世界へ落ちてきたらしい。`,
+    options: [
+      { label: '保護して仕官させる', desc: '異世界人1人を得る（N〜SR）', fx: n => { const c = makeSummoned(n, rint(0, 2)); if (c.role === 'general') n.generals.push(c); else if (n.advisors.length < 3) n.advisors.push(c); else n.bench.push(c); hooks.log(`✨ ${c.title} ${c.name}（${c.rarity}）が仕官した`, 'good'); } },
+      { label: '魔力の触媒として研究する', desc: '魔力+80', fx: n => { n.mana += 80; } },
+    ],
+  },
+  {
+    id: 'demonarmy', title: '魔王軍の侵攻', cond: n => !n.demonKing && S.nations.some(o => o.demonKing && o.alive) && n.race !== 'demon',
+    prep: n => randomOwnProv(n),
+    text: (n, p) => `魔王の命を受けた魔物の大軍団が${esc(p.name)}に迫っている！<br>斥候の報告では、その数は通常の群れを遥かに上回る。`,
+    options: [
+      { label: '全軍で迎え撃つ', desc: '大規模な魔物の軍勢が出現（撃破で軍事点+50）', fx: (n, p) => { const a = spawnMonsters(p, Math.round(6000 + S.day / 360 * 200)); a.name = '魔王軍団'; a.bounty = true; } },
+      { label: '城壁に籠もって耐える', desc: '安定度-1', fx: n => { n.stab = Math.max(-3, (n.stab || 0) - 1); } },
+    ],
+  },
+  {
+    id: 'heresy', title: '異端の広がり', prep: n => randomOwnProv(n, p => p.religion === n.religion && p.id !== n.capital),
+    text: (n, p) => `${esc(p.name)}で、国教とは異なる教えを説く者が現れ、信者を増やしている。`,
+    options: [
+      { label: '異端審問を行う', desc: '統治点-50', fx: n => { n.adm -= 50; } },
+      { label: '信仰の自由を認める', desc: 'この州の宗教が変わる、外交点+30', fx: (n, p) => { p.religion = pick(Object.keys(RELIGIONS).filter(r => r !== n.religion)); n.dip += 30; mapDirty = true; } },
+    ],
+  },
+  {
+    id: 'festival', title: '建国祭',
+    text: (n) => `${esc(n.name)}の建国を祝う祭りが盛大に開かれた。転生者の君主が持ち込んだ「屋台」と「花火」が大評判だ。`,
+    options: [
+      { label: '祝祭を盛り上げる（金貨-40）', desc: '安定度+1', fx: n => { n.gold -= 40; n.stab = Math.min(3, (n.stab || 0) + 1); } },
+      { label: '質素に済ませる', desc: '金貨+20', fx: n => { n.gold += 20; } },
+    ],
+  },
+  {
     id: 'plague', title: '疫病の流行',
     text: () => `都市部で原因不明の熱病が広がっている。`,
     options: [
@@ -105,6 +138,7 @@ function playerEvents() {
   const ctx = e.prep ? e.prep(n) : null;
   if (e.prep && !ctx) return;
   n.evCD[e.id] = S.day + 360 * 4;
+  gainXP(n, 3);
   hooks.modal({
     title: '✦ ' + e.title, body: e.text(n, ctx),
     buttons: e.options.map(o => ({ label: o.label, desc: o.desc, fn: () => { o.fx(n, ctx); mapDirty = true; } })),
@@ -117,8 +151,8 @@ function newWorld(seed) {
   GRID = w.grid;
   S = {
     seed, day: 0, speed: 2, paused: true, started: false, player: -1,
-    provinces: w.provinces, nations: w.nations, rel: w.rel, relBase: w.relBase,
-    armies: [], wars: [], battles: {}, nextArmyId: 1, nextWarId: 1, log: [], sel: null, over: false,
+    provinces: w.provinces, landCount: w.landCount, nodes: w.nodes, nations: w.nations, rel: w.rel, relBase: w.relBase,
+    armies: [], fleets: [], wars: [], battles: {}, nextArmyId: 1, nextWarId: 1, nextFleetId: 1, nextCharId: 1, log: [], sel: null, over: false, victories: {},
   };
   mapDirty = true;
 }
@@ -134,22 +168,31 @@ function startGame(playerId, cheat, rulerName) {
   }
   const p = nat(playerId);
   p.isPlayer = true; p.cheat = cheat;
-  p.ruler = { name: rulerName || '転生者', adm: 3, dip: 3, mil: 3, reincarnated: true };
+  p.ruler = { name: rulerName || '転生者', adm: 3, dip: 3, mil: 3, reincarnated: true, xp: 0, lv: 1 };
+  p.sp = 1; p.mana = 60;
   if (cheat === 'hero') createArmy(playerId, p.capital, 6, 4, 2, { hero: true, name: '勇者隊' });
   p.gold += 50;
+  // AIの初期将軍・艦隊
+  for (const n of S.nations) {
+    if (n.isMonster) continue;
+    n.mil += generalCost(n); const g = recruitGeneral(n);
+    const a = S.armies.find(a => a.owner === n.id && !a.hero); if (g && a) a.gen = g.id;
+    const port = ownedProvs(n.id).find(q => q.coastal);
+    if (port && n.size !== 'small') createFleet(n.id, port.snb[0], n.size === 'big' ? 3 : 1, 2);
+  }
   S.started = true; S.paused = true;
   mapDirty = true;
   hooks.log(`✨ ${p.ruler.name}は${p.name}の君主として転生した。王国暦${START_YEAR}年、物語が始まる。`, 'good');
 }
 
 // ---------- セーブ／ロード ----------
-const SAVE_KEY = 'isekai-senki-save-v1';
-const DYN_KEYS = ['owner', 'controller', 'tax', 'prod', 'mp', 'fort', 'b', 'siege', 'colonizing', 'coreUntil', 'dungeon', 'good', 'terrain'];
+const SAVE_KEY = 'isekai-senki-save-v2';
+const DYN_KEYS = ['owner', 'controller', 'tax', 'prod', 'mp', 'fort', 'b', 'siege', 'colonizing', 'converting', 'coreUntil', 'dungeon', 'good', 'terrain', 'religion'];
 function serialize() {
   return JSON.stringify({
-    v: 1, seed: S.seed, day: S.day, speed: S.speed, player: S.player,
-    nations: S.nations, rel: S.rel, relBase: S.relBase, armies: S.armies, wars: S.wars,
-    nextArmyId: S.nextArmyId, nextWarId: S.nextWarId, log: S.log.slice(-40),
+    v: 2, seed: S.seed, day: S.day, speed: S.speed, player: S.player,
+    nations: S.nations, rel: S.rel, relBase: S.relBase, armies: S.armies, fleets: S.fleets, wars: S.wars, victories: S.victories, demonKingSlayer: S.demonKingSlayer,
+    nextArmyId: S.nextArmyId, nextWarId: S.nextWarId, nextFleetId: S.nextFleetId, nextCharId: S.nextCharId, log: S.log.slice(-40),
     provs: S.provinces.map(p => DYN_KEYS.map(k => p[k])),
   });
 }
@@ -158,9 +201,10 @@ function autosave() { if (S && S.started && !S.over) saveGame(); }
 function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
 function loadGame() {
   let d; try { d = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
-  if (!d || d.v !== 1) return false;
+  if (!d || d.v !== 2) return false;
   newWorld(d.seed);
-  Object.assign(S, { day: d.day, speed: d.speed, player: d.player, nations: d.nations, rel: d.rel, relBase: d.relBase, armies: d.armies, wars: d.wars, nextArmyId: d.nextArmyId, nextWarId: d.nextWarId, log: d.log || [] });
+  Object.assign(S, { day: d.day, speed: d.speed, player: d.player, nations: d.nations, rel: d.rel, relBase: d.relBase, armies: d.armies, fleets: d.fleets || [], wars: d.wars, victories: d.victories || {}, demonKingSlayer: d.demonKingSlayer,
+    nextArmyId: d.nextArmyId, nextWarId: d.nextWarId, nextFleetId: d.nextFleetId || 1, nextCharId: d.nextCharId || 1, log: d.log || [] });
   d.provs.forEach((vals, i) => DYN_KEYS.forEach((k, j) => S.provinces[i][k] = vals[j]));
   S.started = true; S.paused = true; S.battles = {};
   mapDirty = true;
