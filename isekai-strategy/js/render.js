@@ -231,16 +231,91 @@ function renderBase() {
 }
 function computeNationLabels() {
   nationLabels = [];
+  const np = S.provinces.length;
+  const compOf = new Int32Array(np).fill(-1);
+  let cid = 0;
   for (const n of S.nations) {
     if (n.isMonster || !n.alive) continue;
-    let ax = 0, ay = 0, area = 0, minX = 1e9, maxX = -1e9;
-    for (const p of S.provinces) if (p.owner === n.id) { ax += p.x * p.area; ay += p.y * p.area; area += p.area; minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); }
-    if (!area) continue;
-    const name = n.short;
-    const width = Math.max(Math.sqrt(area) * 1.1, maxX - minX + 30);
-    const fs = clamp(width / (name.length + 1), 11, 54);
-    nationLabels.push({ x: ax / area, y: ay / area, fs, name, id: n.id });
+    // 領土を連結成分に分ける
+    const comps = [];
+    for (const p0 of S.provinces) {
+      if (p0.owner !== n.id || compOf[p0.id] >= 0) continue;
+      const list = [], q = [p0.id]; compOf[p0.id] = cid;
+      while (q.length) { const u = q.pop(); list.push(prov(u)); for (const v of prov(u).nb) if (compOf[v] < 0 && prov(v).owner === n.id) { compOf[v] = cid; q.push(v); } }
+      comps.push({ id: cid++, list, area: list.reduce((s, p) => s + p.area, 0) });
+    }
+    comps.sort((a, b) => b.area - a.area);
+    comps.forEach((c, i) => { if (i === 0 || (c.area >= comps[0].area * 0.6 && c.area > 5000)) { const L = fitLabel(n.short, c, compOf); if (L) { L.id = n.id; nationLabels.push(L); } } });
   }
+}
+// 領土の形に沿って国名を収める（傾け・曲げ・縦書き）
+function fitLabel(text, comp, compOf) {
+  const inside = (x, y) => { const ix = x | 0, iy = y | 0; if (ix < 0 || iy < 0 || ix >= MAP_W || iy >= MAP_H) return false; return compOf[GRID[iy * MAP_W + ix]] === comp.id; };
+  const walk = (x, y, dx, dy, max) => { let last = 0, gap = 0; for (let t = 2; t <= max; t += 2) { if (inside(x + dx * t, y + dy * t)) { last = t; gap = 0; } else if (++gap > 3) break; } return last; };
+  let A = 0, mx = 0, my = 0;
+  for (const p of comp.list) { A += p.area; mx += p.x * p.area; my += p.y * p.area; }
+  mx /= A; my /= A;
+  let cxx = 0, cyy = 0, cxy = 0;
+  for (const p of comp.list) { const dx = p.x - mx, dy = p.y - my, sp = p.area / (4 * Math.PI); cxx += p.area * (dx * dx + sp); cyy += p.area * (dy * dy + sp); cxy += p.area * dx * dy; }
+  let ang = 0.5 * Math.atan2(2 * cxy, cxx - cyy);
+  // 起点：重心が領土外なら最大の州の中心
+  let sx0 = mx, sy0 = my;
+  if (!inside(sx0, sy0)) { const big = comp.list.reduce((a, b) => b.area > a.area ? b : a); sx0 = big.x; sy0 = big.y; }
+  const n = [...text].length;
+  let best = null;
+  const tryAngle = (a0) => {
+    const ux = Math.cos(a0), uy = Math.sin(a0), vx = -uy, vy = ux;
+    const a = -walk(sx0, sy0, -ux, -uy, 900), b = walk(sx0, sy0, ux, uy, 900);
+    const len = b - a; if (len < 8) return;
+    const cx = sx0 + ux * (a + b) / 2, cy = sy0 + uy * (a + b) / 2;
+    // 軸に沿って太さと中心線を測る
+    const K = 7, ss = [], ms = [], hs = [];
+    for (let i = 0; i < K; i++) {
+      const s = (i / (K - 1) - 0.5) * len * 0.84, px = cx + ux * s, py = cy + uy * s;
+      let base = 0;
+      if (!inside(px, py)) { let f = false; for (const o of [4, -4, 8, -8, 12, -12, 18, -18]) if (inside(px + vx * o, py + vy * o)) { base = o; f = true; break; } if (!f) continue; }
+      const c1 = base - walk(px + vx * base, py + vy * base, -vx, -vy, 400), c2 = base + walk(px + vx * base, py + vy * base, vx, vy, 400);
+      ss.push(s); ms.push((c1 + c2) / 2); hs.push(c2 - c1);
+    }
+    if (ss.length < 3) return;
+    // 中心線を二次曲線で近似
+    let S0 = ss.length, S1 = 0, S2 = 0, S3 = 0, S4 = 0, T0 = 0, T1 = 0, T2 = 0;
+    for (let i = 0; i < ss.length; i++) { const s = ss[i], m = ms[i]; S1 += s; S2 += s * s; S3 += s * s * s; S4 += s ** 4; T0 += m; T1 += m * s; T2 += m * s * s; }
+    const det = (m) => m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    const M = [[S4, S3, S2], [S3, S2, S1], [S2, S1, S0]], D = det(M);
+    let qa = 0, qb = 0, qc = T0 / S0;
+    if (Math.abs(D) > 1e-6) {
+      qa = det([[T2, S3, S2], [T1, S2, S1], [T0, S1, S0]]) / D; qb = det([[S4, T2, S2], [S3, T1, S1], [S2, T0, S0]]) / D; qc = det([[S4, S3, T2], [S3, S2, T1], [S2, S1, T0]]) / D;
+      const half = len / 2, lim = len * 0.12;
+      if (Math.abs(qa) * half * half > lim) qa = Math.sign(qa) * lim / (half * half);
+    }
+    const hsorted = [...hs].sort((x, y) => x - y), thick = hsorted[Math.floor(hsorted.length * 0.3)];
+    const usable = len * 0.82;
+    let fs = Math.min(thick * 0.72, usable / (n + (n - 1) * 0.2));
+    fs = clamp(fs, 6, 64);
+    const spc = n > 1 ? clamp((usable - n * fs) / ((n - 1) * fs), 0.1, 1.1) : 0;
+    const score = fs * (1 + 0.15 * spc);
+    if (!best || score > best.score) best = { score, cx, cy, ux, uy, vx, vy, qa, qb, qc, fs, spc, ang: a0 };
+  };
+  const vertical = Math.abs(ang) > 0.8; // 縦長・急斜面の国は縦書き
+  if (vertical) ang = Math.PI / 2;
+  else ang = clamp(ang, -0.55, 0.55);
+  for (const d of [0, -0.15, 0.15, -0.3, 0.3]) tryAngle(vertical ? Math.PI / 2 + d * 0.5 : clamp(ang + d, -0.6, 0.6));
+  if (!vertical) { const keep = best; best = null; for (const d of [0, -0.15, 0.15]) tryAngle(Math.PI / 2 + d); if (!best || (keep && keep.score >= best.score * 0.8)) best = keep; }
+  if (!best) return null;
+  // 文字ごとの位置と角度
+  const B = best, chars = [...text], tw = n * B.fs + (n - 1) * B.fs * B.spc;
+  const isV = Math.abs(Math.abs(B.ang) - Math.PI / 2) < 0.5;
+  const glyphs2 = chars.map((ch, k) => {
+    const s = -tw / 2 + B.fs / 2 + k * B.fs * (1 + B.spc);
+    const m = B.qa * s * s + B.qb * s + B.qc, dm = 2 * B.qa * s + B.qb;
+    const x = B.cx + B.ux * s + B.vx * m, y = B.cy + B.uy * s + B.vy * m;
+    let rot = Math.atan2(B.uy + B.vy * dm, B.ux + B.vx * dm);
+    if (isV) { rot -= Math.PI / 2; if (ch === 'ー' || ch === '〜') rot += Math.PI / 2; } // 縦書きは文字を立てる（長音は縦向き）
+    if (rot > Math.PI / 2) rot -= Math.PI; if (rot < -Math.PI / 2) rot += Math.PI;
+    return { ch, x, y, rot };
+  });
+  return { fs: B.fs, glyphs: glyphs2, x: B.cx, y: B.cy, name: text };
 }
 
 function draw() {
@@ -439,14 +514,17 @@ function drawLabels(exporting) {
   if (natAlpha > 0 && mapMode === 'political') {
     for (const L of nationLabels) {
       const fs = L.fs * cam.s;
-      if (fs < 9) continue;
+      if (fs < 8) continue;
+      if (!visible(sx(L.x), sy(L.y), fs * 12)) continue;
       ctx.font = `${fs}px "Zen Antique", "Shippori Mincho", serif`;
-      if ('letterSpacing' in ctx) ctx.letterSpacing = `${fs * 0.3}px`;
-      ctx.lineWidth = Math.max(2, fs * 0.14); ctx.strokeStyle = `rgba(240,228,198,${0.55 * natAlpha})`;
-      ctx.fillStyle = `rgba(70,36,16,${0.78 * natAlpha})`;
-      ctx.strokeText(L.name, sx(L.x), sy(L.y)); ctx.fillText(L.name, sx(L.x), sy(L.y));
+      ctx.lineWidth = Math.max(1.5, fs * 0.12); ctx.strokeStyle = `rgba(240,228,198,${0.5 * natAlpha})`;
+      ctx.fillStyle = `rgba(70,36,16,${0.8 * natAlpha})`;
+      for (const G of L.glyphs) {
+        ctx.save(); ctx.translate(sx(G.x), sy(G.y)); ctx.rotate(G.rot);
+        ctx.strokeText(G.ch, 0, 0); ctx.fillText(G.ch, 0, 0);
+        ctx.restore();
+      }
     }
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
   }
   if (cam.s >= 1.4 || exporting) {
     const a = exporting ? 1 : clamp((cam.s - 1.4) / 0.4, 0, 1);
