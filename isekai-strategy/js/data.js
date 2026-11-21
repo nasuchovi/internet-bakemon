@@ -262,3 +262,25 @@ const ARTIFACTS = [
   { id: 'grimoire', name: '禁書グリモワール', desc: '召喚コスト-20%', mods: { summonCost: -0.2 } },
 ];
 const ARTIFACT_BY_ID = Object.fromEntries(ARTIFACTS.map(a => [a.id, a]));
+
+// ===== 種族特性（長所・短所・時代成長）=====
+const ERAS = ['黎明期', '興隆期', '動乱期', '魔導期', '終末期'];
+Object.assign(RACES.human, { mods: { taxMod: 0.10, techCost: -0.10, combat: -0.05 }, grow: { techCost: -0.05, taxMod: 0.05 },
+  pros: '税収+10%、技術コスト-10%', cons: '戦闘力-5%', growDesc: '時代ごとに技術コスト-5%・税収+5%（適応力）' });
+Object.assign(RACES.elf, { mods: { forestCombat: 0.30, dipPts: 1, mpMod: -0.30, prodMod: -0.10 }, grow: { forestCombat: 0.10, dipPts: 0.5 },
+  pros: '森林・湿地で戦闘力+30%、外交点+1/月', cons: '人的資源-30%、生産-10%', growDesc: '時代ごとに森での戦闘力+10%・外交点+0.5' });
+Object.assign(RACES.dwarf, { mods: { prodMod: 0.20, siege: 0.20, moveSpeed: -0.15 }, grow: { prodMod: 0.05, siege: 0.10 },
+  pros: '生産+20%、包囲速度+20%、首都の要塞+1', cons: '移動速度-15%', growDesc: '時代ごとに生産+5%・包囲速度+10%' });
+Object.assign(RACES.beast, { mods: { mpMod: 0.40, moveSpeed: 0.15, techCost: 0.15 }, grow: { mpMod: 0.10, combat: 0.03 },
+  pros: '人的資源+40%、移動速度+15%', cons: '技術コスト+15%', growDesc: '時代ごとに人的資源+10%・戦闘力+3%' });
+Object.assign(RACES.demon, { mods: { combat: 0.15, morale: 0.5, unrest: 1 }, grow: { combat: 0.05 },
+  pros: '戦闘力+15%、士気+0.5', cons: '反乱+1、他種族から警戒される', growDesc: '時代ごとに戦闘力+5%' });
+Object.assign(RACES.dragon, { mods: { cavPower: 0.40, morale: 0.5, mpMod: -0.25, devCost: 0.15 }, grow: { cavPower: 0.15, morale: 0.25 },
+  pros: '竜騎兵の戦闘力+40%、士気+0.5', cons: '人的資源-25%、開発コスト+15%', growDesc: '時代ごとに竜騎兵+15%・士気+0.25' });
+for (const r of Object.values(RACES)) r.desc = `${r.pros}／短所：${r.cons}`;
+
+const DIFFICULTY = {
+  easy:   { name: 'やさしい', aggr: 0.5, rogue: 0.5, grace: 360 * 5, desc: 'AIは穏やか、魔物・反乱は少なめ。最初の5年は攻められない' },
+  normal: { name: 'ふつう',   aggr: 1.0, rogue: 1.0, grace: 360 * 2, desc: '標準的な難易度' },
+  hard:   { name: 'むずかしい', aggr: 1.5, rogue: 1.3, grace: 360, desc: 'AIは好戦的、魔物・反乱も多い' },
+};

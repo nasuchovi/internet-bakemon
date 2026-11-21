@@ -186,7 +186,10 @@ function draw() {
   if (!S) return;
   if (mapDirty) renderBase();
   const w = viewW(), h = viewH();
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const now = performance.now();
+  let ox = 0, oy = 0;
+  if (now < shakeUntil) { const k = (shakeUntil - now) / 400; ox = (Math.random() - 0.5) * shakeAmp * 2 * k; oy = (Math.random() - 0.5) * shakeAmp * 2 * k; }
+  ctx.setTransform(dpr, 0, 0, dpr, ox * dpr, oy * dpr);
   ctx.fillStyle = '#18324f'; ctx.fillRect(0, 0, w, h);
   ctx.imageSmoothingEnabled = cam.s < 2.5;
   ctx.drawImage(baseCanvas, -cam.x * cam.s, -cam.y * cam.s, MAP_W * cam.s, MAP_H * cam.s);
@@ -197,6 +200,7 @@ function draw() {
   drawArmies();
   drawFleets();
   drawBattles();
+  drawFx(now);
 }
 const sx = x => (x - cam.x) * cam.s, sy = y => (y - cam.y) * cam.s;
 
@@ -359,4 +363,56 @@ function roundRect(x, y, w, h, r) {
 function badgeAt(px, py) {
   for (let i = badgeRects.length - 1; i >= 0; i--) { const b = badgeRects[i]; if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return b; }
   return null;
+}
+
+// ---------- 演出（ポップアップ文字・波紋・画面振動） ----------
+const fxList = []; let shakeUntil = 0, shakeAmp = 0, flashUntil = 0, flashColor = '255,40,30';
+const FX_COLORS = { win: '255,214,90', siege: '255,170,60', lose: '240,90,80', lost: '240,90,80', war: '255,60,40', levelup: '255,230,140', summon: '200,160,255' };
+function addFx(kind, pid, text) {
+  const now = performance.now(), p = pid != null ? prov(pid) : null;
+  fxList.push({ kind, x: p ? p.x : null, y: p ? p.y : null, text, t0: now });
+  const sh = { war: [450, 7], siege: [220, 3.5], win: [200, 3], lose: [260, 4], lost: [260, 4] }[kind];
+  if (sh) { shakeUntil = now + sh[0]; shakeAmp = sh[1]; }
+  if (kind === 'war' || kind === 'lost') { flashUntil = now + 500; flashColor = '255,40,30'; }
+  if (kind === 'levelup') { flashUntil = now + 350; flashColor = '255,225,140'; }
+  if (fxList.length > 30) fxList.shift();
+}
+function drawFx(now) {
+  const w = viewW(), h = viewH();
+  if (now < flashUntil) {
+    const a = (flashUntil - now) / 500;
+    const g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.7);
+    g.addColorStop(0, `rgba(${flashColor},0)`); g.addColorStop(1, `rgba(${flashColor},${0.45 * a})`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = fxList.length - 1; i >= 0; i--) {
+    const f = fxList[i], t = (now - f.t0) / 1000, dur = f.x == null ? 1.8 : 1.6;
+    if (t > dur) { fxList.splice(i, 1); continue; }
+    const col = FX_COLORS[f.kind] || '255,255,255';
+    const alpha = t < 0.12 ? t / 0.12 : 1 - Math.max(0, (t - dur + 0.6) / 0.6);
+    const pop = t < 0.14 ? 1.8 - t / 0.14 * 0.8 : 1;
+    let x, y;
+    if (f.x != null) {
+      x = sx(f.x); y = sy(f.y);
+      for (let k = 0; k < 2; k++) {
+        const tt = t - k * 0.18; if (tt < 0) continue;
+        const r = 8 + tt * 70, a = Math.max(0, 1 - tt / 1.0);
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.strokeStyle = `rgba(${col},${a})`; ctx.lineWidth = 5 * a + 1; ctx.stroke();
+      }
+      if (t < 0.35 && (f.kind === 'win' || f.kind === 'siege')) {
+        ctx.save(); ctx.translate(x, y); ctx.strokeStyle = `rgba(${col},${1 - t / 0.35})`; ctx.lineWidth = 3;
+        for (let k = 0; k < 10; k++) { const an = k / 10 * Math.PI * 2, r0 = 14 + t * 60, r1 = r0 + 16; ctx.beginPath(); ctx.moveTo(Math.cos(an) * r0, Math.sin(an) * r0); ctx.lineTo(Math.cos(an) * r1, Math.sin(an) * r1); ctx.stroke(); }
+        ctx.restore();
+      }
+      y = y - 34 - t * 16;
+    } else { x = w / 2; y = h * 0.3 - t * 10; }
+    if (!f.text) continue;
+    ctx.save(); ctx.translate(x, y); ctx.scale(pop, pop); ctx.globalAlpha = Math.max(0, alpha);
+    const size = f.x == null ? 40 : 22;
+    ctx.font = `800 ${size}px "Shippori Mincho", serif`;
+    ctx.lineWidth = size * 0.22; ctx.strokeStyle = 'rgba(20,10,4,.9)'; ctx.strokeText(f.text, 0, 0);
+    ctx.fillStyle = `rgb(${col})`; ctx.fillText(f.text, 0, 0);
+    ctx.restore();
+  }
 }

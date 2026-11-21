@@ -3,7 +3,7 @@
 let S = null;      // ゲーム状態
 let GRID = null;   // 州IDグリッド（陸も海も）
 let mapDirty = true;
-const hooks = { log: () => {}, modal: () => {}, gameOver: () => {} };
+const hooks = { log: () => {}, modal: () => {}, gameOver: () => {}, fx: () => {} };
 
 const nat = id => S.nations[id];
 const prov = id => S.provinces[id];
@@ -12,11 +12,14 @@ const isRogue = id => id >= 0 && !!S.nations[id] && !!S.nations[id].isMonster; /
 const landProvs = () => S.provinces.slice(0, S.landCount);
 const adjOf = p => p.sea ? p.nb.concat(p.lnb) : p.nb.concat(p.snb);
 
+function eraOf() { return clamp(Math.floor(S.day / (360 * 20)), 0, ERAS.length - 1); }
 function natMod(n, key) {
   if (!n || n.isMonster) return 0;
   let v = 0;
   const add = m => { if (m && m[key]) v += m[key]; };
-  add(RACES[n.race].mods);
+  const R = RACES[n.race];
+  add(R.mods);
+  if (R.grow && R.grow[key]) v += R.grow[key] * eraOf();
   if (n.cheat) add(CHEAT_BY_ID[n.cheat].mods);
   for (const m of n.timed) if (m.key === key && m.until > S.day) v += m.val;
   if (n.skills) for (const s of n.skills) add(SKILL_BY_ID[s].mods);
@@ -152,7 +155,7 @@ function manaIncome(n) {
   let m = 1;
   for (const p of S.provinces) if (p.owner === n.id && p.controller === n.id) { if (p.good === 'manastone') m += 1; if (p.terrain === 'miasma') m += 0.5; }
   for (const a of S.armies) if (a.owner === n.id) m += a.regs.mage * 0.05;
-  return m + natMod(n, 'manaPts');
+  return (m + natMod(n, 'manaPts')) * (1 + eraOf() * 0.35); // 時代が進むほど世界に魔力が満ちる
 }
 function nationPower(id) {
   let p = 0; for (const a of S.armies) if (a.owner === id) p += armyPower(a);
@@ -205,15 +208,23 @@ function makeSummoned(n, ri) {
   if (A.stats) { const bonus = ri - 1; [c.att, c.def, c.man, c.sie] = A.stats.map(v => clamp(v + bonus, 0, 7)); }
   return c;
 }
+const RIFT_BY_RARITY = [6, 10, 16, 25];
+function accidentChance(n) { return natMod(n, 'noAccident') ? 0 : clamp(0.05 + (n.rift || 0) / 400, 0, 0.4); }
+function addRift(n, v) { n.rift = Math.max(0, (n.rift || 0) + v); }
 function doSummon(n) {
   if (!canSummon(n)) return null;
   n.mana -= summonCost(n); n.gold -= SUMMON_GOLD; n.summonCount = (n.summonCount || 0) + 1;
-  if (!natMod(n, 'noAccident') && Math.random() < 0.08) {
+  // 禁忌の術：光輪教の国々は召喚を快く思わない
+  for (const o of S.nations) if (o.alive && !o.isMonster && o.id !== n.id && o.religion === 'light') addRel(n.id, o.id, -4);
+  if (!S.tutSafe && Math.random() < accidentChance(n)) {
+    addRift(n, 10);
     const a = spawnMonsters(prov(n.capital), Math.round(4000 + S.day / 360 * 150));
     a.name = '魔界の軍勢';
     return { accident: true, army: a };
   }
-  const c = makeSummoned(n, rollRarity(n));
+  const ri = rollRarity(n);
+  const c = makeSummoned(n, ri);
+  addRift(n, RIFT_BY_RARITY[ri]);
   if (c.role === 'general') n.generals.push(c);
   else if (n.advisors.length < 3) n.advisors.push(c);
   else n.bench.push(c);
@@ -225,7 +236,7 @@ function xpNeed(lv) { return 40 + lv * 20; }
 function gainXP(n, v) {
   if (!n || !n.isPlayer) return;
   const r = n.ruler; r.xp = (r.xp || 0) + v; r.lv = r.lv || 1;
-  while (r.xp >= xpNeed(r.lv)) { r.xp -= xpNeed(r.lv); r.lv++; n.sp = (n.sp || 0) + 1; hooks.log(`⭐ ${r.name}のレベルが${r.lv}に上がった！ スキルポイント+1`, 'good'); }
+  while (r.xp >= xpNeed(r.lv)) { r.xp -= xpNeed(r.lv); r.lv++; n.sp = (n.sp || 0) + 1; hooks.log(`⭐ ${r.name}のレベルが${r.lv}に上がった！ スキルポイント+1`, 'good'); hooks.fx('levelup', null, `レベル${r.lv}！`); }
 }
 function canLearn(n, id) { const s = SKILL_BY_ID[id]; return (n.sp || 0) >= 1 && !n.skills.includes(id) && (!s.req || n.skills.includes(s.req)); }
 function learnSkill(n, id) { if (!canLearn(n, id)) return false; n.sp--; n.skills.push(id); mapDirty = true; return true; }
@@ -239,7 +250,7 @@ function combatMod(a, pid, vsRogue) {
   const n = nat(a.owner); let m = natMod(n, 'combat');
   const g = genOf(a); m += charMod(g, 'combat'); if (vsRogue) m += charMod(g, 'vsMonster');
   if (a.hero) m += 0.3;
-  if (pid != null && n.race === 'elf') { const t = prov(pid).terrain; if (t === 'forest' || t === 'marsh') m += 0.25; }
+  if (pid != null) { const t = prov(pid).terrain; if (t === 'forest' || t === 'marsh') m += natMod(n, 'forestCombat'); }
   return m;
 }
 function rawPower(a) {
@@ -500,6 +511,8 @@ function battleDay(bt, sA, sB, pid) {
   if (!leftA.length || !leftB.length) {
     const aWon = leftA.length > 0 || (!leftB.length && sumMen(sA) >= sumMen(sB));
     battleEnded(bt, aWon, sA, sB);
+    for (const a of sA.concat(sB)) a.inBattle = false; // 決着したら即座に交戦状態を解く
+    delete S.battles[pid];
   }
   for (const a of sA.concat(sB)) if (broken(a) && S.armies.includes(a)) {
     if (armyMen(a) < 100) destroyArmy(a, true); else retreatArmy(a, pid);
@@ -521,6 +534,7 @@ function battleEnded(bt, aWon, sA, sB) {
   if (pInA || pInB) {
     const won = (pInA && aWon) || (pInB && !aWon);
     const my = pInA ? bt.lossA : bt.lossB, en = pInA ? bt.lossB : bt.lossA;
+    hooks.fx(won ? 'win' : 'lose', bt.pid, won ? '勝利！' : '敗北…');
     hooks.log(`${won ? '🏆' : '💀'} ${prov(bt.pid).name}の戦い — ${won ? '勝利' : '敗北'}（自軍損害 ${fmtMen(my)} / 敵損害 ${fmtMen(en)}）`, won ? 'good' : 'bad');
   }
 }
@@ -544,6 +558,7 @@ function navalBattles() {
       const keep = 0.5 + Math.max(0, f.str);
       f.war = Math.floor(f.war * keep); f.trans = Math.floor(f.trans * keep);
       const winner = sA.includes(f) ? sB : sA;
+      if (f.owner === S.player || winner.some(x => x.owner === S.player)) hooks.fx(f.owner === S.player ? 'lose' : 'win', pid, f.owner === S.player ? '海戦敗北' : '海戦勝利！');
       if (f.owner === S.player || winner.some(x => x.owner === S.player)) hooks.log(`⚓ ${prov(pid).name}の海戦 — ${f.owner === S.player ? '敗北、艦隊は退却した' : '勝利'}`, f.owner === S.player ? 'bad' : 'good');
       if (f.war + f.trans <= 0) { destroyFleet(f); continue; }
       const home = homePort(f.owner, f.prov);
@@ -591,6 +606,7 @@ function occupy(p, by) {
   p.controller = to; p.siege = null; mapDirty = true;
   if (by === REBEL && p.owner > 0) { const n = nat(p.owner); n.stab = Math.max(-3, (n.stab || 0) - 1); }
   if (p.owner === S.player || by === S.player) {
+    hooks.fx(to === S.player || by === S.player ? 'siege' : 'lost', p.id, to === S.player && p.owner === S.player ? '奪還！' : by === S.player ? '陥落！' : '占領された');
     if (to === S.player && p.owner === S.player) hooks.log(`🏰 ${p.name}を奪還した`, 'good');
     else if (by === S.player) hooks.log(`🏰 ${p.name}を占領した`, 'good');
     else hooks.log(`🔥 ${p.name}が${nat(by).name}に占領された！${by === REBEL ? '（安定度-1）' : ''}`, 'bad');
@@ -674,7 +690,7 @@ function finishDelve(a) {
     const avail = ARTIFACTS.filter(x => !S.nations.some(o => o.artifacts && o.artifacts.includes(x.id)));
     if (avail.length && Math.random() < Math.min(0.65, 0.13 * d.lv)) { const art = pick(avail); n.artifacts.push(art.id); res.artifact = art; }
   }
-  if (a.owner === S.player) hooks.modal(delveModal(res));
+  if (a.owner === S.player) { S.tutDelve = true; hooks.modal(delveModal(res)); hooks.fx(ok ? 'win' : 'lose', p.id, ok ? '踏破！' : '撤退'); }
 }
 function delveModal(r) {
   if (!r.ok) return { title: '💀 ダンジョン攻略失敗', body: `${esc(r.pname)}のダンジョン（Lv${r.lv}）の魔物は手強く、撤退を余儀なくされた。<br>損害：${fmtMen(r.loss)}<br><span class="note">兵を補充し、将軍を付けて再挑戦しよう。</span>`, buttons: [{ label: '撤退する' }] };
@@ -712,6 +728,7 @@ function canAnnex(o, v) { return v.overlord === o.id && S.day - v.vassalSince >=
 function annex(o, v) {
   if (!canAnnex(o, v) || o.dip < annexCost(o, v)) return false;
   o.dip -= annexCost(o, v);
+  addAE(o.id, ownedProvs(v.id).map(p => ({ p, from: v.id })), 0.4);
   for (const p of ownedProvs(v.id)) { p.owner = p.controller = o.id; p.coreUntil = 0; p.siege = null; }
   for (const a of S.armies.filter(a => a.owner === v.id)) destroyArmy(a);
   for (const f of S.fleets.filter(f => f.owner === v.id)) f.owner = o.id;
@@ -734,11 +751,12 @@ function vassalAccepts(o, v) {
 function vassalPeaceCost(w, loseSide) { return Math.min(100, totalDev(w[loseSide][0]) / sideDev(w, loseSide) * 100 * 0.7); }
 
 // ---------- 戦争 ----------
-function declareWar(att, def) {
-  if (att === def || isAlly(att, def) || atWar(att, def) || hasTruce(att, def)) return null;
+function declareWar(att, def, opts = {}) {
+  if (att === def || isAlly(att, def) || atWar(att, def) || (hasTruce(att, def) && !opts.coalition)) return null;
   if (nat(def).overlord && nat(def).overlord !== att) def = nat(def).overlord; // 属国への攻撃は宗主国との戦争
   if (isAlly(att, def) || atWar(att, def)) return null;
-  const w = { id: S.nextWarId++, att: [att], def: [def], battle: 0, start: S.day, lastOffer: S.day, name: `${nat(att).short}・${nat(def).short}戦争` };
+  const w = { id: S.nextWarId++, att: [att], def: [def], battle: 0, start: S.day, lastOffer: S.day, name: opts.coalition ? `対${nat(def).short}大同盟戦争` : `${nat(att).short}・${nat(def).short}戦争`, coalition: !!opts.coalition };
+  if (opts.coalition) for (const m of opts.coalition) if (m !== att && m !== def && !isAlly(m, def) && nat(m).alive) w.att.push(m);
   for (const al of [...nat(def).allies]) {
     if (al === att || w.att.includes(al) || w.def.includes(al) || isAlly(al, att) || !nat(al).alive) continue;
     w.def.push(al);
@@ -756,7 +774,9 @@ function declareWar(att, def) {
   nat(att).lastWar = S.day; nat(def).lastWar = S.day;
   mapDirty = true;
   if (w.def.includes(S.player)) {
-    hooks.modal({ title: '⚠ 宣戦布告', body: `<b>${esc(nat(att).name)}</b>が${def === S.player ? '我が国' : esc(nat(def).name)}に宣戦布告してきた！<br>敵：${w.att.map(i => esc(nat(i).name)).join('、')}<br>味方：${w.def.map(i => esc(nat(i).name)).join('、')}`, buttons: [{ label: '迎え撃つ！' }] });
+    hooks.fx('war', null, '宣戦布告！');
+    if (opts.coalition && def === S.player) hooks.modal({ title: '⚠ 対抗同盟の結成', body: `我が国の急速な拡大を恐れた国々が<b>大同盟</b>を結成し、一斉に宣戦布告してきた！<br><br>同盟軍：${w.att.map(i => esc(nat(i).name)).join('、')}<br><br><span class="note">講和するまで戦い抜くしかない。警戒度は時間とともに下がる。</span>`, buttons: [{ label: '受けて立つ！' }] });
+    else hooks.modal({ title: '⚠ 宣戦布告', body: `<b>${esc(nat(att).name)}</b>が${def === S.player ? '我が国' : esc(nat(def).name)}に宣戦布告してきた！<br>敵：${w.att.map(i => esc(nat(i).name)).join('、')}<br>味方：${w.def.map(i => esc(nat(i).name)).join('、')}`, buttons: [{ label: '迎え撃つ！' }] });
   } else if (att !== S.player) hooks.log(`📜 ${nat(att).name}が${nat(def).name}に宣戦布告した`, 'info');
   if (pendingPlayer.length) {
     hooks.modal({
@@ -804,12 +824,17 @@ function makePeace(w, winSide, provIds, vassalize) {
   const lead = winSide ? w[winSide][0] : null;
   const loseLead = winSide ? w[winSide === 'att' ? 'def' : 'att'][0] : null;
   const names = [];
+  const gained = new Map();
   for (const pid of provIds) {
     const p = prov(pid);
     if (vassalize && p.owner === loseLead) continue;
     const to = winners.includes(p.controller) ? p.controller : lead;
-    names.push(p.name); transferProvince(p, to);
+    names.push(p.name);
+    if (!gained.has(to)) gained.set(to, []); gained.get(to).push({ p, from: p.owner });
+    transferProvince(p, to);
   }
+  for (const [to, list] of gained) addAE(to, list);
+  if (vassalize && loseLead != null) addAE(lead, ownedProvs(loseLead).map(p => ({ p, from: loseLead })), 0.5);
   const involved = w.att.includes(S.player) || w.def.includes(S.player);
   let msg = !winSide ? `🕊 ${w.name}は白紙和平で終結した` :
     `🕊 ${w.name}終結 — ${nat(lead).name}側の勝利${names.length ? '（割譲: ' + names.slice(0, 6).join('、') + (names.length > 6 ? ' 他' : '') + '）' : ''}`;
@@ -852,6 +877,56 @@ function checkDeaths() {
   }
 }
 
+// ---------- 警戒度（AE）と対抗同盟 ----------
+const getAE = (target, obs) => (S.ae && S.ae[target] ? S.ae[target][obs] || 0 : 0);
+function aeEstimate(target, list, mult = 1) {
+  // list: [{p, from}] → 観察国ごとの増加量
+  const out = {};
+  for (const o of S.nations) {
+    if (!o.alive || o.isMonster || o.id === target || o.overlord === target) continue;
+    const cap = prov(o.capital); let v = 0;
+    for (const { p, from } of list) {
+      const d = Math.hypot(cap.x - p.x, cap.y - p.y);
+      let k = d < 260 ? 1 : d < 520 ? 0.6 : 0.25;
+      if (from > 0 && nat(from).race === o.race) k *= 1.3;
+      if (from === o.id) k *= 1.5;
+      v += dev(p) * 0.9 * k;
+    }
+    if (isAlly(o.id, target)) v *= 0.4;
+    v *= mult;
+    if (v >= 0.5) out[o.id] = v;
+  }
+  return out;
+}
+function addAE(target, list, mult = 1) {
+  if (!list.length || target <= 0) return;
+  S.ae = S.ae || {}; S.ae[target] = S.ae[target] || {};
+  const est = aeEstimate(target, list, mult);
+  for (const id in est) { S.ae[target][id] = Math.min(100, (S.ae[target][id] || 0) + est[id]); addRel(+id, target, -est[id] * 0.5); }
+  if (target === S.player) {
+    const hi = Object.keys(S.ae[target]).filter(id => S.ae[target][id] >= 50 && nat(+id).alive).length;
+    if (hi >= 2) hooks.log(`⚠ ${hi}か国が我が国を強く警戒している（対抗同盟の危険）`, 'war');
+  }
+}
+const AE_THRESHOLD = 50;
+function coalitionOf(target) {
+  return S.nations.filter(o => o.alive && !o.isMonster && o.id !== target && o.overlord !== target && !isAlly(o.id, target) && getAE(target, o.id) >= AE_THRESHOLD);
+}
+function coalitionMonthly() {
+  if (!S.ae) return;
+  for (const t in S.ae) { for (const o in S.ae[t]) { S.ae[t][o] -= 1.2; if (S.ae[t][o] <= 0) delete S.ae[t][o]; } }
+  for (const X of S.nations) {
+    if (!X.alive || X.isMonster || warsOf(X.id).some(w => w.coalition)) continue;
+    const mem = coalitionOf(X.id).filter(o => o.id !== S.player && !warsOf(o.id).length);
+    if (mem.length < 2) continue;
+    const pow = mem.reduce((s, o) => s + nationPower(o.id), 0);
+    if (pow < coalitionPower(X.id) * 0.9 || Math.random() > 0.15) continue;
+    const leader = mem.sort((a, b) => nationPower(b.id) - nationPower(a.id))[0];
+    declareWar(leader.id, X.id, { coalition: mem.map(o => o.id) });
+    if (X.id !== S.player) hooks.log(`⚔ ${X.name}の拡大を恐れた${mem.length}か国が大同盟を結成し宣戦した`, 'info');
+  }
+}
+
 // ---------- 月次処理 ----------
 function monthlyTick() {
   S._trade = null;
@@ -886,6 +961,7 @@ function monthlyTick() {
     if (Math.abs(d) > 0.5) S.rel[a][b] = S.rel[b][a] = S.rel[a][b] + Math.sign(d) * 0.5;
   }
   rogueMonthly();
+  coalitionMonthly();
   aiMonthly();
   aiPeace();
   checkVictories();
@@ -902,18 +978,32 @@ function spawnRebels(p) {
   const a = createArmy(REBEL, p.id, Math.max(1, Math.round(men / 1000)), 0, 0, { name: p.religion !== nat(p.owner).religion ? `${RELIGIONS[p.religion].name}の反乱軍` : '農民反乱軍', expire: S.day + rint(600, 1000) });
   a.men.inf = men; a.target = p.owner; return a;
 }
+function diff() { return DIFFICULTY[S.diff || 'normal']; }
 function rogueMonthly() {
   const year = S.day / 360;
+  for (const n of S.nations) {
+    if (!n.alive || n.isMonster || !n.rift) continue;
+    n.rift = Math.max(0, n.rift - 1);
+    if (n.rift >= 100) {
+      const c = ownedProvs(n.id).filter(p => p.controller === n.id); if (!c.length) continue;
+      const p = pick(c);
+      const a = spawnMonsters(p, Math.round(7000 + year * 200)); a.name = '異界の魔獣'; a.bounty = n.id === S.player;
+      n.rift -= 60;
+      if (n.id === S.player) { hooks.fx('war', p.id, '次元の裂け目！'); hooks.modal({ title: '🌀 次元の裂け目', body: `度重なる召喚で歪んだ空間が、ついに${esc(p.name)}の上空で裂けた！<br>裂け目から<b>異界の魔獣（${fmtMen(armyMen(a))}）</b>が這い出してきた。<br><br><span class="note">次元の歪みは召喚のたびに溜まり、毎月少しずつ戻る。歪みが大きいほど魔物が湧きやすく、召喚事故も起きやすい。</span>`, buttons: [{ label: '討伐せよ！' }] }); }
+      else hooks.log(`🌀 ${n.name}で次元の裂け目が開いたという`, 'info');
+    }
+  }
   for (const p of S.provinces) {
     if (p.owner <= 0) continue;
     const n = nat(p.owner);
-    const chance = (p.terrain === 'miasma' ? 0.006 : 0.0009) * (1 + natMod(n, 'monsterSpawn'));
+    const dm = p.owner === S.player ? diff().rogue : 1;
+    const chance = (p.terrain === 'miasma' ? 0.006 : 0.0009) * (1 + natMod(n, 'monsterSpawn') + (n.rift || 0) / 50) * dm;
     if (Math.random() < chance && !S.armies.some(a => a.prov === p.id)) {
       const a = spawnMonsters(p, Math.round(2500 + Math.random() * 4500 + year * 120));
       if (p.owner === S.player) hooks.log(`👹 ${p.name}に${a.name}（${fmtMen(armyMen(a))}）が出現した！`, 'bad');
     }
     const u = provUnrest(p);
-    if (u > 0 && p.controller === p.owner && Math.random() < u * 0.0035 && !S.armies.some(a => a.prov === p.id && isRogue(a.owner))) {
+    if (u > 0 && p.controller === p.owner && Math.random() < u * 0.0035 * dm && !S.armies.some(a => a.prov === p.id && isRogue(a.owner))) {
       const a = spawnRebels(p);
       if (p.owner === S.player) hooks.log(`✊ ${p.name}で${a.name}（${fmtMen(armyMen(a))}）が蜂起した！（不穏度 ${u.toFixed(1)}）`, 'bad');
     }

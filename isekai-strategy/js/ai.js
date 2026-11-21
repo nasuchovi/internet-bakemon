@@ -217,7 +217,8 @@ function aiDiplomacy(n) {
     }
   }
   if (war || S.day < 360 || S.day - n.lastWar < 720) return;
-  const aggr = n.demonKing ? 0.14 : n.race === 'demon' ? 0.09 : 0.045;
+  if (coalitionOf(n.id).length >= 2) return; // 警戒されている間は自重
+  const aggr = (n.demonKing ? 0.14 : n.race === 'demon' ? 0.09 : 0.045) * diff().aggr;
   if (Math.random() > aggr) return;
   const neigh = new Set();
   for (const p of ownedProvs(n.id)) for (const q of p.nb) { const o = prov(q).owner; if (o > 0 && o !== n.id) neigh.add(o); }
@@ -225,7 +226,8 @@ function aiDiplomacy(n) {
   let best = null, br = 0;
   for (const o of neigh) {
     if (isAlly(n.id, o) || hasTruce(n.id, o) || !nat(o).alive) continue;
-    if (o === S.player && S.day < 360 * 2) continue;
+    if (o === S.player && S.day < diff().grace) continue;
+    if (o === S.player && S.tut && !S.tut.done) continue;
     if (getRel(n.id, o) > (n.demonKing ? 40 : 5)) continue;
     const tgt = nat(o).overlord || o;
     const ratio = myP / Math.max(1, coalitionPower(tgt));

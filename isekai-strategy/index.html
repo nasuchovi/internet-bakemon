@@ -31,6 +31,7 @@
       <span id="speed-dots"></span>
       <button id="btn-slower" title="遅く (-)">−</button>
       <button id="btn-faster" title="速く (+)">＋</button>
+      <button id="btn-mute" title="効果音のオン／オフ">🔊</button>
     </div>
   </header>
   <main id="main">
@@ -61,6 +62,7 @@
     </div>
     <div id="banner" class="hidden"></div>
     <div id="pausedtag" class="hidden">一時停止中 — Spaceで再開</div>
+    <div id="tut" class="hidden"></div>
   </main>
 
   <section id="start">
@@ -76,6 +78,9 @@
       <div id="st-cheats"></div>
       <div class="st-step"><span>3</span>君主の名前</div>
       <input id="st-name" maxlength="12" value="カイト">
+      <div class="st-step"><span>4</span>難易度とチュートリアル</div>
+      <div id="st-diff"></div>
+      <label class="st-check"><input type="checkbox" id="st-tut" checked><span>チュートリアルを行う<small>初めての方におすすめ。実際のゲームの中で操作を覚えます</small></span></label>
       <div class="st-actions">
         <button id="st-start" class="primary">この国に転生する</button>
         <button id="st-reroll">別の大陸を生成</button>
@@ -95,7 +100,9 @@
 <script src="js/sim.js"></script>
 <script src="js/ai.js"></script>
 <script src="js/events.js"></script>
+<script src="js/sound.js"></script>
 <script src="js/render.js"></script>
+<script src="js/tutorial.js"></script>
 <script src="js/ui.js"></script>
 </body>
 </html>

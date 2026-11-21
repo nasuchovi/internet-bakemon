@@ -266,3 +266,37 @@ select.sel { width: 100%; padding: 5px 6px; border-radius: 4px; background: rgba
 .objective .ck { width: 16px; color: var(--ink-3); }
 .objective.done .ck { color: var(--good); }
 @media (max-width: 760px) { #modes { max-height: 50%; overflow-y: auto; } }
+
+/* ---------- チュートリアル・演出・理由表示 ---------- */
+#tut { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: 380px; max-width: calc(100% - 20px); z-index: 4; background: linear-gradient(rgba(52,38,20,.97), rgba(32,22,12,.97)); border: 1.5px solid var(--gold); border-radius: 8px; padding: 10px 13px 11px; box-shadow: 0 8px 26px rgba(0,0,0,.6), 0 0 18px rgba(217,184,102,.25); animation: pop .25s ease; }
+#panel:not(.hidden) ~ #tut { left: calc(50% + 170px); }
+.tut-h { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--gold); letter-spacing: .05em; }
+.tut-h button { background: none; border: 1px solid var(--line); color: var(--ink-3); border-radius: 3px; font-size: 10.5px; padding: 1px 7px; }
+.tut-t { display: block; font-family: var(--serif); font-size: 16px; color: var(--gold-2); margin: 3px 0 4px; }
+.tut-b { font-size: 12.5px; line-height: 1.7; }
+.tut-r { font-size: 11px; color: var(--good); margin-top: 6px; }
+.pulse { animation: pulse 1s ease-in-out infinite !important; position: relative; z-index: 5; }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,220,120,.9); } 50% { box-shadow: 0 0 0 6px rgba(255,220,120,0); background: rgba(217,184,102,.25); } }
+.bw { display: inline-flex; flex-direction: column; gap: 1px; }
+.btns.full .bw { flex: 1; } .bw .btn { width: 100%; }
+.devbox .bw, .bitem .bw { display: flex; }
+.why { font-size: 10px; color: #f09484; line-height: 1.3; text-align: center; }
+#st-diff { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.dcard { padding: 7px 6px; border-radius: 5px; background: rgba(0,0,0,.25); border: 1px solid rgba(90,66,40,.6); cursor: pointer; text-align: center; }
+.dcard b { display: block; font-family: var(--serif); font-size: 13.5px; }
+.dcard small { display: block; font-size: 10px; color: var(--ink-3); line-height: 1.35; margin-top: 2px; }
+.dcard.on { border-color: var(--gold); background: rgba(217,184,102,.1); }
+.st-check { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; font-size: 13px; cursor: pointer; }
+.st-check input { margin-top: 3px; accent-color: #d9b866; width: 16px; height: 16px; }
+.st-check small { color: var(--ink-3); font-size: 11px; display: block; }
+.rift { height: 10px; border-radius: 5px; background: rgba(0,0,0,.5); overflow: hidden; border: 1px solid rgba(120,80,160,.6); margin: 4px 0; }
+.rift i { display: block; height: 100%; background: linear-gradient(90deg, #6a4fc0, #c05ae0, #ff5a7a); }
+.magic { width: 130px; height: 130px; margin: 6px auto; border-radius: 50%; border: 3px double #b9a0ff; box-shadow: 0 0 30px #8a6cff, inset 0 0 30px #8a6cff; position: relative; animation: spin 1.4s linear infinite; }
+.magic::before, .magic::after { content: ''; position: absolute; inset: 14px; border: 2px solid rgba(200,180,255,.8); transform: rotate(45deg); }
+.magic::after { inset: 30px; border-radius: 50%; transform: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#modal.ssr-flash { animation: ssr 1.2s ease; }
+@keyframes ssr { 0% { box-shadow: 0 0 0 2000px rgba(255,220,120,.85); } 100% { box-shadow: 0 20px 60px rgba(0,0,0,.7); } }
+.ae { font-size: 10.5px; padding: 0 5px; border-radius: 8px; background: rgba(240,120,60,.2); color: #ffb48c; white-space: nowrap; }
+.ae.hi { background: rgba(240,60,40,.35); color: #ffc8bc; font-weight: 700; }
+@media (max-width: 760px) { #tut { top: 6px; bottom: auto; padding: 7px 10px 8px; } #panel:not(.hidden) ~ #tut { left: 50%; } .tut-t { font-size: 14px; margin: 1px 0 2px; } .tut-b { font-size: 11.5px; line-height: 1.55; } }
