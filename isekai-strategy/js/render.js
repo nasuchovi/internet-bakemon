@@ -265,7 +265,24 @@ function drawLabels() {
     }
   }
 }
+function drawWonders() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const w of S.wonders) {
+    const p = prov(w.pid), x = sx(p.x) - 18, y = sy(p.y) + 4;
+    ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fillStyle = 'rgba(250,236,200,.92)'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#b8862f'; ctx.stroke();
+    ctx.font = '13px sans-serif'; ctx.fillText(WONDER_BY_ID[w.id].icon, x, y + 1);
+  }
+  for (const n of S.nations) {
+    if (!n.alive || !n.project) continue;
+    const p = prov(n.project.pid), x = sx(p.x) - 18, y = sy(p.y) + 4;
+    ctx.font = '13px sans-serif'; ctx.fillText('🏗', x, y);
+    ctx.fillStyle = 'rgba(20,12,8,.7)'; ctx.fillRect(x - 11, y + 10, 22, 4);
+    ctx.fillStyle = '#e0b04a'; ctx.fillRect(x - 10, y + 11, 20 * n.project.prog / n.project.need, 2);
+  }
+}
 function drawSiegesAndColonies() {
+  drawWonders();
   for (const p of S.provinces) {
     const x = sx(p.x), y = sy(p.y);
     if (p.siege && p.siege.need) {

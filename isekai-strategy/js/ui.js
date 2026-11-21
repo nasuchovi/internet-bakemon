@@ -1,7 +1,7 @@
 'use strict';
 // ===== UI・入力・メインループ =====
 const $ = id => document.getElementById(id);
-let tab = 'sel', moveMode = false, diploSel = -1, lastPanelHTML = '', modalQueue = [], startSel = -1, startCheat = 'admin', startDiff = 'normal';
+let tab = 'sel', moveMode = false, diploSel = -1, lastPanelHTML = '', modalQueue = [], startSel = -1, startCheat = 'admin', startDiff = 'normal', startCfg = Object.assign({}, AI_PRESETS.normal);
 hooks.fx = (kind, pid, text) => { addFx(kind, pid, text); sfx(kind); };
 // 足りない資源の理由
 function need(have, cost, label) { return have >= cost ? null : `${label}があと${Math.ceil(cost - have)}必要`; }
@@ -74,6 +74,7 @@ function showEnding(victory) {
 function renderTop() {
   const n = S.player >= 0 ? nat(S.player) : null;
   $('date').textContent = '王国暦 ' + dateStr(S.day) + (S.started ? '・' + ERAS[eraOf()] : '');
+  if (S.started && document.body.dataset.era !== String(eraOf())) document.body.dataset.era = eraOf();
   $('btn-mute').textContent = muted ? '🔇' : '🔊';
   if (!n) return;
   const inc = calcIncome(n);
@@ -200,6 +201,17 @@ function provPanel(p) {
     h += `<h3>ダンジョン <small>Lv${p.dungeon.lv}</small></h3>`;
     h += p.dungeon.cleared ? `<div class="okbox">🏆 攻略済み — 冒険者ギルドが生産収入+1/月をもたらす</div>`
       : `<div class="note">🕳 未踏のダンジョン。軍をこの州に置き「ダンジョン攻略」を命じると、財宝・魔力・秘宝が手に入るかもしれない（攻略日数 ${delveNeed(p.dungeon.lv)}日）。</div>`;
+  }
+  // 大建造物
+  if (p.owner >= 0) {
+    const w = wonderAt(p.id);
+    const proj = S.nations.find(o => o.alive && o.project && o.project.pid === p.id);
+    if (w) { const W = WONDER_BY_ID[w.id]; h += `<h3>大建造物</h3><div class="wonder done"><div class="wi">${W.icon}</div><div><b>${esc(W.name)}</b><small>${esc(W.desc)}</small><small class="fl">${START_YEAR + Math.floor(w.day / 360)}年、${esc(nat(w.owner).short)}が建造。現在は支配国が効果を得る。</small></div></div>`; }
+    else if (proj) { const W = WONDER_BY_ID[proj.project.id]; h += `<h3>大建造物</h3><div class="wonder"><div class="wi">🏗</div><div><b>${esc(W.name)}（建設中）</b><small>${esc(nat(proj.id).short)}・残り${proj.project.need - proj.project.prog}か月</small><div class="meter"><i style="width:${proj.project.prog / proj.project.need * 100}%;background:var(--gold)"></i></div></div></div>`; }
+    else if (mine) {
+      const list = WONDERS.filter(W => !wonderBuilt(W.id));
+      if (list.length) h += `<details class="wlist"><summary>🏛 大建造物を建てる（建造可能 ${list.filter(W => !wonderReq(n, W, p.id)).length} / 残り${list.length}種）</summary>${list.map(W => { const c = wonderCost(n, W), why = wonderReq(n, W, p.id); const other = S.nations.filter(o => o.alive && o.project && o.project.id === W.id && o.id !== S.player); return `<div class="wonder"><div class="wi">${W.icon}</div><div style="flex:1"><b>${esc(W.name)}</b><small>${esc(W.desc)}・${W.months}か月</small>${other.length ? `<small class="warnline">⚠ ${other.map(o => esc(o.short)).join('、')}が建設中</small>` : ''}${btn('wonder', W.id + ':' + p.id, `建設 💰${c}`, { cls: 'gold', disabled: !!why || n.gold < c, why: why || need(n.gold, c, '金貨') })}</div></div>`; }).join('')}</details>`;
+    }
   }
   if (mine) {
     if (p.converting) h += `<div class="okbox">⛪ 改宗中（${dateStr(p.converting.until)}完了予定）</div>`;
@@ -390,7 +402,14 @@ function econPanel() {
   const mine = guildsOf(n.id);
   h += `<h3>商会 <small>${mine.length} / ${maxGuilds(n)}軒　収入 +${fmt(tradeIncome(n), 2)}/月</small></h3><p class="note" style="margin-top:0">州の画面から設立する。近くの自国商会と連携するほど稼ぐ（地図モード「商会」で網を確認できる）。商会枠は発展度50ごとに+1。</p><div class="rows" style="margin-top:6px">`;
   h += mine.map(g => `<div class="row" data-act="prov" data-arg="${g.pid}"><i class="dot" style="background:${rgb(nat(prov(g.pid).owner >= 0 ? prov(g.pid).owner : n.id).color)}"></i><span class="nm">⚖ ${esc(prov(g.pid).name)}${prov(g.pid).owner !== n.id ? ' <small style="color:var(--ink-3)">（' + esc(nat(prov(g.pid).owner).short) + '）</small>' : ''}</span><span class="num">+${fmt(guildIncome(g), 2)}${guildLinks(g) ? '・連携' + guildLinks(g) : ''}${guildRivals(g) ? '・競合' + guildRivals(g) : ''}</span></div>`).join('') || '<p class="note">商会がない。</p>';
-  h += `</div><h3>資源の使い道</h3><p class="note"><span class="cost-adm">政務</span>：開拓、代官・将軍の任命、安定度、関係改善、外交併合<br>📚 前世の知識：発明<br>🔮 魔力：召喚<br>💰 金貨：徴兵・建設・造船・商会・投資</p>`;
+  h += `</div><h3>大建造物 <small>世界に一つずつ・建造中は他国と競争</small></h3>`;
+  if (n.project) { const W = WONDER_BY_ID[n.project.id]; h += `<div class="okbox">🏗 ${esc(prov(n.project.pid).name)}で「${esc(W.name)}」を建設中 — 残り${n.project.need - n.project.prog}か月</div>`; }
+  h += WONDERS.map(W => {
+    const w = wonderBuilt(W.id), bs = S.nations.filter(o => o.alive && o.project && o.project.id === W.id);
+    const st = w ? `完成：${esc(prov(w.pid).name)}（現在の支配：${prov(w.pid).owner >= 0 ? esc(nat(prov(w.pid).owner).short) : '—'}）` : bs.length ? `建設中：${bs.map(o => `${esc(o.short)} ${Math.round(o.project.prog / o.project.need * 100)}%`).join('、')}` : `未建造・💰${wonderCost(n, W)}・発展度${W.minDev}以上${W.coastal ? '・沿岸' : ''}${W.terrain ? '・' + TERRAIN[W.terrain].name : ''}`;
+    return `<div class="wonder ${w ? 'done' : ''}" ${w ? `data-act="prov" data-arg="${w.pid}" style="cursor:pointer"` : ''}><div class="wi">${W.icon}</div><div><b>${esc(W.name)}</b><small>${esc(W.desc)}</small><small class="fl">${st}</small></div></div>`;
+  }).join('') + `<p class="note">州の画面から建設できる。完成した大建造物は、その州を支配する国に効果をもたらす（征服すれば奪える）。</p>`;
+  h += `<h3>資源の使い道</h3><p class="note"><span class="cost-adm">政務</span>：開拓、代官・将軍の任命、安定度、関係改善、外交併合<br>📚 前世の知識：発明<br>🔮 魔力：召喚<br>💰 金貨：徴兵・建設・造船・商会・投資・大建造物</p>`;
   return h;
 }
 
@@ -448,6 +467,7 @@ function act(name, arg, ev) {
     case 'dsel': diploSel = diploSel === +arg ? -1 : +arg; break;
     case 'goto': { const p = prov(+arg); centerOn(p.x, p.y, Math.max(cam.s, 1.6)); select({ type: 'prov', id: +arg }, true); } break;
     case 'dev': if (develop(n, prov(+arg))) hooks.fx('win', +arg, '発展！'); break;
+    case 'wonder': { const [id, pid] = arg.split(':'); if (startWonder(n, id, +pid)) { hooks.fx('siege', +pid, '着工！'); hooks.log(`🏗 ${prov(+pid).name}で「${WONDER_BY_ID[id].name}」の建設を始めた`, 'good'); } } break;
     case 'invest': if (invest(n, prov(+arg))) hooks.fx('win', +arg, '発展！'); break;
     case 'invent': if (invent(n, arg)) { const inv = INVENTION_BY_ID[arg]; hooks.fx('levelup', null, `${inv.icon} ${inv.name}`); hooks.log(`💡 前世の知識で「${inv.name}」を発明した！ — ${inv.desc}`, 'good'); } break;
     case 'guild': if (foundGuild(S.player, +arg)) { hooks.fx('siege', +arg, '商会設立！'); hooks.log(`⚖ ${prov(+arg).name}に商会を設立した`, 'good'); } break;
@@ -628,7 +648,7 @@ function initInput() {
 
   document.addEventListener('click', e => {
     const el = e.target.closest('[data-act]');
-    if (el && !el.disabled) { sfx(['dev', 'invest', 'build', 'recruit', 'ship', 'invent', 'guild', 'gov-native', 'colonize', 'convert', 'stab', 'learn', 'gen-new'].includes(el.dataset.act) ? 'coin' : 'click'); act(el.dataset.act, el.dataset.arg, e); return; }
+    if (el && !el.disabled) { sfx(['dev', 'invest', 'wonder', 'build', 'recruit', 'ship', 'invent', 'guild', 'gov-native', 'colonize', 'convert', 'stab', 'learn', 'gen-new'].includes(el.dataset.act) ? 'coin' : 'click'); act(el.dataset.act, el.dataset.arg, e); return; }
     const m = e.target.closest('[data-mode]');
     if (m) { mapMode = m.dataset.mode; document.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b === m)); mapDirty = true; }
   });
@@ -696,7 +716,15 @@ function renderStart() {
     $('st-nations').querySelector(`[data-sn="${startSel}"]`).insertAdjacentHTML('afterend', `<div class="detail" id="st-detail"><b>${RACES[n.race].name}</b>（${RELIGIONS[n.religion].name}）：${RACES[n.race].desc}<br><span class="note">同盟：${n.allies.map(i => esc(nat(i).name)).join('、') || 'なし'}${n.demonKing ? '<br>⚠ 魔王国は周辺国すべてから敵視されている。勝利条件は「魔界統一」。' : ''}</span></div>`);
   }
   $('st-diff').innerHTML = Object.entries(DIFFICULTY).map(([k, d]) => `<button class="dcard ${startDiff === k ? 'on' : ''}" data-sd="${k}"><b>${d.name}</b><small>${d.desc}</small></button>`).join('');
-  $('st-diff').querySelectorAll('[data-sd]').forEach(b => b.onclick = () => { startDiff = b.dataset.sd; renderStart(); });
+  $('st-diff').querySelectorAll('[data-sd]').forEach(b => b.onclick = () => { startDiff = b.dataset.sd; startCfg = Object.assign({}, AI_PRESETS[startDiff]); renderStart(); });
+  $('st-ai-label').textContent = startDiff === 'custom' ? '（カスタム）' : `（${DIFFICULTY[startDiff].name}の設定）`;
+  $('st-ai-body').innerHTML = AI_SETTINGS.map(A => { const v = startCfg[A.key]; return `<label class="slider"><span class="sl-h"><b>${A.name}</b><em data-slv="${A.key}">${A.pct ? Math.round(v * 100) + '%' : v + A.unit}</em></span><input type="range" min="${A.min}" max="${A.max}" step="${A.step}" value="${v}" data-sl="${A.key}"><small>${A.desc}</small></label>`; }).join('') + `<button class="btn" id="st-ai-reset" style="margin-top:6px">標準に戻す</button>`;
+  $('st-ai-body').querySelectorAll('[data-sl]').forEach(inp => inp.oninput = () => {
+    const A = AI_SETTINGS.find(x => x.key === inp.dataset.sl); startCfg[A.key] = +inp.value; startDiff = 'custom';
+    $('st-ai-body').querySelector(`[data-slv="${A.key}"]`).textContent = A.pct ? Math.round(+inp.value * 100) + '%' : inp.value + A.unit;
+    $('st-diff').querySelectorAll('.dcard').forEach(c => c.classList.remove('on')); $('st-ai-label').textContent = '（カスタム）';
+  });
+  $('st-ai-reset').onclick = (e) => { e.preventDefault(); startDiff = 'normal'; startCfg = Object.assign({}, AI_PRESETS.normal); renderStart(); };
   $('st-cheats').innerHTML = CHEATS.map(c => `<button class="ccard ${startCheat === c.id ? 'on' : ''}" data-sc="${c.id}"><b>${c.name}</b><small>${c.desc}</small></button>`).join('');
   $('st-start').disabled = startSel < 0;
   $('st-nations').querySelectorAll('[data-sn]').forEach(b => b.onclick = () => chooseStartNation(+b.dataset.sn));
@@ -715,7 +743,7 @@ function chooseStartNation(id) {
 function beginPlay() {
   highlightNation = -1;
   const tut = $('st-tut').checked;
-  startGame(startSel, startCheat, $('st-name').value.trim() || 'カイト', { diff: startDiff });
+  startGame(startSel, startCheat, $('st-name').value.trim() || 'カイト', { diff: startDiff === 'custom' ? 'normal' : startDiff, aiCfg: startCfg });
   if (tut) S.tut = { step: 0, done: false };
   $('start').classList.add('hidden');
   const c = prov(nat(S.player).capital);

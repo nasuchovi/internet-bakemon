@@ -152,12 +152,12 @@ function newWorld(seed) {
   S = {
     seed, day: 0, speed: 2, paused: true, started: false, player: -1,
     provinces: w.provinces, landCount: w.landCount, nodes: w.nodes, nations: w.nations, rel: w.rel, relBase: w.relBase,
-    armies: [], fleets: [], guilds: [], nextGuildId: 1, wars: [], battles: {}, nextArmyId: 1, nextWarId: 1, nextFleetId: 1, nextCharId: 1, log: [], sel: null, over: false, victories: {}, ae: {}, diff: 'normal', tut: null, rebirths: 0,
+    armies: [], fleets: [], guilds: [], nextGuildId: 1, wonders: [], aiCfg: Object.assign({}, AI_PRESETS.normal), wars: [], battles: {}, nextArmyId: 1, nextWarId: 1, nextFleetId: 1, nextCharId: 1, log: [], sel: null, over: false, victories: {}, ae: {}, diff: 'normal', tut: null, rebirths: 0,
   };
   mapDirty = true;
 }
 function startGame(playerId, cheat, rulerName, opts = {}) {
-  S.player = playerId; S.diff = opts.diff || 'normal';
+  S.player = playerId; S.diff = opts.diff || 'normal'; S.aiCfg = Object.assign({}, AI_PRESETS.normal, opts.aiCfg || AI_PRESETS[S.diff] || {});
   for (const n of S.nations) {
     if (n.isMonster) continue;
     n.manpower = maxManpower(n);
@@ -192,7 +192,7 @@ const DYN_KEYS = ['owner', 'controller', 'dev', 'fort', 'b', 'siege', 'colonizin
 function serialize() {
   return JSON.stringify({
     v: 3, seed: S.seed, day: S.day, speed: S.speed, player: S.player,
-    nations: S.nations, rel: S.rel, relBase: S.relBase, armies: S.armies, fleets: S.fleets, guilds: S.guilds, nextGuildId: S.nextGuildId, wars: S.wars, victories: S.victories, demonKingSlayer: S.demonKingSlayer,
+    nations: S.nations, rel: S.rel, relBase: S.relBase, armies: S.armies, fleets: S.fleets, guilds: S.guilds, nextGuildId: S.nextGuildId, wonders: S.wonders, aiCfg: S.aiCfg, wars: S.wars, victories: S.victories, demonKingSlayer: S.demonKingSlayer,
     nextArmyId: S.nextArmyId, nextWarId: S.nextWarId, nextFleetId: S.nextFleetId, nextCharId: S.nextCharId, log: S.log.slice(-40), ae: S.ae, diff: S.diff, tut: S.tut, rebirths: S.rebirths,
     provs: S.provinces.map(p => DYN_KEYS.map(k => p[k])),
   });
@@ -204,7 +204,7 @@ function loadGame() {
   let d; try { d = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
   if (!d || d.v !== 3) return false;
   newWorld(d.seed);
-  Object.assign(S, { day: d.day, speed: d.speed, player: d.player, nations: d.nations, rel: d.rel, relBase: d.relBase, armies: d.armies, fleets: d.fleets || [], guilds: d.guilds || [], nextGuildId: d.nextGuildId || 1, wars: d.wars, victories: d.victories || {}, demonKingSlayer: d.demonKingSlayer,
+  Object.assign(S, { day: d.day, speed: d.speed, player: d.player, nations: d.nations, rel: d.rel, relBase: d.relBase, armies: d.armies, fleets: d.fleets || [], guilds: d.guilds || [], nextGuildId: d.nextGuildId || 1, wonders: d.wonders || [], aiCfg: d.aiCfg || Object.assign({}, AI_PRESETS.normal), wars: d.wars, victories: d.victories || {}, demonKingSlayer: d.demonKingSlayer,
     nextArmyId: d.nextArmyId, nextWarId: d.nextWarId, nextFleetId: d.nextFleetId || 1, nextCharId: d.nextCharId || 1, log: d.log || [], ae: d.ae || {}, diff: d.diff || 'normal', tut: d.tut || null, rebirths: d.rebirths || 0 });
   d.provs.forEach((vals, i) => DYN_KEYS.forEach((k, j) => S.provinces[i][k] = vals[j]));
   S.started = true; S.paused = true; S.battles = {};

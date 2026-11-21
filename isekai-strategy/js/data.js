@@ -324,3 +324,37 @@ const GOV_EFFECTS = {
   farmer:    { growth: 2.0, tax: 0.6, desc: '発展++、税+60%' },
 };
 const NATIVE_GOV_COST = 40;
+
+// ===== 大建造物（世界に一つ） =====
+const WONDERS = [
+  { id: 'garden', icon: '🌳', name: '空中庭園', cost: 900, months: 36, minDev: 15, desc: '税収+15%、反乱-2', mods: { taxMod: 0.15, unrest: -2 }, flavor: '魔石の浮力で天に浮かぶ大庭園。転生者の記憶にある古代の伝説を、魔法で再現した。' },
+  { id: 'tower', icon: '🗼', name: '大魔導塔', cost: 800, months: 30, minDev: 12, desc: '魔力+4/月、次元の歪みの回復+2/月', mods: { manaPts: 4, riftDecay: 2 }, flavor: '雲を貫く魔導の塔。大陸中の魔力の流れがここに集う。' },
+  { id: 'library', icon: '📚', name: '叡智の大図書館', cost: 850, months: 32, minDev: 14, desc: '前世の知識+2/月、発明コスト-10%', mods: { knowPts: 2, inventCost: -0.1 }, flavor: '前世の記憶を書き写した写本が、天井まで積み上がる。' },
+  { id: 'lighthouse', icon: '🔆', name: '天空灯台', cost: 700, months: 28, minDev: 10, coastal: true, desc: '商会収入+20%、海戦の戦闘力+25%', mods: { tradeMod: 0.2, navalCombat: 0.25 }, flavor: '魔石の光は百里先の船をも導く。沿岸の州にしか建てられない。' },
+  { id: 'bazaar', icon: '🪙', name: '黄金の大市場', cost: 1000, months: 30, minDev: 15, desc: '商会収入+30%、商会枠+2', mods: { tradeMod: 0.3, guilds: 2 }, flavor: '大陸中の品が並ぶ、黄金の屋根の大市場。' },
+  { id: 'arena', icon: '🏟', name: '竜骨の大闘技場', cost: 750, months: 26, minDev: 12, desc: '士気+0.5、戦闘力+5%、人的資源+15%', mods: { morale: 0.5, combat: 0.05, mpMod: 0.15 }, flavor: '古竜の骨で組まれた闘技場。勇士たちが名を競う。' },
+  { id: 'cathedral', icon: '⛪', name: '聖光大聖堂', cost: 800, months: 30, minDev: 12, desc: '反乱-2、関係改善+50%、安定度の費用-30%', mods: { unrest: -2, relMult: 0.5, stabCost: -0.3 }, flavor: '光輪の紋章を戴く大聖堂。巡礼者が絶えない。' },
+  { id: 'gate', icon: '🌀', name: '次元門', cost: 1200, months: 40, minDev: 16, desc: '召喚コスト-30%、高レア度が出やすい', mods: { summonCost: -0.3, rarityUp: 1 }, flavor: '異界と常につながる巨大な門。禁忌とされた技術の結晶。' },
+  { id: 'worldtree', icon: '🌲', name: '世界樹の聖域', cost: 900, months: 34, minDev: 10, terrain: 'forest', desc: '人的資源+25%、代官による発展+30%', mods: { mpMod: 0.25, devGrowth: 0.3 }, flavor: '世界樹の若木を祀る聖域。森林の州にしか建てられない。' },
+];
+const WONDER_BY_ID = Object.fromEntries(WONDERS.map(w => [w.id, w]));
+
+// ===== AIの詳細設定 =====
+const AI_SETTINGS = [
+  { key: 'aggr', name: '攻撃性', desc: 'AIが戦争を仕掛ける頻度', min: 0, max: 2, step: 0.1, pct: true },
+  { key: 'expand', name: '入植意欲', desc: 'AIが未開の地へ入植する頻度', min: 0, max: 2, step: 0.1, pct: true },
+  { key: 'ally', name: '同盟の結びやすさ', desc: 'AI同士が同盟を組む頻度', min: 0, max: 2, step: 0.1, pct: true },
+  { key: 'summon', name: '召喚の頻度', desc: 'AIが異世界人を召喚する頻度', min: 0, max: 2, step: 0.1, pct: true },
+  { key: 'wonder', name: '大建造物への意欲', desc: 'AIが大建造物を建てようとする頻度', min: 0, max: 2, step: 0.1, pct: true },
+  { key: 'aiEcon', name: 'AIの経済力', desc: 'AIの黒字収入の倍率', min: 0.5, max: 2, step: 0.05, pct: true },
+  { key: 'aiKnow', name: 'AIの知識収入', desc: 'AIが前世の知識を得る速さ', min: 0, max: 2, step: 0.1, pct: true },
+  { key: 'ae', name: '警戒されやすさ', desc: '領土を奪った時に上がる警戒度の倍率', min: 0, max: 2, step: 0.1, pct: true },
+  { key: 'monster', name: '魔物の出現', desc: '大陸全体の魔物の湧きやすさ', min: 0, max: 2, step: 0.1, pct: true },
+  { key: 'rebel', name: '反乱の頻度', desc: '大陸全体の反乱の起きやすさ', min: 0, max: 2, step: 0.1, pct: true },
+  { key: 'grace', name: '開始時の猶予', desc: 'AIがプレイヤーに宣戦しない期間', min: 0, max: 10, step: 1, unit: '年' },
+];
+const AI_PRESETS = {
+  easy:   { aggr: 0.5, expand: 0.8, ally: 1.0, summon: 0.7, wonder: 0.7, aiEcon: 0.85, aiKnow: 0.8, ae: 0.7, monster: 0.6, rebel: 0.6, grace: 5 },
+  normal: { aggr: 1.0, expand: 1.0, ally: 1.0, summon: 1.0, wonder: 1.0, aiEcon: 1.0, aiKnow: 1.0, ae: 1.0, monster: 1.0, rebel: 1.0, grace: 2 },
+  hard:   { aggr: 1.5, expand: 1.2, ally: 1.2, summon: 1.3, wonder: 1.3, aiEcon: 1.25, aiKnow: 1.2, ae: 1.3, monster: 1.2, rebel: 1.2, grace: 1 },
+};

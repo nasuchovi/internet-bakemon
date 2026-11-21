@@ -26,6 +26,7 @@ function natMod(n, key) {
   if (n.advisors) for (const c of n.advisors) add(c.mods);
   if (n.artifacts) for (const a of n.artifacts) add(ARTIFACT_BY_ID[a].mods);
   if (n.inventions) for (const i of n.inventions) add(INVENTION_BY_ID[i].mods);
+  if (S.wonders) for (const w of S.wonders) { const p = prov(w.pid); if (p.owner === n.id && p.controller === n.id) add(WONDER_BY_ID[w.id].mods); }
   if (key === 'taxMod') v += (n.stab || 0) * 0.03;
   return v;
 }
@@ -199,7 +200,7 @@ function manaIncome(n) {
   return (m + natMod(n, 'manaPts')) * (1 + eraOf() * 0.35);
 }
 function knowIncome(n) {
-  let k = (n.isPlayer ? 2 : 0.8) + natMod(n, 'knowPts');
+  let k = (n.isPlayer ? 2 : 0.8 * cfg().aiKnow) + natMod(n, 'knowPts');
   for (const c of n.governors || []) if (c.pid != null) { const g = govEffect(c); k += g.know; }
   return k * (1 + eraOf() * 0.15);
 }
@@ -629,7 +630,7 @@ function navalBattles() {
       if (hostile(list[i].owner, list[j].owner) && (list[i].war + list[j].war) > 0) { A = list[i].owner; B = list[j].owner; break outer; }
     if (A < 0) continue;
     const sA = list.filter(f => friendly(f.owner, A) && hostile(f.owner, B)), sB = list.filter(f => friendly(f.owner, B) && hostile(f.owner, A));
-    const pw = side => side.reduce((s, f) => s + f.war * f.str * (1 + natMod(nat(f.owner), 'combat') * 0.5), 0);
+    const pw = side => side.reduce((s, f) => s + f.war * f.str * (1 + natMod(nat(f.owner), 'combat') * 0.5 + natMod(nat(f.owner), 'navalCombat')), 0);
     const hp = side => side.reduce((s, f) => s + f.war + f.trans * 0.4, 0) || 1;
     const dA = pw(sB) * (2 + rint(0, 6)) * 0.03 / hp(sA), dB = pw(sA) * (2 + rint(0, 6)) * 0.03 / hp(sB);
     for (const f of sA) { f.inBattle = true; f.str -= dA; } for (const f of sB) { f.inBattle = true; f.str -= dB; }
@@ -964,6 +965,51 @@ function checkDeaths() {
   }
 }
 
+// ---------- 大建造物 ----------
+const wonderBuilt = id => S.wonders.find(w => w.id === id);
+const wonderAt = pid => S.wonders.find(w => w.pid === pid);
+function wonderCost(n, W) { return Math.round(W.cost * Math.max(0.3, 1 + natMod(n, 'buildCost'))); }
+function wonderReq(n, W, pid) {
+  // 建設できない理由（できるならnull）
+  const p = prov(pid);
+  if (wonderBuilt(W.id)) return '既に建造された';
+  if (n.project) return '他の大建造物を建設中';
+  if (p.owner !== n.id || p.controller !== n.id) return '自国が支配する州が必要';
+  if (wonderAt(pid)) return 'この州には既に大建造物がある';
+  if (p.dev < W.minDev) return `発展度${W.minDev}以上が必要`;
+  if (W.coastal && !p.coastal) return '沿岸の州が必要';
+  if (W.terrain && p.terrain !== W.terrain) return `${TERRAIN[W.terrain].name}の州が必要`;
+  return null;
+}
+function startWonder(n, id, pid) {
+  const W = WONDER_BY_ID[id], c = wonderCost(n, W);
+  if (wonderReq(n, W, pid) || n.gold < c) return false;
+  n.gold -= c; n.project = { id, pid, prog: 0, need: W.months, paid: c };
+  if (n.id !== S.player && S.player >= 0) hooks.log(`🏗 ${n.name}が${prov(pid).name}で「${W.name}」の建設を始めたという`, 'info');
+  return true;
+}
+function cancelWonder(n, refund, why) {
+  const pr = n.project; if (!pr) return;
+  n.gold += Math.round(pr.paid * refund); n.project = null;
+  if (n.id === S.player) hooks.log(`🏗 「${WONDER_BY_ID[pr.id].name}」の建設は中止された（${why}${refund ? '・費用の' + Math.round(refund * 100) + '%を返金' : ''}）`, 'bad');
+}
+function progressWonder(n) {
+  const pr = n.project; if (!pr) return;
+  const W = WONDER_BY_ID[pr.id], p = prov(pr.pid);
+  if (wonderBuilt(pr.id)) { cancelWonder(n, 0.5, `${nat(wonderBuilt(pr.id).owner).name}に先を越された`); return; }
+  if (p.owner !== n.id) { cancelWonder(n, 0, '建設地を失った'); return; }
+  if (p.controller !== n.id) return; // 占領中は停止
+  pr.prog++;
+  if (pr.prog >= pr.need) {
+    S.wonders.push({ id: pr.id, owner: n.id, pid: pr.pid, day: S.day }); n.project = null; mapDirty = true;
+    if (n.id === S.player) {
+      hooks.fx('levelup', null, `${W.icon} ${W.name} 完成！`);
+      hooks.modal({ title: `${W.icon} ${W.name}、完成`, sound: 'levelup', body: `${esc(p.name)}に「<b>${esc(W.name)}</b>」が完成した！<br><br><i>${esc(W.flavor)}</i><br><br>効果：<b>${esc(W.desc)}</b><br><span class="note">この州を支配している国が効果を得る。奪われないよう守り抜こう。</span>`, buttons: [{ label: '民と共に祝う' }] });
+      gainXP(n, 30);
+    } else hooks.log(`🏛 ${n.name}が${p.name}に「${W.name}」を完成させた`, 'info');
+  }
+}
+
 // ---------- 警戒度（AE）と対抗同盟 ----------
 const getAE = (target, obs) => (S.ae && S.ae[target] ? S.ae[target][obs] || 0 : 0);
 function aeEstimate(target, list, mult = 1) {
@@ -988,7 +1034,7 @@ function aeEstimate(target, list, mult = 1) {
 function addAE(target, list, mult = 1) {
   if (!list.length || target <= 0) return;
   S.ae = S.ae || {}; S.ae[target] = S.ae[target] || {};
-  const est = aeEstimate(target, list, mult);
+  const est = aeEstimate(target, list, mult * (target === S.player ? cfg().ae : 1));
   for (const id in est) { S.ae[target][id] = Math.min(100, (S.ae[target][id] || 0) + est[id]); addRel(+id, target, -est[id] * 0.5); }
   if (target === S.player) {
     const hi = Object.keys(S.ae[target]).filter(id => S.ae[target][id] >= 50 && nat(+id).alive).length;
@@ -1021,8 +1067,9 @@ function monthlyTick() {
     if (!n.alive || n.isMonster) continue;
     const inc = calcIncome(n);
     n._lastBase = inc.base;
-    n.gold += inc.net;
+    n.gold += inc.net * (n.isPlayer || inc.net < 0 ? 1 : cfg().aiEcon);
     if (n.gold < -200) bankrupt(n);
+    progressWonder(n);
     const mm = maxManpower(n);
     n.manpower = Math.min(mm, n.manpower + mm / 40 * (n.gold < 0 ? 0.5 : 1));
     n.gov = Math.min(999, n.gov + govIncome(n));
@@ -1086,12 +1133,13 @@ function spawnRebels(p) {
   const a = createArmy(REBEL, p.id, Math.max(1, Math.round(men / 1000)), 0, 0, { name: p.religion !== nat(p.owner).religion ? `${RELIGIONS[p.religion].name}の反乱軍` : '農民反乱軍', expire: S.day + rint(600, 1000) });
   a.men.inf = men; a.target = p.owner; return a;
 }
-function diff() { return DIFFICULTY[S.diff || 'normal']; }
+function diff() { return DIFFICULTY[S.diff] || DIFFICULTY.normal; }
+function cfg() { return S.aiCfg || AI_PRESETS.normal; }
 function rogueMonthly() {
   const year = S.day / 360;
   for (const n of S.nations) {
     if (!n.alive || n.isMonster || !n.rift) continue;
-    n.rift = Math.max(0, n.rift - 1);
+    n.rift = Math.max(0, n.rift - 1 - natMod(n, 'riftDecay'));
     if (n.rift >= 100) {
       const c = ownedProvs(n.id).filter(p => p.controller === n.id); if (!c.length) continue;
       const p = pick(c);
@@ -1104,14 +1152,13 @@ function rogueMonthly() {
   for (const p of S.provinces) {
     if (p.owner <= 0) continue;
     const n = nat(p.owner);
-    const dm = p.owner === S.player ? diff().rogue : 1;
-    const chance = (p.terrain === 'miasma' ? 0.006 : 0.0009) * (1 + natMod(n, 'monsterSpawn') + (n.rift || 0) / 50) * dm;
+    const chance = (p.terrain === 'miasma' ? 0.006 : 0.0009) * (1 + natMod(n, 'monsterSpawn') + (n.rift || 0) / 50) * cfg().monster;
     if (Math.random() < chance && !S.armies.some(a => a.prov === p.id)) {
       const a = spawnMonsters(p, Math.round(2500 + Math.random() * 4500 + year * 120));
       if (p.owner === S.player) hooks.log(`👹 ${p.name}に${a.name}（${fmtMen(armyMen(a))}）が出現した！`, 'bad');
     }
     const u = provUnrest(p);
-    if (u > 0 && p.controller === p.owner && Math.random() < u * 0.0035 * dm && !S.armies.some(a => a.prov === p.id && isRogue(a.owner))) {
+    if (u > 0 && p.controller === p.owner && Math.random() < u * 0.0035 * cfg().rebel && !S.armies.some(a => a.prov === p.id && isRogue(a.owner))) {
       const a = spawnRebels(p);
       if (p.owner === S.player) hooks.log(`✊ ${p.name}で${a.name}（${fmtMen(armyMen(a))}）が蜂起した！（不穏度 ${u.toFixed(1)}）`, 'bad');
     }

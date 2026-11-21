@@ -139,6 +139,13 @@ function aiEconomy(n) {
     const cand = landProvs().filter(p => canFoundGuild(n.id, p.id)).map(p => ({ p, v: guildIncome({ owner: n.id, pid: p.id }) })).sort((a, b) => b.v - a.v);
     if (cand.length) foundGuild(n.id, cand[0].p.id);
   }
+  // 大建造物
+  if (!war && !n.project && Math.random() < 0.25 * cfg().wonder) {
+    const provs = ownedProvs(n.id).filter(p => p.controller === n.id).sort((a, b) => dev(b) - dev(a));
+    const opts = [];
+    for (const W of WONDERS) { if (n.gold < wonderCost(n, W) + 150) continue; const p = provs.find(p => !wonderReq(n, W, p.id)); if (p) opts.push({ W, p }); }
+    if (opts.length) { const o = pick(opts); startWonder(n, o.W.id, o.p.id); }
+  }
   // 余剰資金の投資
   for (let k = 0; k < 6 && !war && n.gold > 600; k++) {
     const p = ownedProvs(n.id).filter(p => p.controller === n.id && p.dev < DEV_CAP).sort((a, b) => investCost(n, a) - investCost(n, b))[0];
@@ -185,7 +192,7 @@ function aiEconomy(n) {
     if (p) develop(n, p);
   }
   // 召喚
-  if (canSummon(n) && n.gold > 150 && Math.random() < 0.3) {
+  if (canSummon(n) && n.gold > 150 && Math.random() < 0.3 * cfg().summon) {
     const r = doSummon(n);
     if (r && r.char && (r.char.rarity === 'SSR' || r.char.rarity === 'SR')) hooks.log(`✨ ${n.name}が異世界から${r.char.title}（${r.char.rarity}）を召喚したという噂だ`, 'info');
   }
@@ -198,7 +205,7 @@ function aiEconomy(n) {
   if (!war && n.gold > colonizeCost(n) + 40 && !S.provinces.some(p => p.colonizing && p.colonizing.by === n.id)) {
     const c = [];
     for (const p of landProvs()) if (canColonize(n.id, p.id)) c.push(p.id);
-    if (c.length && Math.random() < 0.5) colonize(n.id, pick(c));
+    if (c.length && Math.random() < 0.5 * cfg().expand) colonize(n.id, pick(c));
   }
 }
 
@@ -216,7 +223,7 @@ function aiDiplomacy(n) {
     const neigh = new Set(); for (const p of ownedProvs(n.id)) for (const q of p.nb) { const o = prov(q).owner; if (o > 0 && o !== n.id) neigh.add(o); }
     for (const o of neigh) if (vassalAccepts(n, nat(o))) { makeVassal(n, nat(o)); hooks.log(`📜 ${nat(o).name}が${n.name}の属国となった`, 'info'); break; }
   }
-  if (!war && n.allies.length < 2 && Math.random() < 0.04) {
+  if (!war && n.allies.length < 2 && Math.random() < 0.04 * cfg().ally) {
     const cand = S.nations.filter(o => o.alive && !o.isMonster && o.id !== n.id && !o.overlord && !isAlly(n.id, o.id) && o.allies.length < 3 && getRel(n.id, o.id) > 45 && !hostile(n.id, o.id));
     if (cand.length) {
       const o = pick(cand);
@@ -231,7 +238,7 @@ function aiDiplomacy(n) {
   }
   if (war || S.day < 360 || S.day - n.lastWar < 720) return;
   if (coalitionOf(n.id).length >= 2) return; // 警戒されている間は自重
-  const aggr = (n.demonKing ? 0.14 : n.race === 'demon' ? 0.09 : 0.045) * diff().aggr;
+  const aggr = (n.demonKing ? 0.14 : n.race === 'demon' ? 0.09 : 0.045) * cfg().aggr;
   if (Math.random() > aggr) return;
   const neigh = new Set();
   for (const p of ownedProvs(n.id)) for (const q of p.nb) { const o = prov(q).owner; if (o > 0 && o !== n.id) neigh.add(o); }
@@ -239,7 +246,7 @@ function aiDiplomacy(n) {
   let best = null, br = 0;
   for (const o of neigh) {
     if (isAlly(n.id, o) || hasTruce(n.id, o) || !nat(o).alive) continue;
-    if (o === S.player && S.day < diff().grace) continue;
+    if (o === S.player && S.day < cfg().grace * 360) continue;
     if (o === S.player && S.tut && !S.tut.done) continue;
     if (getRel(n.id, o) > (n.demonKing ? 40 : 5)) continue;
     const tgt = nat(o).overlord || o;
