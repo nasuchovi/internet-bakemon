@@ -838,11 +838,11 @@ function drawRoads() {
     if (!visible((ax + bx) / 2, (ay + by) / 2, Math.abs(ax - bx) + Math.abs(ay - by) + 30)) continue;
     const P = paths[R.tier]; P.moveTo(ax, ay); P.quadraticCurveTo(sx(R.mx), sy(R.my), bx, by);
   }
-  // 小道：点線 / 街道：実線 / 大街道：二重線
-  ctx.setLineDash([2.5, 3.5]); ctx.lineWidth = Math.max(0.8, cam.s * 0.7); ctx.strokeStyle = `rgba(110,72,36,${0.6 * a})`; ctx.stroke(paths[1]); ctx.setLineDash([]);
-  ctx.lineWidth = Math.max(1, cam.s * 1.1); ctx.strokeStyle = `rgba(110,68,30,${0.7 * a})`; ctx.stroke(paths[2]);
-  ctx.lineWidth = Math.max(2.2, cam.s * 2.6); ctx.strokeStyle = `rgba(100,62,28,${0.75 * a})`; ctx.stroke(paths[3]);
-  ctx.lineWidth = Math.max(0.8, cam.s * 1.1); ctx.strokeStyle = `rgba(236,222,188,${0.9 * a})`; ctx.stroke(paths[3]);
+  // 小道：点線 / 街道：細い実線 / 大街道：細い二重線（古地図の道の描き方）
+  ctx.setLineDash([1.2, 3]); ctx.lineWidth = Math.max(0.7, cam.s * 0.6); ctx.strokeStyle = `rgba(66,42,20,${0.55 * a})`; ctx.stroke(paths[1]); ctx.setLineDash([]);
+  ctx.lineWidth = Math.max(0.7, cam.s * 0.65); ctx.strokeStyle = `rgba(66,42,20,${0.65 * a})`; ctx.stroke(paths[2]);
+  ctx.lineWidth = Math.max(2, cam.s * 2.1); ctx.strokeStyle = `rgba(66,42,20,${0.75 * a})`; ctx.stroke(paths[3]);
+  ctx.lineWidth = Math.max(0.9, cam.s * 1.05); ctx.strokeStyle = `rgba(238,226,196,${0.95 * a})`; ctx.stroke(paths[3]);
   // 鉄道：線路と枕木
   if (roadCache.rails.length) {
     const rail = new Path2D(), ties = new Path2D(), tl = Math.max(2, cam.s * 2.2);
@@ -856,55 +856,134 @@ function drawRoads() {
     ctx.lineWidth = Math.max(1, cam.s * 0.9); ctx.strokeStyle = `rgba(40,26,14,${0.85 * a})`; ctx.stroke(rail); ctx.lineWidth = Math.max(0.6, cam.s * 0.6); ctx.stroke(ties);
   }
 }
+function drawIcon(f, x, y, k, r) {
+  const sl = { r };
+  const a = 1;
+  const INKC = `rgba(52,32,14,${0.88 * a})`, HATCH = `rgba(52,32,14,${0.5 * a})`, PAPERC = `rgba(241,230,204,${0.92 * a})`;
+  const lw = Math.max(0.7, Math.min(1.3, k * 0.1));
+  ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
+  // ---- 部品（インク線＋紙色の塗り＋斜線の陰影） ----
+  const stroke = (w) => { ctx.lineWidth = w || lw; ctx.strokeStyle = INKC; ctx.stroke(); };
+  const fillP = () => { ctx.fillStyle = PAPERC; ctx.fill(); };
+  const hatchPoly = (pts, n) => { // 多角形の内側に斜線
+    ctx.save(); ctx.beginPath(); pts.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); ctx.clip();
+    const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), st = Math.max(1.4, (x1 - x0) / n);
+    ctx.beginPath(); for (let t = x0 - (y1 - y0); t < x1; t += st) { ctx.moveTo(t, y1); ctx.lineTo(t + (y1 - y0), y0); }
+    ctx.lineWidth = lw * 0.6; ctx.strokeStyle = HATCH; ctx.stroke(); ctx.restore();
+  };
+  const house = (x, y, w, h) => { // 横から見た家（屋根の片側に陰影）
+    const rh = h * 0.75;
+    ctx.beginPath(); ctx.rect(x - w / 2, y - h, w, h); fillP(); stroke();
+    const roof = [[x - w / 2 - w * 0.08, y - h], [x, y - h - rh], [x + w / 2 + w * 0.08, y - h]];
+    ctx.beginPath(); ctx.moveTo(...roof[0]); ctx.lineTo(...roof[1]); ctx.lineTo(...roof[2]); ctx.closePath(); fillP(); stroke();
+    hatchPoly([roof[1], roof[2], [x, y - h]], 4);
+    ctx.beginPath(); ctx.rect(x - w * 0.12, y - h * 0.45, w * 0.24, h * 0.45); ctx.fillStyle = INKC; ctx.fill();
+  };
+  const spire = (x, y, w, h) => { // 教会の尖塔
+    const sh = h * 0.9;
+    ctx.beginPath(); ctx.rect(x - w / 2, y - h, w, h); fillP(); stroke();
+    ctx.beginPath(); ctx.moveTo(x - w / 2, y - h); ctx.lineTo(x, y - h - sh); ctx.lineTo(x + w / 2, y - h); ctx.closePath(); fillP(); stroke();
+    hatchPoly([[x, y - h - sh], [x + w / 2, y - h], [x, y - h]], 3);
+    ctx.beginPath(); ctx.moveTo(x, y - h - sh); ctx.lineTo(x, y - h - sh - w * 0.7); ctx.moveTo(x - w * 0.28, y - h - sh - w * 0.45); ctx.lineTo(x + w * 0.28, y - h - sh - w * 0.45); stroke(lw * 0.8);
+    ctx.beginPath(); ctx.arc(x, y - h * 0.62, w * 0.18, 0, Math.PI * 2); stroke(lw * 0.7);
+  };
+  const tower = (x, y, w, h) => { // 鋸壁の塔
+    ctx.beginPath(); ctx.rect(x - w / 2, y - h, w, h); fillP(); stroke();
+    hatchPoly([[x + w * 0.1, y - h], [x + w / 2, y - h], [x + w / 2, y], [x + w * 0.1, y]], 3);
+    const c = w / 5; ctx.beginPath();
+    for (let i = 0; i < 3; i++) ctx.rect(x - w / 2 + i * 2 * c, y - h - c, c, c);
+    fillP(); stroke(lw * 0.8);
+  };
+  const dome = (x, y, w) => { ctx.beginPath(); ctx.moveTo(x - w / 2, y); ctx.arc(x, y, w / 2, Math.PI, 0); ctx.closePath(); fillP(); stroke(); hatchPoly([[x, y - w / 2], [x + w / 2, y - w * 0.1], [x + w / 2, y], [x, y]], 3); ctx.beginPath(); ctx.moveTo(x, y - w / 2); ctx.lineTo(x, y - w * 0.8); stroke(lw * 0.8); };
+  const townDot = (x, y, r) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); fillP(); stroke(lw * 0.9); ctx.beginPath(); ctx.arc(x, y, r * 0.35, 0, Math.PI * 2); ctx.fillStyle = INKC; ctx.fill(); };
+  switch (f) {
+        case 'village':
+          house(x - k * 0.42, y + k * 0.35, k * 0.55, k * 0.4);
+          house(x + k * 0.3, y + k * 0.42, k * 0.45, k * 0.32);
+          break;
+        case 'town':
+          house(x - k * 0.62, y + k * 0.42, k * 0.55, k * 0.42);
+          house(x + k * 0.62, y + k * 0.45, k * 0.5, k * 0.38);
+          spire(x, y + k * 0.42, k * 0.36, k * 0.65);
+          townDot(x, y + k * 0.72, k * 0.17);
+          break;
+        case 'city': {
+          // 奥の家並み・尖塔・丸屋根
+          house(x - k * 0.75, y + k * 0.05, k * 0.5, k * 0.45);
+          dome(x + k * 0.05, y - k * 0.25, k * 0.6);
+          spire(x - k * 0.25, y + k * 0.05, k * 0.3, k * 0.75);
+          spire(x + k * 0.7, y + k * 0.05, k * 0.28, k * 0.6);
+          // 手前の城壁と円塔
+          const wy = y + k * 0.62, wh = k * 0.42, x0 = x - k * 1.2, x1 = x + k * 1.2;
+          ctx.beginPath(); ctx.rect(x0, wy - wh, x1 - x0, wh); fillP(); stroke();
+          ctx.beginPath(); for (let t = x0; t < x1 - k * 0.1; t += k * 0.24) ctx.rect(t, wy - wh - k * 0.12, k * 0.12, k * 0.12); fillP(); stroke(lw * 0.8);
+          ctx.beginPath(); ctx.moveTo(x - k * 0.18, wy); ctx.lineTo(x - k * 0.18, wy - wh * 0.6); ctx.arc(x, wy - wh * 0.6, k * 0.18, Math.PI, 0); ctx.lineTo(x + k * 0.18, wy); ctx.fillStyle = INKC; ctx.fill();
+          tower(x0, wy, k * 0.34, k * 0.7); tower(x1, wy, k * 0.34, k * 0.7);
+          break;
+        }
+        case 'field': { // 畝の線だけの区画（2枚）
+          ctx.save(); ctx.translate(x, y); ctx.rotate((sl.r - 0.5) * 0.9);
+          for (const [ox, w2, ang] of [[-k * 0.42, k * 0.7, 0], [k * 0.42, k * 0.62, 1]]) {
+            ctx.beginPath(); ctx.rect(ox - w2 / 2, -k * 0.35, w2, k * 0.7); ctx.setLineDash([lw * 1.5, lw * 1.5]); ctx.lineWidth = lw * 0.7; ctx.strokeStyle = HATCH; ctx.stroke(); ctx.setLineDash([]);
+            ctx.beginPath();
+            if (ang) for (let t = -w2 / 2 + 1.5; t < w2 / 2; t += Math.max(1.6, k * 0.14)) { ctx.moveTo(ox + t, -k * 0.3); ctx.lineTo(ox + t, k * 0.3); }
+            else for (let t = -k * 0.3; t <= k * 0.3; t += Math.max(1.6, k * 0.14)) { ctx.moveTo(ox - w2 / 2 + 1.5, t); ctx.lineTo(ox + w2 / 2 - 1.5, t); }
+            ctx.lineWidth = lw * 0.6; ctx.strokeStyle = HATCH; ctx.stroke();
+          }
+          ctx.restore(); break;
+        }
+        case 'mine': { // 交差した鎚（鉱山の記号）
+          ctx.save(); ctx.translate(x, y);
+          for (const d of [1, -1]) {
+            ctx.save(); ctx.rotate(d * Math.PI / 4);
+            ctx.beginPath(); ctx.moveTo(0, k * 0.65); ctx.lineTo(0, -k * 0.45); stroke(Math.max(1, lw * 1.2));
+            ctx.beginPath(); ctx.rect(-k * 0.28, -k * 0.62, k * 0.56, k * 0.22); ctx.fillStyle = INKC; ctx.fill();
+            ctx.restore();
+          }
+          ctx.restore(); break;
+        }
+        case 'oasis': // ヤシと水面
+          ctx.beginPath(); for (let j = 0; j < 2; j++) { const yy = y + k * (0.5 + j * 0.2), w2 = k * (0.7 - j * 0.15); ctx.moveTo(x - w2, yy); ctx.quadraticCurveTo(x - w2 / 2, yy - k * 0.1, x, yy); ctx.quadraticCurveTo(x + w2 / 2, yy + k * 0.1, x + w2, yy); } stroke(lw * 0.8);
+          ctx.beginPath(); ctx.moveTo(x, y + k * 0.42); ctx.quadraticCurveTo(x + k * 0.18, y - k * 0.1, x + k * 0.05, y - k * 0.6); stroke(Math.max(1, lw * 1.1));
+          ctx.beginPath(); for (const [dx, dy] of [[-0.6, -0.35], [-0.5, -0.75], [0.55, -0.3], [0.5, -0.8], [0.05, -0.95]]) { ctx.moveTo(x + k * 0.05, y - k * 0.6); ctx.quadraticCurveTo(x + k * (0.05 + dx * 0.5), y - k * (0.6 - dy * 0.1) - k * 0.25, x + k * (0.05 + dx), y + k * dy); } stroke(lw);
+          break;
+        case 'polder': { // 堤防と風車
+          ctx.beginPath(); ctx.moveTo(x - k * 0.9, y + k * 0.55); ctx.lineTo(x + k * 0.9, y + k * 0.55); ctx.moveTo(x - k * 0.9, y + k * 0.7); ctx.lineTo(x + k * 0.9, y + k * 0.7); stroke(lw * 0.8);
+          ctx.beginPath(); ctx.moveTo(x - k * 0.2, y + k * 0.55); ctx.lineTo(x - k * 0.12, y - k * 0.15); ctx.lineTo(x + k * 0.12, y - k * 0.15); ctx.lineTo(x + k * 0.2, y + k * 0.55); ctx.closePath(); fillP(); stroke();
+          hatchPoly([[x, y - k * 0.15], [x + k * 0.12, y - k * 0.15], [x + k * 0.2, y + k * 0.55], [x, y + k * 0.55]], 3);
+          ctx.save(); ctx.translate(x, y - k * 0.2); ctx.rotate(0.35 + sl.r);
+          for (let j = 0; j < 4; j++) { ctx.rotate(Math.PI / 2); ctx.beginPath(); ctx.rect(k * 0.06, -k * 0.07, k * 0.55, k * 0.14); fillP(); stroke(lw * 0.7); ctx.beginPath(); ctx.moveTo(k * 0.06, 0); ctx.lineTo(k * 0.61, 0); stroke(lw * 0.5); }
+          ctx.restore(); break;
+        }
+      }
+}
+// アイコンは一度だけ描いて使い回す（斜線の陰影が重いため）
+const iconCache = new Map();
+function iconSprite(f, k, v) {
+  const key = f + ':' + k + ':' + v;
+  let sp = iconCache.get(key);
+  if (sp) return sp;
+  if (iconCache.size > 500) iconCache.clear();
+  const S2 = k * 3.6, pr = Math.max(1, exportView ? 1 : dpr);
+  const c = document.createElement('canvas'); c.width = Math.ceil(S2 * pr); c.height = Math.ceil(S2 * pr);
+  const save = ctx; ctx = c.getContext('2d'); ctx.scale(pr, pr);
+  try { drawIcon(f, S2 / 2, S2 * 0.55, k, v / 3 + 0.15); } finally { ctx = save; }
+  sp = { c, w: S2, h: S2, ox: S2 / 2, oy: S2 * 0.55 };
+  iconCache.set(key, sp); return sp;
+}
 function drawDevelopment() {
   if (cam.s < 0.55) return;
-  const a = clamp((cam.s - 0.55) / 0.3, 0, 1), s = clamp(5 * cam.s, 3.5, 12);
-  ctx.lineWidth = Math.max(0.8, Math.min(1.5, cam.s * 0.6)); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-  const ink = `rgba(58,36,18,${0.85 * a})`, paperFill = `rgba(242,230,204,${0.95 * a})`, roof = `rgba(150,60,40,${0.75 * a})`;
-  const house = (x, y, k) => {
-    ctx.beginPath(); ctx.rect(x - k * 0.45, y - k * 0.1, k * 0.9, k * 0.6); ctx.fillStyle = paperFill; ctx.fill(); ctx.strokeStyle = ink; ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x - k * 0.6, y - k * 0.1); ctx.lineTo(x, y - k * 0.65); ctx.lineTo(x + k * 0.6, y - k * 0.1); ctx.closePath(); ctx.fillStyle = roof; ctx.fill(); ctx.stroke();
-  };
+  const a = clamp((cam.s - 0.55) / 0.3, 0, 1), s = clamp(5.6 * cam.s, 3.8, 24);
+  ctx.save(); ctx.globalAlpha = a;
   for (const p of S.provinces) {
     if (p.sea || p.owner < 0 || !p._slots) continue;
     if (!visible(sx(p.x), sy(p.y), Math.sqrt(p.area) * cam.s + 30)) continue;
     const feats = p._feats || [];
-    feats.forEach((f, i) => {
-      const sl = p._slots[i], x = sx(sl.x), y = sy(sl.y), k = s * (0.9 + sl.r * 0.25);
-      switch (f) {
-        case 'village': house(x - k * 0.45, y + k * 0.15, k * 0.8); house(x + k * 0.5, y - k * 0.1, k * 0.7); break;
-        case 'town':
-          house(x - k * 0.75, y + k * 0.2, k * 0.8); house(x + k * 0.75, y + k * 0.25, k * 0.8); house(x, y + k * 0.35, k * 0.75);
-          ctx.beginPath(); ctx.rect(x - k * 0.18, y - k * 0.7, k * 0.36, k * 0.85); ctx.fillStyle = paperFill; ctx.fill(); ctx.strokeStyle = ink; ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(x - k * 0.26, y - k * 0.7); ctx.lineTo(x, y - k * 1.35); ctx.lineTo(x + k * 0.26, y - k * 0.7); ctx.closePath(); ctx.fillStyle = roof; ctx.fill(); ctx.stroke();
-          break;
-        case 'city': {
-          const r = k * 1.25;
-          ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = paperFill; ctx.fill(); ctx.lineWidth = Math.max(1.2, cam.s * 1.0); ctx.strokeStyle = ink; ctx.stroke(); ctx.lineWidth = Math.max(0.8, Math.min(1.5, cam.s * 0.6));
-          for (let t = 0; t < 6; t++) { const an = t / 6 * Math.PI * 2, tx = x + Math.cos(an) * r, ty = y + Math.sin(an) * r; ctx.beginPath(); ctx.rect(tx - k * 0.16, ty - k * 0.16, k * 0.32, k * 0.32); ctx.fillStyle = paperFill; ctx.fill(); ctx.stroke(); }
-          house(x - k * 0.4, y + k * 0.15, k * 0.65); house(x + k * 0.4, y + k * 0.2, k * 0.65); house(x, y - k * 0.3, k * 0.7);
-          break;
-        }
-        case 'field': { // 畝の入った畑
-          ctx.save(); ctx.translate(x, y); ctx.rotate((sl.r - 0.5) * 0.8);
-          ctx.beginPath(); ctx.rect(-k * 0.8, -k * 0.5, k * 1.6, k); ctx.fillStyle = `rgba(196,170,96,${0.35 * a})`; ctx.fill(); ctx.strokeStyle = `rgba(90,60,26,${0.6 * a})`; ctx.stroke();
-          ctx.beginPath(); for (let j = -2; j <= 2; j++) { ctx.moveTo(-k * 0.8, j * k * 0.2); ctx.lineTo(k * 0.8, j * k * 0.2); } ctx.strokeStyle = `rgba(90,60,26,${0.4 * a})`; ctx.stroke();
-          ctx.restore(); break;
-        }
-        case 'mine': // 坑道の入口とつるはし
-          ctx.beginPath(); ctx.arc(x, y + k * 0.3, k * 0.5, Math.PI, 0); ctx.lineTo(x + k * 0.5, y + k * 0.3); ctx.closePath(); ctx.fillStyle = `rgba(40,26,14,${0.8 * a})`; ctx.fill();
-          ctx.beginPath(); ctx.moveTo(x - k * 0.6, y - k * 0.7); ctx.lineTo(x + k * 0.3, y + k * 0.1); ctx.moveTo(x + k * 0.6, y - k * 0.7); ctx.lineTo(x - k * 0.3, y + k * 0.1);
-          ctx.moveTo(x - k * 0.85, y - k * 0.45); ctx.quadraticCurveTo(x - k * 0.6, y - k * 0.95, x - k * 0.3, y - k * 0.85); ctx.moveTo(x + k * 0.85, y - k * 0.45); ctx.quadraticCurveTo(x + k * 0.6, y - k * 0.95, x + k * 0.3, y - k * 0.85);
-          ctx.strokeStyle = ink; ctx.stroke(); break;
-        case 'oasis': // 泉とヤシ
-          ctx.beginPath(); ctx.ellipse(x, y + k * 0.4, k * 0.8, k * 0.3, 0, 0, Math.PI * 2); ctx.fillStyle = `rgba(110,150,160,${0.6 * a})`; ctx.fill(); ctx.strokeStyle = ink; ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(x, y + k * 0.3); ctx.quadraticCurveTo(x + k * 0.15, y - k * 0.3, x, y - k * 0.9);
-          for (const d of [-1, 1]) { ctx.moveTo(x, y - k * 0.9); ctx.quadraticCurveTo(x + d * k * 0.5, y - k * 1.1, x + d * k * 0.8, y - k * 0.6); }
-          ctx.stroke(); break;
-        case 'polder': // 干拓地：堤防で囲んだ区画
-          ctx.beginPath(); ctx.rect(x - k * 0.8, y - k * 0.5, k * 1.6, k); ctx.fillStyle = `rgba(150,170,110,${0.35 * a})`; ctx.fill(); ctx.strokeStyle = ink; ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(x, y - k * 0.5); ctx.lineTo(x, y + k * 0.5); ctx.moveTo(x - k * 0.8, y); ctx.lineTo(x + k * 0.8, y); ctx.strokeStyle = `rgba(70,100,110,${0.6 * a})`; ctx.stroke(); break;
-      }
-    });
+    for (let i = 0; i < feats.length; i++) {
+      const sl = p._slots[i], k = Math.round(s * (0.92 + sl.r * 0.2) * 2) / 2, v = Math.floor(sl.r * 3) % 3;
+      const sp = iconSprite(feats[i], k, v);
+      ctx.drawImage(sp.c, sx(sl.x) - sp.ox, sy(sl.y) - sp.oy, sp.w, sp.h);
+    }
   }
+  ctx.restore();
 }
