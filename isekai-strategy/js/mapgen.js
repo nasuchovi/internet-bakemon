@@ -253,7 +253,7 @@ function generateWorld(seed) {
     const root = genName(T.race);
     const big = T.size === 'big';
     nations.push({
-      id, name: root + T.gov, short: root, race: T.race, religion: RACE_RELIGION[T.race], gov: T.gov, size: T.size, color: T.color, demonKing: !!T.demonKing,
+      id, name: root + T.gov, short: root, race: T.race, religion: RACE_RELIGION[T.race], polity: T.gov, size: T.size, color: T.color, demonKing: !!T.demonKing,
       capital: cap.id, alive: true, isMonster: false, isPlayer: false,
       gold: big ? 150 : 80, manpower: 0, gov: 50, know: 0, mana: 20, stab: 1, inventions: [], governors: [], guildCount: 0,
       ruler: { name: pick(RACES[T.race].rulers, R), cap: 1 + Math.floor(R() * 5) },

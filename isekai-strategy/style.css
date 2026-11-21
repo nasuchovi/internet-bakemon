@@ -484,3 +484,14 @@ body[data-era="4"] #main::after { box-shadow: inset 0 0 0 2px rgba(160,30,30,.45
 #map { filter: none; }
 #main::after { box-shadow: inset 0 0 70px rgba(20,10,4,.55); }
 #btn-export { border-left: 1px solid rgba(184,137,47,.5) !important; margin-left: 2px; }
+
+.trait { padding: 8px 10px; border-radius: 4px; background: linear-gradient(rgba(255,236,170,.5), rgba(255,248,228,.4)); border: 1px solid #b8892f; }
+.trait b { display: block; font-family: var(--display); font-weight: 400; font-size: 15px; color: var(--accent); }
+.trait span { font-size: 12px; color: var(--ink-2); }
+.mission { display: flex; gap: 8px; padding: 7px 9px; margin-bottom: 5px; border-radius: 4px; background: rgba(255,248,228,.45); border: 1px solid rgba(107,69,32,.35); }
+.mission .mi { color: var(--accent); font-size: 14px; width: 16px; }
+.mission b { display: block; font-family: var(--display); font-weight: 400; font-size: 14px; }
+.mission small { display: block; font-size: 11px; color: var(--ink-2); }
+.mission small.rw { color: #6a3f10; margin-top: 2px; }
+.mission.done { border-color: rgba(46,110,36,.5); background: rgba(46,110,36,.08); }
+.mission.done .mi { color: #2e6e24; }

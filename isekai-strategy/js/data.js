@@ -358,3 +358,94 @@ const AI_PRESETS = {
   normal: { aggr: 1.0, expand: 1.0, ally: 1.0, summon: 1.0, wonder: 1.0, aiEcon: 1.0, aiKnow: 1.0, ae: 1.0, monster: 1.0, rebel: 1.0, grace: 2 },
   hard:   { aggr: 1.5, expand: 1.2, ally: 1.2, summon: 1.3, wonder: 1.3, aiEcon: 1.25, aiKnow: 1.2, ae: 1.3, monster: 1.2, rebel: 1.2, grace: 1 },
 };
+
+// ===== 国家固有の特性と目標（政体ごと） =====
+const NATION_TRAITS = {
+  '帝国':       { name: '皇帝の威光', desc: '属国からの貢納金+50%、講和での属国化コスト-30%', mods: { tributeMod: 0.5, vassalCost: -0.3 } },
+  '王国':       { name: '騎士道', desc: '騎兵の戦闘力+25%、士気+0.3', mods: { cavPower: 0.25, morale: 0.3 } },
+  '公国':       { name: '商業特権', desc: '商会枠+1、商会収入+15%', mods: { guilds: 1, tradeMod: 0.15 } },
+  '聖教国':     { name: '聖戦', desc: '魔物・反乱軍・魔族の国との戦いで戦闘力+25%。ただし召喚するたびに安定度-1', mods: { holyWar: 0.25, summonStabLoss: 1 } },
+  '自由都市同盟': { name: '自治都市', desc: '商会収入+30%。関係値5以上なら外国の州にも商会を出せる', mods: { tradeMod: 0.3, guildRel: 20 } },
+  '森王国':     { name: '世界樹の守り手', desc: '「世界樹の聖域」の建設費が半額。森林・湿地での戦闘力+10%', mods: { forestCombat: 0.1 }, wonderDiscount: { worldtree: 0.5 } },
+  '盟約国':     { name: '精霊契約', desc: '魔力+2/月、召喚事故が起きにくい', mods: { manaPts: 2, accidentMod: -0.5 } },
+  '山岳王国':   { name: '鉄壁', desc: '全ての州の要塞Lv+1', mods: { fortAll: 1 } },
+  '氏族連合':   { name: '名工の血', desc: '建物・大建造物の建設費-30%', mods: { buildCost: -0.3 } },
+  '大部族連合': { name: '大移動', desc: '入植の速さ2倍、入植費-30%', mods: { colonizeSpeed: 1, colonizeCost: -0.3 } },
+  '族長国':     { name: '魔獣狩り', desc: '魔物の群れを倒すたびに金貨と政務を得る。対魔物の戦闘力+15%', mods: { hunter: 1, holyWarRogue: 0.15 } },
+  '魔王国':     { name: '魔物の王', desc: '魔物の群れに襲われない。召喚事故で現れた魔物は自軍になる', mods: { monsterKing: 1 } },
+  '辺境伯領':   { name: '境界の砦', desc: '自国の州での戦闘力+20%、包囲されにくい（要塞Lv+1）', mods: { homeDefense: 0.2, fortAll: 1 } },
+  '竜帝国':     { name: '竜の巣', desc: '騎兵（竜騎兵）の維持費が半額', mods: { cavUpkeep: 0.5 } },
+};
+// 目標：prog(n) → [現在値, 目標値]、reward は即時（gold/gov/mana/know/stab）か永続（mods）
+const MISSIONS = {
+  '帝国': [
+    { id: 'emp1', name: '諸侯を従えよ', desc: '属国を2つ持つ', prog: n => [vassalsOf(n.id).length, 2], reward: { gov: 150, label: '政務+150' } },
+    { id: 'emp2', name: '帝国の繁栄', desc: '総開発度300', prog: n => [totalDev(n.id), 300], reward: { mods: { taxMod: 0.1 }, label: '永続：税収+10%' } },
+    { id: 'emp3', name: '帝都の威容', desc: '首都に大建造物を建てる', prog: n => [S.wonders.some(w => w.pid === n.capital) ? 1 : 0, 1], reward: { stab: 1, gov: 100, label: '安定度+1、政務+100' } },
+  ],
+  '王国': [
+    { id: 'kng1', name: '騎士団の結成', desc: '騎兵を10連隊そろえる', prog: n => [S.armies.filter(a => a.owner === n.id).reduce((s, a) => s + a.regs.cav, 0), 10], reward: { mods: { morale: 0.5 }, label: '永続：士気+0.5' } },
+    { id: 'kng2', name: '失地回復', desc: '講和で州を5つ獲得する', prog: n => [n.conquered || 0, 5], reward: { gov: 120, label: '政務+120' } },
+    { id: 'kng3', name: '王国の黄金期', desc: '総開発度250', prog: n => [totalDev(n.id), 250], reward: { mods: { combat: 0.1 }, label: '永続：戦闘力+10%' } },
+  ],
+  '公国': [
+    { id: 'duc1', name: '商人の都', desc: '商会を4軒持つ', prog: n => [guildsOf(n.id).length, 4], reward: { gold: 200, label: '金貨+200' } },
+    { id: 'duc2', name: '黄金の市', desc: '「黄金の大市場」を所有する', prog: n => [ownsWonder(n, 'bazaar') ? 1 : 0, 1], reward: { mods: { guilds: 1 }, label: '永続：商会枠+1' } },
+    { id: 'duc3', name: '大公の金庫', desc: '金貨2000を貯める', prog: n => [Math.floor(n.gold), 2000], reward: { mods: { tradeMod: 0.2 }, label: '永続：商会収入+20%' } },
+  ],
+  '聖教国': [
+    { id: 'hol1', name: '信仰の統一', desc: '異教の州を3つ改宗する', prog: n => [n.converted || 0, 3], reward: { stab: 1, mods: { unrest: -1 }, label: '安定度+1、永続：反乱-1' } },
+    { id: 'hol2', name: '光の大聖堂', desc: '「聖光大聖堂」を所有する', prog: n => [ownsWonder(n, 'cathedral') ? 1 : 0, 1], reward: { mods: { govPts: 2 }, label: '永続：政務+2/月' } },
+    { id: 'hol3', name: '魔王討伐の聖戦', desc: '魔王国の滅亡', prog: n => [S.nations.some(o => o.demonKing && !o.alive) ? 1 : 0, 1], reward: { mods: { combat: 0.15 }, label: '永続：戦闘力+15%' } },
+  ],
+  '自由都市同盟': [
+    { id: 'fre1', name: '海外商館', desc: '外国の州に商会を3軒持つ', prog: n => [guildsOf(n.id).filter(g => prov(g.pid).owner !== n.id).length, 3], reward: { mods: { guilds: 1 }, label: '永続：商会枠+1' } },
+    { id: 'fre2', name: '商業同盟', desc: '商会を8軒持つ', prog: n => [guildsOf(n.id).length, 8], reward: { mods: { tradeMod: 0.25 }, label: '永続：商会収入+25%' } },
+    { id: 'fre3', name: '中立の都', desc: '関係値50以上の国を5つ持つ', prog: n => [S.nations.filter(o => o.alive && !o.isMonster && o.id !== n.id && getRel(n.id, o.id) >= 50).length, 5], reward: { mods: { govPts: 2 }, label: '永続：政務+2/月' } },
+  ],
+  '森王国': [
+    { id: 'for1', name: '世界樹を祀れ', desc: '「世界樹の聖域」を所有する', prog: n => [ownsWonder(n, 'worldtree') ? 1 : 0, 1], reward: { mods: { manaPts: 2 }, label: '永続：魔力+2/月' } },
+    { id: 'for2', name: '大森林の守護', desc: '森林の州を15持つ', prog: n => [ownedProvs(n.id).filter(p => p.terrain === 'forest').length, 15], reward: { mods: { forestCombat: 0.2 }, label: '永続：森での戦闘力+20%' } },
+    { id: 'for3', name: '古の叡智', desc: '発明を10種完成させる', prog: n => [n.inventions.length, 10], reward: { mods: { knowPts: 1 }, label: '永続：前世の知識+1/月' } },
+  ],
+  '盟約国': [
+    { id: 'pac1', name: '魔力の泉', desc: '魔力を500貯める', prog: n => [Math.floor(n.mana), 500], reward: { mods: { summonCost: -0.2 }, label: '永続：召喚コスト-20%' } },
+    { id: 'pac2', name: '異界の友', desc: '異世界人を4人抱える', prog: n => [summonedCount(n), 4], reward: { mods: { riftDecay: 1 }, label: '永続：次元の歪みの回復+1/月' } },
+    { id: 'pac3', name: '精霊王の塔', desc: '「大魔導塔」を所有する', prog: n => [ownsWonder(n, 'tower') ? 1 : 0, 1], reward: { mods: { manaPts: 3 }, label: '永続：魔力+3/月' } },
+  ],
+  '山岳王国': [
+    { id: 'mtn1', name: '城塞の国', desc: '城壁を5つ建てる', prog: n => [ownedProvs(n.id).filter(p => p.b.walls).length, 5], reward: { mods: { siege: 0.2 }, label: '永続：包囲速度+20%' } },
+    { id: 'mtn2', name: '山々の王', desc: '山岳・丘陵の州を16持つ', prog: n => [ownedProvs(n.id).filter(p => p.terrain === 'mountains' || p.terrain === 'hills').length, 16], reward: { mods: { mpMod: 0.2 }, label: '永続：人的資源+20%' } },
+    { id: 'mtn3', name: '地底の富', desc: '総開発度250', prog: n => [totalDev(n.id), 250], reward: { mods: { prodMod: 0.2 }, label: '永続：生産+20%' } },
+  ],
+  '氏族連合': [
+    { id: 'cln1', name: '大工房', desc: '建物を15棟建てる', prog: n => [ownedProvs(n.id).reduce((s, p) => s + Object.keys(p.b).filter(k => p.b[k]).length, 0), 15], reward: { mods: { buildCost: -0.15 }, label: '永続：建設費-15%' } },
+    { id: 'cln2', name: '名匠の証', desc: '大建造物を1つ所有する', prog: n => [S.wonders.filter(w => prov(w.pid).owner === n.id).length, 1], reward: { mods: { combat: 0.1 }, label: '永続：戦闘力+10%' } },
+    { id: 'cln3', name: '鉱脈の主', desc: '鉄かミスリルの州を7つ持つ', prog: n => [ownedProvs(n.id).filter(p => p.good === 'iron' || p.good === 'mithril').length, 7], reward: { mods: { prodMod: 0.25 }, label: '永続：生産+25%' } },
+  ],
+  '大部族連合': [
+    { id: 'trb1', name: '大草原の覇者', desc: '州を20以上持つ', prog: n => [ownedProvs(n.id).length, 20], reward: { mods: { mpMod: 0.2 }, label: '永続：人的資源+20%' } },
+    { id: 'trb2', name: '新天地へ', desc: '入植を5回完了する', prog: n => [n.colonized || 0, 5], reward: { mods: { moveSpeed: 0.15 }, label: '永続：移動速度+15%' } },
+    { id: 'trb3', name: '百部族の軍', desc: '40連隊をそろえる', prog: n => [S.armies.filter(a => a.owner === n.id).reduce((s, a) => s + armyRegs(a), 0), 40], reward: { mods: { combat: 0.1 }, label: '永続：戦闘力+10%' } },
+  ],
+  '族長国': [
+    { id: 'chf1', name: '魔獣狩りの名声', desc: '魔物の群れを5回撃破する', prog: n => [n.monsterKills || 0, 5], reward: { gold: 200, label: '金貨+200' } },
+    { id: 'chf2', name: '迷宮踏破', desc: 'ダンジョンを3つ踏破する', prog: n => [n.delves || 0, 3], reward: { mana: 150, gov: 80, label: '魔力+150、政務+80' } },
+    { id: 'chf3', name: '大族長', desc: '州を15以上持つ', prog: n => [ownedProvs(n.id).length, 15], reward: { mods: { morale: 0.5 }, label: '永続：士気+0.5' } },
+  ],
+  '魔王国': [
+    { id: 'dem1', name: '人族への鉄槌', desc: '人族の国を1つ滅ぼす', prog: n => [n.humanKills || 0, 1], reward: { mana: 200, label: '魔力+200' } },
+    { id: 'dem2', name: '魔境の拡大', desc: '魔境の州を18持つ', prog: n => [ownedProvs(n.id).filter(p => p.terrain === 'miasma').length, 18], reward: { mods: { combat: 0.1 }, label: '永続：戦闘力+10%' } },
+    { id: 'dem3', name: '異界との門', desc: '「次元門」を所有する', prog: n => [ownsWonder(n, 'gate') ? 1 : 0, 1], reward: { mods: { summonCost: -0.3 }, label: '永続：召喚コスト-30%' } },
+  ],
+  '辺境伯領': [
+    { id: 'mar1', name: '国境の守り', desc: '自国の州での防衛戦に5回勝つ', prog: n => [n.defWins || 0, 5], reward: { mods: { fortAll: 1 }, label: '永続：全州の要塞Lv+1' } },
+    { id: 'mar2', name: '辺境の雄', desc: '州を12以上持つ', prog: n => [ownedProvs(n.id).length, 12], reward: { gov: 150, label: '政務+150' } },
+    { id: 'mar3', name: '城壁の連なり', desc: '城壁を3つ建てる', prog: n => [ownedProvs(n.id).filter(p => p.b.walls).length, 3], reward: { mods: { mpMod: 0.25 }, label: '永続：人的資源+25%' } },
+  ],
+  '竜帝国': [
+    { id: 'drg1', name: '竜の墓所', desc: '竜骨の州を4つ持つ', prog: n => [ownedProvs(n.id).filter(p => p.good === 'dragonbone').length, 4], reward: { mods: { cavPower: 0.2 }, label: '永続：竜騎兵+20%' } },
+    { id: 'drg2', name: '竜の闘技場', desc: '「竜骨の大闘技場」を所有する', prog: n => [ownsWonder(n, 'arena') ? 1 : 0, 1], reward: { mods: { morale: 0.5 }, label: '永続：士気+0.5' } },
+    { id: 'drg3', name: '竜帝の威光', desc: '総開発度200', prog: n => [totalDev(n.id), 200], reward: { mods: { taxMod: 0.15 }, label: '永続：税収+15%' } },
+  ],
+};

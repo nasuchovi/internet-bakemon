@@ -187,11 +187,11 @@ function startGame(playerId, cheat, rulerName, opts = {}) {
 }
 
 // ---------- セーブ／ロード ----------
-const SAVE_KEY = 'isekai-senki-save-v3';
+const SAVE_KEY = 'isekai-senki-save-v4';
 const DYN_KEYS = ['owner', 'controller', 'dev', 'fort', 'b', 'siege', 'colonizing', 'converting', 'coreUntil', 'dungeon', 'good', 'terrain', 'religion'];
 function serialize() {
   return JSON.stringify({
-    v: 3, seed: S.seed, day: S.day, speed: S.speed, player: S.player,
+    v: 4, seed: S.seed, day: S.day, speed: S.speed, player: S.player,
     nations: S.nations, rel: S.rel, relBase: S.relBase, armies: S.armies, fleets: S.fleets, guilds: S.guilds, nextGuildId: S.nextGuildId, wonders: S.wonders, aiCfg: S.aiCfg, wars: S.wars, victories: S.victories, demonKingSlayer: S.demonKingSlayer,
     nextArmyId: S.nextArmyId, nextWarId: S.nextWarId, nextFleetId: S.nextFleetId, nextCharId: S.nextCharId, log: S.log.slice(-40), ae: S.ae, diff: S.diff, tut: S.tut, rebirths: S.rebirths,
     provs: S.provinces.map(p => DYN_KEYS.map(k => p[k])),
@@ -202,7 +202,7 @@ function autosave() { if (S && S.started && !S.over) saveGame(); }
 function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
 function loadGame() {
   let d; try { d = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { return false; }
-  if (!d || d.v !== 3) return false;
+  if (!d || d.v !== 4) return false;
   newWorld(d.seed);
   Object.assign(S, { day: d.day, speed: d.speed, player: d.player, nations: d.nations, rel: d.rel, relBase: d.relBase, armies: d.armies, fleets: d.fleets || [], guilds: d.guilds || [], nextGuildId: d.nextGuildId || 1, wonders: d.wonders || [], aiCfg: d.aiCfg || Object.assign({}, AI_PRESETS.normal), wars: d.wars, victories: d.victories || {}, demonKingSlayer: d.demonKingSlayer,
     nextArmyId: d.nextArmyId, nextWarId: d.nextWarId, nextFleetId: d.nextFleetId || 1, nextCharId: d.nextCharId || 1, log: d.log || [], ae: d.ae || {}, diff: d.diff || 'normal', tut: d.tut || null, rebirths: d.rebirths || 0 });

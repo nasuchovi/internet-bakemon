@@ -311,10 +311,11 @@ function diploButtons(id) {
 // ---------- 国家 ----------
 function nationPanel() {
   const n = me(), inc = calcIncome(n), c = CHEAT_BY_ID[n.cheat];
-  let h = `<h2><i class="dot" style="background:${rgb(n.color)};width:16px;height:16px;margin-right:6px"></i>${esc(n.name)}</h2><div class="sub"><span>${RACES[n.race].name}</span><span>・${n.gov}</span><span>・${RELIGIONS[n.religion].name}</span><span>・首都 ${esc(prov(n.capital).name)}</span></div>`;
+  let h = `<h2><i class="dot" style="background:${rgb(n.color)};width:16px;height:16px;margin-right:6px"></i>${esc(n.name)}</h2><div class="sub"><span>${RACES[n.race].name}</span><span>・${n.polity}</span><span>・${RELIGIONS[n.religion].name}</span><span>・首都 ${esc(prov(n.capital).name)}</span></div>`;
   h += `<h3>君主</h3><div class="ruler"><div class="portrait">👑</div><div><b style="font-family:var(--serif);font-size:15px">${esc(n.ruler.name)}</b> <span class="chip me">転生者 Lv${n.ruler.lv}</span><div class="stats3"><span>器量 ${n.ruler.cap}</span><span class="cost-adm">政務 +${fmt(govIncome(n), 1)}/月</span><span>📚 +${fmt(knowIncome(n), 1)}/月</span></div><div class="note" style="margin-top:2px">チート：<b style="color:var(--gold-2)">${c.name}</b> — ${c.desc}</div></div></div>`;
   const R = RACES[n.race];
   h += `<h3>種族特性 <small>${R.name}・${ERAS[eraOf()]}（第${eraOf() + 1}時代）</small></h3><div class="kv"><span>長所</span><span style="text-align:left">${R.pros}</span><span>短所</span><span style="text-align:left">${R.cons}</span></div><div class="note">${R.growDesc}。20年ごとに時代が進み、種族の差が広がっていく。</div>`;
+  h += traitAndMissions(n, true);
   const co = coalitionOf(n.id);
   const aeList = S.nations.filter(o => o.alive && !o.isMonster && getAE(n.id, o.id) >= 10).sort((a, b) => getAE(n.id, b.id) - getAE(n.id, a.id));
   if (aeList.length) h += `<h3>警戒度 <small>50以上で対抗同盟に参加</small></h3>${co.length >= 2 ? `<div class="warn">⚠ ${co.length}か国が対抗同盟を組める状態にある。国力で上回られると一斉に宣戦される。</div>` : ''}<div class="btns" style="margin-top:4px">${aeList.slice(0, 10).map(o => `<span class="ae ${getAE(n.id, o.id) >= 50 ? 'hi' : ''}">${esc(o.short)} ${Math.round(getAE(n.id, o.id))}</span>`).join('')}</div><p class="note">警戒度は毎月少しずつ下がる。領土を奪うほど（特に近隣・同種族から）上がる。</p>`;
@@ -329,6 +330,17 @@ function nationPanel() {
   h += `<h3>自軍・艦隊</h3><div class="rows">` + (S.armies.filter(a => a.owner === S.player).map(a => `<div class="row" data-act="army" data-arg="${a.id}"><span class="nm">${a.gen != null || a.hero ? '★' : ''}${esc(a.name)} <small style="color:var(--ink-3)">${esc(prov(a.prov).name)}</small></span><span class="num">${fmtMen(armyMen(a))}</span></div>`).join('') +
     S.fleets.filter(f => f.owner === S.player).map(f => `<div class="row" data-act="fleet" data-arg="${f.id}"><span class="nm">⛵ ${esc(f.name)} <small style="color:var(--ink-3)">${esc(prov(f.prov).name)}</small></span><span class="num">戦${f.war} 輸${f.trans}</span></div>`).join('') || '<p class="note">軍がない。州を選んで徴兵しよう。</p>') + `</div>`;
   h += `<h3>システム</h3><div class="btns full">${btn('save', 0, '💾 セーブ')}${btn('load', 0, '📂 ロード', { disabled: !hasSave() })}${btn('newgame', 0, '最初から', { cls: 'red' })}</div><p class="note">毎年1月1日に自動セーブされる。</p>`;
+  return h;
+}
+function traitAndMissions(n, mine) {
+  const T = NATION_TRAITS[n.polity]; if (!T) return '';
+  let h = `<h3>固有特性 <small>${esc(n.polity)}</small></h3><div class="trait"><b>${esc(T.name)}</b><span>${esc(T.desc)}</span></div>`;
+  const done = n.missionsDone || [];
+  h += `<h3>国家目標 <small>${done.length} / ${missionsOf(n).length} 達成</small></h3>`;
+  for (const M of missionsOf(n)) {
+    const ok = done.includes(M.id), [cur, tgt] = M.prog(n), pct = clamp(cur / tgt, 0, 1);
+    h += `<div class="mission ${ok ? 'done' : ''}"><div class="mi">${ok ? '✔' : '◇'}</div><div style="flex:1"><b>${esc(M.name)}</b><small>${esc(M.desc)}${ok ? '' : `（${fmt(Math.min(cur, tgt))} / ${fmt(tgt)}）`}</small>${ok ? '' : `<div class="meter"><i style="width:${pct * 100}%;background:var(--gold)"></i></div>`}<small class="rw">報酬：${esc(M.reward.label)}</small></div></div>`;
+  }
   return h;
 }
 function objectives(n) {
@@ -356,7 +368,7 @@ function diploPanel() {
     h += `<div class="row ${diploSel === n.id ? 'on' : ''}" data-act="dsel" data-arg="${n.id}"><i class="dot" style="background:${rgb(n.color)}"></i><span class="nm">${esc(n.name)}</span>${relStatus(n.id)}${getAE(S.player, n.id) >= 10 ? `<span class="ae ${getAE(S.player, n.id) >= 50 ? 'hi' : ''}" title="我が国への警戒度">警戒${Math.round(getAE(S.player, n.id))}</span>` : ''}<span class="num">${relSpan(getRel(S.player, n.id))}</span></div>`;
     if (diploSel === n.id) {
       const pw = nationPower(n.id), mp = nationPower(S.player);
-      h += `<div class="detail"><div class="kv"><span>種族・宗教</span><span>${RACES[n.race].name}・${RELIGIONS[n.religion].name}</span><span>君主</span><span>${esc(n.ruler.name)}（器量${n.ruler.cap}）</span><span>発明</span><span>${n.inventions.length}種</span><span>商会</span><span>${guildsOf(n.id).length}軒</span><span>総開発度</span><span>${d}</span><span>軍勢</span><span>約${fmtMen(S.armies.filter(a => a.owner === n.id).reduce((s, a) => s + armyMen(a), 0))}（自国比 ${mp > 0 ? Math.round(pw / mp * 100) : '—'}%）</span><span>同盟国</span><span>${n.allies.map(i => esc(nat(i).short)).join('、') || 'なし'}</span><span>異世界人</span><span>${n.generals.filter(g => g.summoned).length + n.advisors.filter(c => c.summoned).length}人</span><span>戦争</span><span>${warsOf(n.id).length ? warsOf(n.id).map(w => esc(w.name)).join('、') : 'なし'}</span></div><div class="btns" style="margin-top:8px">${btn('goto', n.capital, '📍 首都へ')}${diploButtons(n.id)}</div></div>`;
+      h += `<div class="detail"><div class="kv"><span>種族・宗教</span><span>${RACES[n.race].name}・${RELIGIONS[n.religion].name}</span><span>固有特性</span><span title="${esc((NATION_TRAITS[n.polity] || {}).desc || '')}">${esc((NATION_TRAITS[n.polity] || {}).name || '—')}</span><span>国家目標</span><span>${(n.missionsDone || []).length} / ${missionsOf(n).length}</span><span>君主</span><span>${esc(n.ruler.name)}（器量${n.ruler.cap}）</span><span>発明</span><span>${n.inventions.length}種</span><span>商会</span><span>${guildsOf(n.id).length}軒</span><span>総開発度</span><span>${d}</span><span>軍勢</span><span>約${fmtMen(S.armies.filter(a => a.owner === n.id).reduce((s, a) => s + armyMen(a), 0))}（自国比 ${mp > 0 ? Math.round(pw / mp * 100) : '—'}%）</span><span>同盟国</span><span>${n.allies.map(i => esc(nat(i).short)).join('、') || 'なし'}</span><span>異世界人</span><span>${n.generals.filter(g => g.summoned).length + n.advisors.filter(c => c.summoned).length}人</span><span>戦争</span><span>${warsOf(n.id).length ? warsOf(n.id).map(w => esc(w.name)).join('、') : 'なし'}</span></div><div class="btns" style="margin-top:8px">${btn('goto', n.capital, '📍 首都へ')}${diploButtons(n.id)}</div></div>`;
     }
   }
   return h + `</div>`;
@@ -510,6 +522,11 @@ function summonRitual() {
   const n = me();
   const r = doSummon(n);
   if (!r) return;
+  if (r.accident && r.tamed) {
+    sfx('accident'); hooks.fx('win', n.capital, '魔物が従った！');
+    hooks.modal({ title: '😈 魔界の軍勢、来たる', body: `魔法陣が紫に染まり、空間が裂けた。現れたのは異世界人ではなく<b>${esc(r.army.name)}（${fmtMen(armyMen(r.army))}）</b>だった。<br><br>しかし魔物たちは魔王の前にひれ伏した——<b>「魔物の王」</b>の力により、彼らは我が軍に加わった。`, buttons: [{ label: '我が配下とする' }] });
+    return;
+  }
   if (r.accident) {
     sfx('accident'); hooks.fx('lost', n.capital, '召喚事故！');
     hooks.modal({ title: '💥 召喚事故！', body: `魔法陣が不気味な紫に染まり、空間が裂けた——！<br>現れたのは異世界人ではなく、<b>${esc(r.army.name)}（${fmtMen(armyMen(r.army))}）</b>だった！<br><br><span class="note">首都${esc(prov(n.capital).name)}に魔物が出現した。急ぎ討伐せよ。</span>`, buttons: [{ label: '迎え撃て！' }] });
@@ -714,7 +731,8 @@ function renderStart() {
   $('st-nations').innerHTML = list.map(({ n, d, c }) => `<button class="ncard ${startSel === n.id ? 'on' : ''}" data-sn="${n.id}"><i class="dot" style="background:${rgb(n.color)}"></i><span class="nm">${esc(n.name)}<span class="diff ${n.size}">${SIZE_LABEL[n.size]}</span></span><span class="meta">${RACES[n.race].name}・${c}州<br>開発度 ${d}</span></button>`).join('');
   if (startSel > 0) {
     const n = nat(startSel);
-    $('st-nations').querySelector(`[data-sn="${startSel}"]`).insertAdjacentHTML('afterend', `<div class="detail" id="st-detail"><b>${RACES[n.race].name}</b>（${RELIGIONS[n.religion].name}）：${RACES[n.race].desc}<br><span class="note">同盟：${n.allies.map(i => esc(nat(i).name)).join('、') || 'なし'}${n.demonKing ? '<br>⚠ 魔王国は周辺国すべてから敵視されている。勝利条件は「魔界統一」。' : ''}</span></div>`);
+    const T = NATION_TRAITS[n.polity];
+    $('st-nations').querySelector(`[data-sn="${startSel}"]`).insertAdjacentHTML('afterend', `<div class="detail" id="st-detail"><b>固有特性「${esc(T.name)}」</b>：${esc(T.desc)}<br><b>国家目標</b>：${missionsOf(n).map(M => esc(M.name)).join('／')}<br><b>${RACES[n.race].name}</b>（${RELIGIONS[n.religion].name}）：${RACES[n.race].desc}<br><span class="note">同盟：${n.allies.map(i => esc(nat(i).name)).join('、') || 'なし'}${n.demonKing ? '<br>⚠ 魔王国は周辺国すべてから敵視されている。勝利条件は「魔界統一」。' : ''}</span></div>`);
   }
   $('st-diff').innerHTML = Object.entries(DIFFICULTY).map(([k, d]) => `<button class="dcard ${startDiff === k ? 'on' : ''}" data-sd="${k}"><b>${d.name}</b><small>${d.desc}</small></button>`).join('');
   $('st-diff').querySelectorAll('[data-sd]').forEach(b => b.onclick = () => { startDiff = b.dataset.sd; startCfg = Object.assign({}, AI_PRESETS[startDiff]); renderStart(); });

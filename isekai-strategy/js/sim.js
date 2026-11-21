@@ -26,6 +26,8 @@ function natMod(n, key) {
   if (n.advisors) for (const c of n.advisors) add(c.mods);
   if (n.artifacts) for (const a of n.artifacts) add(ARTIFACT_BY_ID[a].mods);
   if (n.inventions) for (const i of n.inventions) add(INVENTION_BY_ID[i].mods);
+  const TR = NATION_TRAITS[n.polity]; if (TR) add(TR.mods);
+  if (n.missionMods) for (const m of n.missionMods) add(m);
   if (S.wonders) for (const w of S.wonders) { const p = prov(w.pid); if (p.owner === n.id && p.controller === n.id) add(WONDER_BY_ID[w.id].mods); }
   if (key === 'taxMod') v += (n.stab || 0) * 0.03;
   return v;
@@ -46,6 +48,8 @@ function coBelligerent(a, b) {
 }
 function hostile(a, b) {
   if (a === b || a < 0 || b < 0) return false;
+  if (a === MONSTER && nat(b).polity === '魔王国') return false; // 魔物の王
+  if (b === MONSTER && nat(a).polity === '魔王国') return false;
   if (isRogue(a) || isRogue(b)) return true;
   return atWar(a, b);
 }
@@ -90,7 +94,7 @@ function govEffect(c) {
   o.unrest = (E.unrest || 0) * R; o.fort = E.fort || 0;
   return o;
 }
-function effFort(p) { const g = govEffect(governorAt(p)); return p.fort + (g ? g.fort : 0); }
+function effFort(p) { const g = govEffect(governorAt(p)); return p.fort + (g ? g.fort : 0) + (p.owner > 0 ? Math.floor(natMod(nat(p.owner), 'fortAll')) : 0); }
 function maxManpower(n) {
   let m = 3000;
   for (const p of S.provinces) if (p.owner === n.id) {
@@ -159,7 +163,7 @@ function canFoundGuild(nid, pid) {
   if (p.sea || p.owner < 0 || S.guilds.some(g => g.owner === nid && g.pid === pid)) return false;
   if (guildsOf(nid).length >= maxGuilds(n)) return false;
   if (p.owner === nid) return p.controller === nid;
-  return !hostile(nid, p.owner) && (isAlly(nid, p.owner) || getRel(nid, p.owner) >= 25);
+  return !hostile(nid, p.owner) && (isAlly(nid, p.owner) || getRel(nid, p.owner) >= 25 - natMod(n, 'guildRel'));
 }
 function foundGuild(nid, pid) {
   const n = nat(nid), c = guildCost(n);
@@ -183,14 +187,15 @@ function calcIncome(n) {
   }
   const trade = tradeIncome(n);
   let maint = 0, regs = 0, navy = 0;
-  for (const a of S.armies) if (a.owner === n.id) for (const t in UNITS) { maint += a.regs[t] * UNITS[t].maint; regs += a.regs[t]; }
+  const cavUp = 1 - natMod(n, 'cavUpkeep');
+  for (const a of S.armies) if (a.owner === n.id) for (const t in UNITS) { maint += a.regs[t] * UNITS[t].maint * (t === 'cav' ? cavUp : 1); regs += a.regs[t]; }
   for (const f of S.fleets) if (f.owner === n.id) navy += f.war * SHIPS.war.maint + f.trans * SHIPS.trans.maint;
   const fl = Math.floor(5 + d / 5);
   if (regs > fl) maint *= 1 + (regs - fl) / Math.max(1, fl) * 2;
   let tribute = 0;
   const base = tax + prod + trade - maint - navy - bmaint;
   if (n.overlord) tribute = -Math.max(0, base * 0.15);
-  for (const v of vassalsOf(n.id)) tribute += Math.max(0, v._lastBase || 0) * 0.15;
+  for (const v of vassalsOf(n.id)) tribute += Math.max(0, v._lastBase || 0) * 0.15 * (1 + natMod(n, 'tributeMod'));
   return { tax, prod, trade, maint, navy, bmaint, tribute, net: base + tribute, base, dev: d, regs, fl };
 }
 function manaIncome(n) {
@@ -287,16 +292,22 @@ function makeSummoned(n, ri) {
   return c;
 }
 const RIFT_BY_RARITY = [6, 10, 16, 25];
-function accidentChance(n) { return natMod(n, 'noAccident') ? 0 : clamp(0.05 + (n.rift || 0) / 400, 0, 0.4); }
+function accidentChance(n) { return natMod(n, 'noAccident') ? 0 : clamp((0.05 + (n.rift || 0) / 400) * (1 + natMod(n, 'accidentMod')), 0, 0.4); }
 function addRift(n, v) { n.rift = Math.max(0, (n.rift || 0) + v); }
 function doSummon(n) {
   if (!canSummon(n)) return null;
   n.mana -= summonCost(n); n.gold -= SUMMON_GOLD; n.summonCount = (n.summonCount || 0) + 1;
   // 禁忌の術：光輪教の国々は召喚を快く思わない
   for (const o of S.nations) if (o.alive && !o.isMonster && o.id !== n.id && o.religion === 'light') addRel(n.id, o.id, -4);
+  if (natMod(n, 'summonStabLoss')) { n.stab = Math.max(-3, (n.stab || 0) - 1); if (n.id === S.player) hooks.log('⛪ 禁忌の召喚に聖職者たちが反発した（安定度-1）', 'bad'); }
   if (!S.tutSafe && Math.random() < accidentChance(n)) {
     addRift(n, 10);
-    const a = spawnMonsters(prov(n.capital), Math.round(4000 + S.day / 360 * 150));
+    const men = Math.round(4000 + S.day / 360 * 150);
+    if (nat(n.id).polity === '魔王国') { // 魔物の王：現れた魔物は配下になる
+      const a = createArmy(n.id, n.capital, Math.round(men / 1000), 0, 0, { name: '魔界の軍勢' });
+      return { accident: true, army: a, tamed: true };
+    }
+    const a = spawnMonsters(prov(n.capital), men);
     a.name = '魔界の軍勢';
     return { accident: true, army: a };
   }
@@ -323,10 +334,12 @@ function learnSkill(n, id) { if (!canLearn(n, id)) return false; n.sp--; n.skill
 const armyMen = a => a.men.inf + a.men.cav + a.men.mage;
 const armyRegs = a => a.regs.inf + a.regs.cav + a.regs.mage;
 function maxMorale(nid) { return isRogue(nid) ? 2.5 : 3 + natMod(nat(nid), 'morale'); }
-function combatMod(a, pid, vsRogue) {
+function combatMod(a, pid, vsRogue, enemy) {
   if (isRogue(a.owner)) return 0;
   const n = nat(a.owner); let m = natMod(n, 'combat');
-  const g = genOf(a); m += charMod(g, 'combat'); if (vsRogue) m += charMod(g, 'vsMonster');
+  const g = genOf(a); m += charMod(g, 'combat'); if (vsRogue) m += charMod(g, 'vsMonster') + natMod(n, 'holyWarRogue');
+  if (vsRogue || (enemy > 0 && !isRogue(enemy) && nat(enemy).race === 'demon')) m += natMod(n, 'holyWar');
+  if (pid != null && prov(pid).owner === n.id) m += natMod(n, 'homeDefense');
   if (a.hero) m += 0.3;
   if (pid != null) { const t = prov(pid).terrain; if (t === 'forest' || t === 'marsh') m += natMod(n, 'forestCombat'); }
   return m;
@@ -562,7 +575,7 @@ function resolveBattles() {
   for (const k in S.battles) if (!active.has(+k)) delete S.battles[k];
 }
 function sumMen(side) { let m = 0; for (const a of side) m += armyMen(a); return m; }
-function sidePower(side, pid, vsRogue) { let p = 0; for (const a of side) p += rawPower(a) * (1 + combatMod(a, pid, vsRogue)); return p; }
+function sidePower(side, pid, vsRogue, enemy) { let p = 0; for (const a of side) p += rawPower(a) * (1 + combatMod(a, pid, vsRogue, enemy)); return p; }
 function bestGen(side) { let b = null; for (const a of side) { const g = genOf(a); if (g && (!b || g.att + g.def > b.att + b.def)) b = g; } return b; }
 function applyLoss(side, dmg, total) {
   for (const a of side) {
@@ -580,8 +593,8 @@ function battleDay(bt, sA, sB, pid) {
   const gA = bestGen(sA), gB = bestGen(sB);
   const pipA = Math.max(0, (gA ? gA.att : 0) - (gB ? gB.def : 0)), pipB = Math.max(0, (gB ? gB.att : 0) - (gA ? gA.def : 0));
   const menA = sumMen(sA), menB = sumMen(sB);
-  const dmgB = sidePower(sA, pid, isRogue(bt.B)) * (3 + bt.diceA + pipA + (defA ? tdef : 0)) * 5;
-  const dmgA = sidePower(sB, pid, isRogue(bt.A)) * (3 + bt.diceB + pipB + (defB ? tdef : 0)) * 5;
+  const dmgB = sidePower(sA, pid, isRogue(bt.B), bt.B) * (3 + bt.diceA + pipA + (defA ? tdef : 0)) * 5;
+  const dmgA = sidePower(sB, pid, isRogue(bt.A), bt.A) * (3 + bt.diceB + pipB + (defB ? tdef : 0)) * 5;
   applyLoss(sA, dmgA, menA); applyLoss(sB, dmgB, menB);
   bt.lossA += Math.min(dmgA, menA); bt.lossB += Math.min(dmgB, menB);
   const mdA = dmgA / Math.max(menA, 1) * 8 + 0.03, mdB = dmgB / Math.max(menB, 1) * 8 + 0.03;
@@ -607,6 +620,16 @@ function battleEnded(bt, aWon, sA, sB) {
   }
   const pInA = sA.some(a => a.owner === S.player), pInB = sB.some(a => a.owner === S.player);
   const loserSide = aWon ? sB : sA, winnerSide = aWon ? sA : sB;
+  const winNations = [...new Set(winnerSide.map(a => a.owner))].filter(id => !isRogue(id));
+  const bp = prov(bt.pid);
+  for (const id of winNations) {
+    const wn = nat(id);
+    if (lose === MONSTER) {
+      wn.monsterKills = (wn.monsterKills || 0) + 1;
+      if (natMod(wn, 'hunter')) { const g = Math.round(15 + loserLoss / 250); wn.gold += g; wn.gov += 10; if (id === S.player) hooks.log(`🏹 魔獣狩りの報酬：金貨+${g}、政務+10`, 'good'); }
+    }
+    if (bp.owner === id) wn.defWins = (wn.defWins || 0) + 1;
+  }
   if (winnerSide.some(a => a.owner === S.player)) {
     gainXP(nat(S.player), loserSide.some(a => isRogue(a.owner)) ? 3 : 5);
     if (loserSide.some(a => a.bounty)) { nat(S.player).gov += 40; hooks.log('🎖 魔物の討伐に成功！ 政務+40', 'good'); }
@@ -699,13 +722,14 @@ function processColonies() {
       else if (S.day >= p.colonizing.until) {
         const by = p.colonizing.by; p.colonizing = null;
         p.owner = p.controller = by; p.dev = 3; p.coreUntil = 0; mapDirty = true;
+        nat(by).colonized = (nat(by).colonized || 0) + 1;
         if (by === S.player) hooks.log(`⛺ ${p.name}への入植が完了した`, 'good');
       }
     }
     if (p.converting) {
       if (p.owner !== p.converting.by) p.converting = null;
       else if (S.day >= p.converting.until) {
-        p.religion = nat(p.owner).religion; p.converting = null; mapDirty = true;
+        p.religion = nat(p.owner).religion; p.converting = null; mapDirty = true; nat(p.owner).converted = (nat(p.owner).converted || 0) + 1;
         if (p.owner === S.player) hooks.log(`⛪ ${p.name}の改宗が完了した`, 'good');
       }
     }
@@ -721,7 +745,7 @@ function canColonize(nid, pid) {
 function colonize(nid, pid) {
   const n = nat(nid), c = colonizeCost(n);
   if (n.gold < c || !canColonize(nid, pid)) return false;
-  n.gold -= c; prov(pid).colonizing = { by: nid, start: S.day, until: S.day + 150 };
+  n.gold -= c; prov(pid).colonizing = { by: nid, start: S.day, until: S.day + Math.round(150 / (1 + natMod(n, 'colonizeSpeed'))) };
   return true;
 }
 const CONVERT_COST = 40;
@@ -764,7 +788,7 @@ function finishDelve(a) {
   for (const t in UNITS) a.men[t] *= 1 - lossF;
   const res = { ok, lv: d.lv, loss: Math.round(before - armyMen(a)), pname: p.name };
   if (ok) {
-    d.cleared = true;
+    d.cleared = true; n.delves = (n.delves || 0) + 1;
     res.gold = 40 * d.lv + rint(0, 30); res.mana = 15 * d.lv; res.xp = 8 * d.lv;
     n.gold += res.gold; n.mana = (n.mana || 0) + res.mana; gainXP(n, res.xp);
     const avail = ARTIFACTS.filter(x => !S.nations.some(o => o.artifacts && o.artifacts.includes(x.id)));
@@ -833,7 +857,7 @@ function vassalAccepts(o, v) {
   return !v.overlord && !vassalsOf(v.id).length && !hostile(o.id, v.id) && v.id !== S.player && !v.demonKing &&
     nationPower(v.id) * 4 < nationPower(o.id) && totalDev(v.id) * 3 < totalDev(o.id) && getRel(o.id, v.id) >= 30;
 }
-function vassalPeaceCost(w, loseSide) { return Math.min(100, totalDev(w[loseSide][0]) / sideDev(w, loseSide) * 100 * 0.7); }
+function vassalPeaceCost(w, loseSide) { const win = w[loseSide === 'att' ? 'def' : 'att'][0]; return Math.min(100, totalDev(w[loseSide][0]) / sideDev(w, loseSide) * 100 * 0.7 * Math.max(0.3, 1 + natMod(nat(win), 'vassalCost'))); }
 
 // ---------- 戦争 ----------
 function declareWar(att, def, opts = {}) {
@@ -897,6 +921,7 @@ function pickDemands(w, winSide, score) {
 }
 function transferProvince(p, to) {
   const from = p.owner;
+  if (from > 0 && to > 0 && from !== to) nat(to).conquered = (nat(to).conquered || 0) + 1;
   if (from > 0) { const c = governorAt(p); if (c) unassignGov(nat(from), c); }
   p.owner = p.controller = to; p.coreUntil = S.day + 360 * 3; p.siege = null; p.colonizing = null; p.converting = null;
   if (from > 0 && nat(from).capital === p.id) {
@@ -961,14 +986,41 @@ function checkDeaths() {
     }
     hooks.log(`☠ ${n.name}は滅亡した`, n.id === S.player ? 'bad' : 'info');
     if (n.demonKing) S.demonKingSlayer = n.killedBy;
+    if (n.race === 'human' && n.killedBy > 0 && nat(n.killedBy)) nat(n.killedBy).humanKills = (nat(n.killedBy).humanKills || 0) + 1;
     if (n.id === S.player) hooks.gameOver(false);
+  }
+}
+
+// ---------- 国家目標 ----------
+function ownsWonder(n, id) { const w = wonderBuilt(id); return !!w && prov(w.pid).owner === n.id; }
+function summonedCount(n) { return n.generals.filter(c => c.summoned).length + n.advisors.length + n.bench.length + n.governors.filter(c => c.summoned).length; }
+function missionsOf(n) { return MISSIONS[n.polity] || []; }
+function checkMissions() {
+  for (const n of S.nations) {
+    if (!n.alive || n.isMonster) continue;
+    n.missionsDone = n.missionsDone || [];
+    for (const M of missionsOf(n)) {
+      if (n.missionsDone.includes(M.id)) continue;
+      const [cur, tgt] = M.prog(n);
+      if (cur < tgt) continue;
+      n.missionsDone.push(M.id);
+      const r = M.reward;
+      if (r.gold) n.gold += r.gold; if (r.gov) n.gov += r.gov; if (r.mana) n.mana += r.mana; if (r.know) n.know += r.know;
+      if (r.stab) n.stab = Math.min(3, (n.stab || 0) + r.stab);
+      if (r.mods) { n.missionMods = n.missionMods || []; n.missionMods.push(r.mods); }
+      if (n.id === S.player) {
+        gainXP(n, 25);
+        hooks.fx('levelup', null, `目標達成：${M.name}`);
+        hooks.modal({ title: `🎯 国家目標「${M.name}」達成`, sound: 'levelup', body: `${esc(n.name)}は目標「<b>${esc(M.name)}</b>」（${esc(M.desc)}）を成し遂げた！<br><br>報酬：<b>${esc(r.label)}</b>`, buttons: [{ label: '次なる目標へ' }] });
+      } else if (missionsOf(n).every(m => n.missionsDone.includes(m.id))) hooks.log(`🎯 ${n.name}が国家目標をすべて達成した`, 'info');
+    }
   }
 }
 
 // ---------- 大建造物 ----------
 const wonderBuilt = id => S.wonders.find(w => w.id === id);
 const wonderAt = pid => S.wonders.find(w => w.pid === pid);
-function wonderCost(n, W) { return Math.round(W.cost * Math.max(0.3, 1 + natMod(n, 'buildCost'))); }
+function wonderCost(n, W) { const TR = NATION_TRAITS[n.polity], disc = TR && TR.wonderDiscount ? TR.wonderDiscount[W.id] || 0 : 0; return Math.round(W.cost * Math.max(0.3, 1 + natMod(n, 'buildCost')) * (1 - disc)); }
 function wonderReq(n, W, pid) {
   // 建設できない理由（できるならnull）
   const p = prov(pid);
@@ -1108,6 +1160,7 @@ function monthlyTick() {
   coalitionMonthly();
   aiMonthly();
   aiPeace();
+  checkMissions();
   checkVictories();
   if (typeof playerEvents === 'function') playerEvents();
   if (S.day % 360 === 0) { mapDirty = true; if (typeof autosave === 'function') autosave(); }
@@ -1152,7 +1205,7 @@ function rogueMonthly() {
   for (const p of S.provinces) {
     if (p.owner <= 0) continue;
     const n = nat(p.owner);
-    const chance = (p.terrain === 'miasma' ? 0.006 : 0.0009) * (1 + natMod(n, 'monsterSpawn') + (n.rift || 0) / 50) * cfg().monster;
+    const chance = n.polity === '魔王国' ? 0 : (p.terrain === 'miasma' ? 0.006 : 0.0009) * (1 + natMod(n, 'monsterSpawn') + (n.rift || 0) / 50) * cfg().monster;
     if (Math.random() < chance && !S.armies.some(a => a.prov === p.id)) {
       const a = spawnMonsters(p, Math.round(2500 + Math.random() * 4500 + year * 120));
       if (p.owner === S.player) hooks.log(`👹 ${p.name}に${a.name}（${fmtMen(armyMen(a))}）が出現した！`, 'bad');

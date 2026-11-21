@@ -229,7 +229,7 @@ function aiDiplomacy(n) {
       const o = pick(cand);
       if (o.id === S.player) {
         hooks.modal({
-          title: '🤝 同盟の申し出', body: `<b>${esc(n.name)}</b>（${RACES[n.race].name}・${n.gov}）が我が国との同盟を申し出ている。<br>同盟国は互いの防衛戦争に参戦する。`,
+          title: '🤝 同盟の申し出', body: `<b>${esc(n.name)}</b>（${RACES[n.race].name}・${n.polity}）が我が国との同盟を申し出ている。<br>同盟国は互いの防衛戦争に参戦する。`,
           buttons: [{ label: '同盟を結ぶ', fn: () => { if (n.alive && !hostile(n.id, S.player)) { addAlliance(n.id, S.player); hooks.log(`🤝 ${n.name}と同盟を結んだ`, 'good'); } } },
             { label: '断る', fn: () => addRel(n.id, S.player, -10) }],
         });
