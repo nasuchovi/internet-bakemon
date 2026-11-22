@@ -1,0 +1,103 @@
+/* =========================================================
+   スマホ版レイアウト（style.css の上に重ねる）
+   ========================================================= */
+body.m { -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
+body.m #app { padding-bottom: env(safe-area-inset-bottom); }
+.st-link { display: inline-flex; align-items: center; padding: 9px 14px; border-radius: 5px; border: 1px solid #6e5232; color: #6b3f10; text-decoration: none; font-size: 13px; background: rgba(255,248,228,.5); }
+
+/* --- 上部：資源（横スクロール）と日付 --- */
+body.m #topbar { display: block; padding: 4px 6px 3px; padding-top: calc(4px + env(safe-area-inset-top)); min-height: 0; overflow: visible; flex-wrap: nowrap; }
+body.m .mt-row { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; align-items: center; }
+body.m .mt-row::-webkit-scrollbar { display: none; }
+body.m .tb-nation { margin: 0 2px 0 0; padding: 0 4px 0 0; }
+body.m .tb-nation #tb-name { display: none; }
+body.m .res { padding: 3px 7px; flex: none; }
+body.m .res small { display: inline; font-size: 10px; }
+body.m .res b { font-size: 13px; }
+body.m .mt-row2 { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+body.m #date { flex: 1; font-size: 13px; padding: 0 2px; }
+body.m .mt-row2 button { width: 32px; height: 28px; border-radius: 50%; border: 1px solid #b8892f; background: radial-gradient(circle at 50% 35%, #6a4a26, #3a2512); color: #f6e4b8; font-size: 14px; }
+
+/* --- 地図 --- */
+body.m #main { position: relative; }
+body.m #main::after { box-shadow: inset 0 0 40px rgba(20,10,4,.5); }
+
+/* --- 右下の操作ボタン --- */
+#fab { position: absolute; right: 10px; bottom: 12px; z-index: 4; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+#fab #btn-pause { width: 64px; height: 64px; border-radius: 50%; font-size: 26px; border: 2px solid #e0b050; color: #fff3d0;
+  background: radial-gradient(circle at 45% 35%, #c0392b, #6e1a10); box-shadow: 0 4px 14px rgba(0,0,0,.55), inset 0 2px 0 rgba(255,210,170,.35); }
+#fab #btn-pause.paused { background: radial-gradient(circle at 45% 35%, #3f8a3a, #1f4d1c); border-color: #c8e0a0; }
+#fab .spd { display: flex; align-items: center; gap: 4px; background: linear-gradient(#3a2614, #22150b); border: 1px solid #b8892f; border-radius: 22px; padding: 4px 6px; box-shadow: 0 3px 10px rgba(0,0,0,.5); }
+#fab .spd button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #b8892f; background: radial-gradient(circle at 50% 35%, #6a4a26, #3a2512); color: #f6e4b8; font-size: 18px; }
+#fab #speed-dots { display: flex; gap: 3px; padding: 0 3px; }
+#fab #speed-dots i { width: 6px; height: 16px; }
+#fab #btn-modes { width: 46px; height: 46px; border-radius: 50%; border: 1px solid #b8892f; background: radial-gradient(circle at 50% 35%, #6a4a26, #3a2512); color: #f6e4b8; font-size: 20px; box-shadow: 0 3px 10px rgba(0,0,0,.45); }
+body.m.sheet-open #fab { bottom: calc(52% + 10px); }
+body.m.sheet-open #fab .spd, body.m.sheet-open #fab #btn-modes { display: none; }
+body.m.sheet-full #fab { display: none; }
+
+/* --- 地図モードのポップアップ --- */
+body.m #modes { position: absolute; right: 66px; bottom: 112px; left: auto; top: auto; flex-direction: row; flex-wrap: wrap; width: 230px; max-height: none; gap: 5px; padding: 8px; z-index: 5; }
+body.m #modes button { flex: 1 1 30%; padding: 9px 4px; font-size: 13px; }
+body.m #modes #btn-export { flex: 1 1 100%; border: 1px solid rgba(184,137,47,.6) !important; color: #f1d796; }
+
+/* --- ログ：最新の1件だけ。タップで履歴を開く --- */
+body.m #log { top: 8px; left: 8px; right: 8px; bottom: auto; width: auto; pointer-events: auto; }
+body.m #log div { display: none; font-size: 12px; }
+body.m #log div:last-child { display: block; }
+body.m #log.open div { display: block; }
+body.m #log.open { max-height: 50%; overflow-y: auto; }
+body.m.sheet-open #log { display: none; }
+
+/* --- 下部タブバー --- */
+body.m #mtabs { flex: none; display: flex; border-top: 2px solid #8a6434; border-bottom: none; padding-bottom: env(safe-area-inset-bottom);
+  background: linear-gradient(#3a2614, #1d1209); box-shadow: 0 -3px 12px rgba(0,0,0,.5); z-index: 6; }
+body.m #mtabs button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 6px 0 7px; font-size: 11px; color: #c9ab7a; border-bottom: none; border-top: 3px solid transparent; }
+body.m #mtabs button b { font-size: 18px; font-weight: 400; line-height: 1.2; }
+body.m #mtabs button.on { color: #fff0d0; border-top-color: var(--accent); background: rgba(255,240,200,.08); }
+
+/* --- 下から引き出すパネル（シート） --- */
+body.m #panel { left: 0; right: 0; bottom: 0; top: auto; width: auto; height: 52%; border-radius: 14px 14px 0 0; transition: height .22s ease; z-index: 5; }
+body.m #panel.full { height: calc(100% - 8px); }
+body.m #panel::after { display: none; }
+#sheet-handle { flex: none; height: 26px; display: grid; place-items: center; cursor: grab; touch-action: none; }
+#sheet-handle i { width: 44px; height: 5px; border-radius: 3px; background: rgba(107,69,32,.55); }
+body.m #panel-body { padding: 2px 14px 24px; font-size: 14px; }
+body.m .btn { padding: 9px 12px; font-size: 13.5px; min-height: 40px; }
+body.m .btn small { font-size: 12px; }
+body.m .row { padding: 10px 10px; }
+body.m .note { font-size: 12.5px; }
+body.m h2 { font-size: 22px; }
+body.m h3 { font-size: 15px; }
+body.m select.sel { padding: 10px 8px; font-size: 14px; }
+body.m .kv { font-size: 13.5px; }
+body.m .devgrid, body.m .blist { gap: 7px; }
+body.m .skilltree { grid-template-columns: repeat(2, 1fr); }
+body.m .sk { font-size: 12px; padding: 8px 4px; }
+
+/* --- 地図上のコンテキストメニュー --- */
+#ctxmenu { position: absolute; z-index: 7; min-width: 170px; padding: 6px; border-radius: 8px; border: 2px solid #6b4520;
+  background: #ead9b0; background-image: var(--parch-tex); box-shadow: 0 8px 24px rgba(0,0,0,.55); display: flex; flex-direction: column; gap: 5px; }
+#ctxmenu .t { font-family: var(--display); color: var(--accent); font-size: 14px; padding: 2px 4px; }
+#ctxmenu button { padding: 11px 12px; border-radius: 5px; border: 1px solid #2e1a0a; text-align: left; font-family: var(--display); font-size: 15px;
+  background: linear-gradient(#7a4a24, #4f2c12); color: #f9e9c6; }
+#ctxmenu button.go { background: radial-gradient(ellipse at 50% 30%, #c0392b, #7d1d12); border-color: #4a0f08; color: #fff0d0; }
+
+/* --- 書状（モーダル）は下寄せで大きなボタン --- */
+body.m #modal-wrap { place-items: end center; padding: 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+body.m #modal { width: 100%; max-height: 88%; padding: 26px 16px 14px; }
+body.m #modal .mbtns button { padding: 13px 14px; font-size: 16px; }
+body.m #modal .mbody { font-size: 14.5px; }
+
+/* --- 説明の吹き出し・チュートリアル --- */
+#toast { position: fixed; left: 50%; top: 92px; transform: translateX(-50%); z-index: 20; max-width: 86%; padding: 8px 14px; border-radius: 6px;
+  background: rgba(30,19,10,.94); color: #f6e4b8; border: 1px solid #b8892f; font-size: 13px; pointer-events: none; }
+body.m #tut { top: 6px; width: calc(100% - 16px); }
+body.m.sheet-full #tut { display: none; }
+body.m #banner { top: auto; bottom: 90px; font-size: 14px; padding: 9px 18px; }
+
+/* --- 開始画面 --- */
+body.m #start { width: 100%; top: 34%; border-radius: 14px 14px 0 0; }
+body.m .st-head h1 { font-size: 26px; }
+body.m .ncard { padding: 10px; }
+body.m .st-actions button { padding: 12px; }

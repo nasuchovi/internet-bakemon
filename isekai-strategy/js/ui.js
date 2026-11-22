@@ -610,7 +610,7 @@ function openPeace(w) {
 function select(sel, keepTab) {
   S.sel = sel; moveMode = false; updateBanner();
   if (!keepTab) tab = 'sel';
-  openPanel(); mapDirty = true;
+  openPanel();
 }
 function openPanel() { $('panel').classList.remove('hidden'); document.body.classList.add('panel-open'); }
 function updateBanner() {

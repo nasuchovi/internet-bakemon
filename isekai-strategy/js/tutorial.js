@@ -11,20 +11,22 @@ const TUT_STEPS = [
       S.tut.monsterId = a.id; S.tut.target = p.id;
       centerOn((cap.x + p.x) / 2, (cap.y + p.y) / 2 + (window.innerWidth <= 760 ? viewH() * 0.12 / cam.s : 0));
     },
-    text: () => `首都の隣の<b>${esc(prov(S.tut.target).name)}</b>に魔物が現れた！<br>① 地図上の自軍の札（★のついたもの）をクリックして選ぶ<br>② 魔物のいる州を<b>右クリック</b>（スマホは「🚩移動」→タップ）`,
+    text: () => document.body.classList.contains('m')
+      ? `首都の隣の<b>${esc(prov(S.tut.target).name)}</b>に魔物が現れた！<br>① 自軍の旗（★のついたもの）をタップして選ぶ<br>② 魔物の旗をタップし「<b>⚔ 向かわせて攻撃</b>」を選ぶ（長押しなら即移動）`
+      : `首都の隣の<b>${esc(prov(S.tut.target).name)}</b>に魔物が現れた！<br>① 地図上の自軍の旗（★のついたもの）をクリックして選ぶ<br>② 魔物のいる州を<b>右クリック</b>`,
     check: () => !tutMonster() || S.armies.some(a => a.owner === S.player && (a.prov === S.tut.target || a.path.includes(S.tut.target))),
   },
   {
     title: '時間を進めて戦う',
     focus: '#btn-pause',
-    text: () => `右上の<b>▶ボタン（またはSpace）</b>で時間が進む。<br>軍が到着すると戦闘が始まる。勝てば魔物は消える。`,
+    text: () => `${document.body.classList.contains('m') ? '右下の<b>▶ボタン</b>' : '右上の<b>▶ボタン（またはSpace）</b>'}で時間が進む。<br>軍が到着すると戦闘が始まる。勝てば魔物は消える。`,
     check: () => !tutMonster(),
     reward: { gold: 50, label: '金貨+50' },
   },
   {
     title: '州を開発する',
     start() { S.tut.dev0 = totalDev(S.player); },
-    text: () => `自国の州をクリックし、「<b>🏗 開拓</b>」を押して発展度を上げよう。<br>政務は毎月貯まる。発展度が上がると収入や兵力が増える。州に<b>代官</b>を置けば自然に発展していく。`,
+    text: () => `自国の州を${document.body.classList.contains('m') ? 'タップ' : 'クリック'}し、「<b>🏗 開拓</b>」を押して発展度を上げよう。<br>政務は毎月貯まる。発展度が上がると収入や兵力が増える。州に<b>代官</b>を置けば自然に発展していく。`,
     check: () => totalDev(S.player) > S.tut.dev0,
     reward: { mana: true, label: '初回の召喚に必要な魔力' },
   },

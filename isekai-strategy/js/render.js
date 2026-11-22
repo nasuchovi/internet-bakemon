@@ -67,6 +67,9 @@ function prepareStatic() {
     if (y > 0) chk(g[i - MAP_W]); if (y < MAP_H - 1) chk(g[i + MAP_W]);
     provBorder[i] = b;
   }
+  for (const p of S.provinces) p._bb = [MAP_W, MAP_H, 0, 0];
+  for (let y = 0, i = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++, i++) { const b = S.provinces[g[i]]._bb; if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y; }
+  baseSig = null; selCache.clear();
   // 海岸からの距離
   const dist = new Uint8Array(n).fill(255), q = new Int32Array(n); let qh = 0, qt = 0;
   for (let i = 0; i < n; i++) if (!isSea[g[i]]) { dist[i] = 0; q[qt++] = i; }
@@ -188,9 +191,38 @@ function provColor(p) {
     }
   }
 }
+// 地図の下地：見た目に関わる州の状態が変わった所だけ描き直す
+let baseSig = null, baseMode = null, baseHL = null;
+function provSig(p) {
+  if (p.sea) return '';
+  const c = provColor(p);
+  return `${p.owner}|${p.controller}|${p.colonizing ? p.colonizing.by : ''}|${c ? (c[0] | 0) + ',' + (c[1] | 0) + ',' + (c[2] | 0) : '-'}`;
+}
 function renderBase() {
-  const d = baseImg.data, g = GRID, np = S.provinces.length, n = MAP_W * MAP_H;
+  const np = S.provinces.length;
+  const sig = S.provinces.map(provSig);
+  const full = !baseSig || baseMode !== mapMode || baseHL !== highlightNation || baseSig.length !== np;
+  let regions = null;
+  if (!full) {
+    const changed = [];
+    for (let i = 0; i < np; i++) if (sig[i] !== baseSig[i]) changed.push(i);
+    if (changed.length > 50) regions = null;
+    else regions = changed.map(i => { const b = S.provinces[i]._bb; return b ? [b[0] - 10, b[1] - 10, b[2] + 10, b[3] + 10] : null; }).filter(Boolean);
+  }
+  if (full || regions === null) renderRegion(0, 0, MAP_W - 1, MAP_H - 1);
+  else for (const r of regions) renderRegion(r[0], r[1], r[2], r[3]);
+  baseSig = sig; baseMode = mapMode; baseHL = highlightNation;
+  computeNationLabels();
+  for (const p of S.provinces) if (!p.sea) p._feats = devFeatures(p);
+  computeRoads();
+  mapDirty = false;
+}
+function renderRegion(rx0, ry0, rx1, ry1) {
+  const d = baseImg.data, g = GRID, np = S.provinces.length;
   const political = mapMode === 'political';
+  rx0 = Math.max(0, rx0); ry0 = Math.max(0, ry0); rx1 = Math.min(MAP_W - 1, rx1); ry1 = Math.min(MAP_H - 1, ry1);
+  // 距離計算は少し広めに取る（縁取りの帯が正しくなるように）
+  const cx0 = Math.max(0, rx0 - 9), cy0 = Math.max(0, ry0 - 9), cx1 = Math.min(MAP_W - 1, rx1 + 9), cy1 = Math.min(MAP_H - 1, ry1 + 9);
   const cols = new Float32Array(np * 3), owner = new Int16Array(np), aBase = new Float32Array(np), occ = new Uint8Array(np), occC = new Float32Array(np * 3);
   for (const p of S.provinces) {
     if (p.sea) { owner[p.id] = -2; continue; }
@@ -201,28 +233,22 @@ function renderBase() {
     if (political && p.owner >= 0 && p.controller !== p.owner) { occ[p.id] = 1; const cc = nat(p.controller).color; occC[p.id * 3] = cc[0]; occC[p.id * 3 + 1] = cc[1]; occC[p.id * 3 + 2] = cc[2]; }
     if (political && p.colonizing) { occ[p.id] = 2; const cc = nat(p.colonizing.by).color; occC[p.id * 3] = cc[0]; occC[p.id * 3 + 1] = cc[1]; occC[p.id * 3 + 2] = cc[2]; }
   }
-  // 国境・海岸からの距離（手彩色の縁取り用）
   const ed = edgeBuf;
-  for (let y = 0, i = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++, i++) {
+  for (let y = cy0; y <= cy1; y++) for (let x = cx0, i = y * MAP_W + cx0; x <= cx1; x++, i++) {
     const o = owner[g[i]];
     if (o === -2) { ed[i] = 0; continue; }
     const diff = (x > 0 && owner[g[i - 1]] !== o) || (x < MAP_W - 1 && owner[g[i + 1]] !== o) || (y > 0 && owner[g[i - MAP_W]] !== o) || (y < MAP_H - 1 && owner[g[i + MAP_W]] !== o);
     ed[i] = diff ? 0 : 255;
   }
-  for (let y = 0, i = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++, i++) {
-    let v = ed[i]; if (x > 0 && ed[i - 1] + 1 < v) v = ed[i - 1] + 1; if (y > 0 && ed[i - MAP_W] + 1 < v) v = ed[i - MAP_W] + 1; ed[i] = v;
+  for (let y = cy0; y <= cy1; y++) for (let x = cx0, i = y * MAP_W + cx0; x <= cx1; x++, i++) {
+    let v = ed[i]; if (x > cx0 && ed[i - 1] + 1 < v) v = ed[i - 1] + 1; if (y > cy0 && ed[i - MAP_W] + 1 < v) v = ed[i - MAP_W] + 1; ed[i] = v;
   }
-  for (let y = MAP_H - 1, i = n - 1; y >= 0; y--) for (let x = MAP_W - 1; x >= 0; x--, i--) {
-    let v = ed[i]; if (x < MAP_W - 1 && ed[i + 1] + 1 < v) v = ed[i + 1] + 1; if (y < MAP_H - 1 && ed[i + MAP_W] + 1 < v) v = ed[i + MAP_W] + 1; ed[i] = v;
+  for (let y = cy1; y >= cy0; y--) for (let x = cx1, i = y * MAP_W + cx1; x >= cx0; x--, i--) {
+    let v = ed[i]; if (x < cx1 && ed[i + 1] + 1 < v) v = ed[i + 1] + 1; if (y < cy1 && ed[i + MAP_W] + 1 < v) v = ed[i + MAP_W] + 1; ed[i] = v;
   }
-  const sel = S.sel && S.sel.type === 'prov' ? S.sel.id : -1;
-  for (let y = 0, i = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++, i++) {
+  for (let y = ry0; y <= ry1; y++) for (let x = rx0, i = y * MAP_W + rx0; x <= rx1; x++, i++) {
     const pid = g[i], o = i * 4, k = i * 3;
-    if (isSea[pid]) {
-      let r = seaRGB[k], gg = seaRGB[k + 1], b = seaRGB[k + 2];
-      if (pid === sel) { r += 22; gg += 26; b += 26; if (provBorder[i] === 3) { r = 150; gg = 40; b = 30; } }
-      d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255; continue;
-    }
+    if (isSea[pid]) { d[o] = seaRGB[k]; d[o + 1] = seaRGB[k + 1]; d[o + 2] = seaRGB[k + 2]; d[o + 3] = 255; continue; }
     let r = paper[k], gg = paper[k + 1], b = paper[k + 2];
     const band = Math.max(0, 1 - ed[i] / 7);
     const a = aBase[pid] * (political ? 0.26 + 0.6 * band * band + (band > 0 ? 0.05 : 0) : 0.5 + 0.2 * band);
@@ -231,17 +257,35 @@ function renderBase() {
     const bd = provBorder[i];
     if (bd === 2) { r = r * 0.25 + 52; gg = gg * 0.25 + 34; b = b * 0.25 + 20; }
     else if (bd === 1) {
-      if (ed[i] === 0) { r = r * 0.2 + 56; gg = gg * 0.2 + 34; b = b * 0.2 + 18; } // 国境：濃いインク
-      else if (((x + y) & 3) < 2) { r *= 0.8; gg *= 0.78; b *= 0.76; } // 州境：点線
+      if (ed[i] === 0) { r = r * 0.2 + 56; gg = gg * 0.2 + 34; b = b * 0.2 + 18; }
+      else if (((x + y) & 3) < 2) { r *= 0.8; gg *= 0.78; b *= 0.76; }
     }
-    if (pid === sel) { if (bd) { r = 160; gg = 36; b = 24; } else { r = r * 0.85 + 38; gg = gg * 0.85 + 36; b = b * 0.85 + 30; } }
     d[o] = r; d[o + 1] = gg; d[o + 2] = b; d[o + 3] = 255;
   }
-  baseCtx.putImageData(baseImg, 0, 0);
-  computeNationLabels();
-  for (const p of S.provinces) if (!p.sea) p._feats = devFeatures(p);
-  computeRoads();
-  mapDirty = false;
+  baseCtx.putImageData(baseImg, 0, 0, rx0, ry0, rx1 - rx0 + 1, ry1 - ry0 + 1);
+}
+// 選択中の州の縁取り（地図とは別の層）
+const selCache = new Map();
+function selCanvas(pid) {
+  let c = selCache.get(pid); if (c) return c;
+  const p = prov(pid), b = p._bb; if (!b) return null;
+  const w = b[2] - b[0] + 1, h = b[3] - b[1] + 1;
+  c = document.createElement('canvas'); c.width = w; c.height = h;
+  const cx = c.getContext('2d'), img = cx.createImageData(w, h), dd = img.data;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const gi = (b[1] + y) * MAP_W + b[0] + x; if (GRID[gi] !== pid) continue;
+    const o = (y * w + x) * 4;
+    if (provBorder[gi]) { dd[o] = 160; dd[o + 1] = 36; dd[o + 2] = 24; dd[o + 3] = 255; }
+    else { dd[o] = 255; dd[o + 1] = 250; dd[o + 2] = 235; dd[o + 3] = p.sea ? 50 : 60; }
+  }
+  cx.putImageData(img, 0, 0); selCache.set(pid, c);
+  return c;
+}
+function drawSelection() {
+  if (!S.sel || S.sel.type !== 'prov') return;
+  const c = selCanvas(S.sel.id), b = prov(S.sel.id)._bb; if (!c) return;
+  ctx.imageSmoothingEnabled = cam.s < 2.5;
+  ctx.drawImage(c, sx(b[0]), sy(b[1]), c.width * cam.s, c.height * cam.s);
 }
 function computeNationLabels() {
   nationLabels = [];
@@ -360,6 +404,7 @@ function drawMapSheet(exporting) {
   ctx.restore();
   ctx.imageSmoothingEnabled = cam.s < 2.5;
   ctx.drawImage(baseCanvas, sx(0), sy(0), MAP_W * cam.s, MAP_H * cam.s);
+  if (!exporting) drawSelection();
   drawRoads();
   drawTerrainGlyphs();
   drawDevelopment();
@@ -581,7 +626,7 @@ function exportMap() {
   const sc = 1.6, W = Math.round(MAP_W * sc), H = Math.round(MAP_H * sc);
   const c2 = document.createElement('canvas'); c2.width = W; c2.height = H;
   const saved = { ctx, cam: Object.assign({}, cam), mode: mapMode, sel: S.sel, hl: highlightNation };
-  mapMode = 'political'; S.sel = null; highlightNation = -1; renderBase();
+  mapMode = 'political'; S.sel = null; highlightNation = -1; baseSig = null; renderBase();
   ctx = c2.getContext('2d'); exportView = { w: W, h: H }; cam.x = 0; cam.y = 0; cam.s = sc;
   try { drawMapSheet(true); }
   finally { ctx = saved.ctx; exportView = null; Object.assign(cam, saved.cam); mapMode = saved.mode; S.sel = saved.sel; highlightNation = saved.hl; mapDirty = true; }

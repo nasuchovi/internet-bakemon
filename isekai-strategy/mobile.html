@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#2a1b0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>異界大陸戦記 スマホ版</title>
+<meta name="description" content="転生した君主となり、剣と魔法の大陸で国家を導く異世界グランドストラテジー。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Antique&family=Cinzel:wght@600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="mobile.css">
+</head>
+<body class="m">
+<div id="app">
+  <header id="topbar">
+    <div class="mt-row">
+      <div class="tb-nation" data-act="tab" data-arg="nation"><span class="flag" id="tb-flag"></span><span id="tb-name">—</span></div>
+      <div class="res" id="r-gold" title="金貨（月収）"><i>💰</i><b>0</b><small></small></div>
+      <div class="res pt" id="r-gov" title="政務：開拓・任命・安定度・外交に使う"><i class="pt-adm">政</i><b>0</b><small></small></div>
+      <div class="res" id="r-know" title="前世の知識：発明に使う" data-act="tab" data-arg="econ"><i>📚</i><b>0</b><small></small></div>
+      <div class="res" id="r-mana" title="魔力：召喚に使う" data-act="tab" data-arg="hero"><i>🔮</i><b>0</b><small></small></div>
+      <div class="res" id="r-mp" title="人的資源 / 上限"><i>👥</i><b>0</b><small></small></div>
+      <div class="res" id="r-stab" title="安定度（-3〜+3）"><i>⚖</i><b>0</b></div>
+      <div class="res" id="r-army" title="連隊数 / 維持限界"><i>⚔</i><b>0</b><small></small></div>
+    </div>
+    <div class="mt-row2">
+      <div id="date">—</div>
+      <button id="btn-music" title="音楽">🎵</button>
+      <button id="btn-mute" title="効果音">🔊</button>
+    </div>
+  </header>
+  <main id="main">
+    <canvas id="map"></canvas>
+    <div id="log"></div>
+    <div id="modes" class="hidden">
+      <button data-mode="political" class="on">政治</button>
+      <button data-mode="terrain">地形</button>
+      <button data-mode="dev">開発度</button>
+      <button data-mode="goods">交易品</button>
+      <button data-mode="diplo">外交</button>
+      <button data-mode="religion">宗教</button>
+      <button data-mode="guild">商会</button>
+      <button data-mode="unrest">不穏</button>
+      <button id="btn-export">🗺 地図を保存</button>
+    </div>
+    <div id="banner" class="hidden"></div>
+    <div id="pausedtag" class="hidden"></div>
+    <div id="tut" class="hidden"></div>
+    <div id="ctxmenu" class="hidden"></div>
+    <div id="fab">
+      <button id="btn-modes" title="地図の表示">🗺</button>
+      <div class="spd"><button id="btn-slower">−</button><span id="speed-dots"></span><button id="btn-faster">＋</button></div>
+      <button id="btn-pause" title="一時停止">▶</button>
+    </div>
+    <aside id="panel" class="hidden">
+      <div id="sheet-handle"><i></i></div>
+      <div id="panel-body"></div>
+    </aside>
+  </main>
+  <nav class="tabs" id="mtabs">
+    <button data-act="tab" data-arg="sel"><b>📍</b>選択</button>
+    <button data-act="tab" data-arg="nation"><b>👑</b>国家</button>
+    <button data-act="tab" data-arg="diplo"><b>🤝</b>外交</button>
+    <button data-act="tab" data-arg="war"><b>⚔</b>戦争</button>
+    <button data-act="tab" data-arg="econ"><b>📚</b>経済</button>
+    <button data-act="tab" data-arg="hero"><b>✨</b>英雄</button>
+    <button data-act="tab" data-arg="skill"><b>⭐</b>技能<i id="sp-dot" class="hidden"></i></button>
+  </nav>
+
+  <section id="start">
+    <div class="st-head">
+      <div class="st-kicker">ISEKAI GRAND STRATEGY</div>
+      <h1>異界大陸戦記</h1>
+      <p class="st-lead">トラックに轢かれた（たぶん）あなたは、剣と魔法の大陸で一国の君主として目を覚ました。<br>前世の知識とチートスキルで、百年の覇道を歩め。</p>
+    </div>
+    <div class="st-body">
+      <div class="st-step"><span>1</span>転生先の国を選ぶ <em>地図をクリックしても選べます</em></div>
+      <div id="st-nations"></div>
+      <div class="st-step"><span>2</span>チートスキルを選ぶ</div>
+      <div id="st-cheats"></div>
+      <div class="st-step"><span>3</span>君主の名前</div>
+      <input id="st-name" maxlength="12" value="カイト">
+      <div class="st-step"><span>4</span>難易度とチュートリアル</div>
+      <div id="st-diff"></div>
+      <details id="st-ai"><summary>⚙ AIの詳細設定 <span id="st-ai-label"></span></summary><div id="st-ai-body"></div></details>
+      <label class="st-check"><input type="checkbox" id="st-tut" checked><span>チュートリアルを行う<small>初めての方におすすめ。実際のゲームの中で操作を覚えます</small></span></label>
+      <div class="st-actions">
+        <button id="st-start" class="primary">この国に転生する</button>
+        <button id="st-reroll">別の大陸を生成</button>
+        <button id="st-load" class="hidden">続きから</button>
+        <a class="st-link" href="index.html">🖥 PC版で遊ぶ</a>
+      </div>
+      <p class="st-help">
+        <b>操作</b>：タップで州・軍を選ぶ。自軍を選んだ状態で行き先をタップすると「ここへ移動」が出る（<b>長押しなら即移動</b>）。ドラッグで地図を動かし、ピンチで拡大。右下の丸ボタンで時間を進める。
+      </p>
+    </div>
+  </section>
+
+  <div id="modal-wrap" class="hidden"><div id="modal"></div></div>
+  <div id="toast" class="hidden"></div>
+  <div id="loading">大陸を創造中…</div>
+</div>
+<script src="js/data.js"></script>
+<script src="js/mapgen.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/events.js"></script>
+<script src="js/sound.js"></script>
+<script src="js/render.js"></script>
+<script src="js/tutorial.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/mobile.js"></script>
+</body>
+</html>
