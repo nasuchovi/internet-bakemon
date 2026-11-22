@@ -724,6 +724,11 @@ function drawArmyToken(a, x, y, sel) {
   else if (a.hero) { ctx.beginPath(); ctx.moveTo(ex - 4, ey + 2.5); ctx.lineTo(ex - 4, ey - 2); ctx.lineTo(ex - 2, ey); ctx.lineTo(ex, ey - 3); ctx.lineTo(ex + 2, ey); ctx.lineTo(ex + 4, ey - 2); ctx.lineTo(ex + 4, ey + 2.5); ctx.closePath(); ctx.fillStyle = 'rgba(250,232,170,.95)'; ctx.fill(); ctx.lineWidth = 0.8; ctx.strokeStyle = ink; ctx.stroke(); }
   else if (a.gen != null) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? 1.6 : 3.8, an = -Math.PI / 2 + i * Math.PI / 5; ctx.lineTo(ex + Math.cos(an) * r, ey + Math.sin(an) * r); } ctx.closePath(); ctx.fillStyle = 'rgba(250,240,210,.95)'; ctx.fill(); ctx.lineWidth = 0.7; ctx.strokeStyle = ink; ctx.stroke(); }
   if (a.delve) markerAt('cave', x + 14, y - 6, 5);
+  if (a.auto && a.auto.mode !== 'manual') { // 自律行動の印
+    const ch = { defend: '守', offense: '攻', hunt: '討' }[a.auto.mode];
+    ctx.beginPath(); ctx.arc(x - 6, y - 36, 5.5, 0, Math.PI * 2); ctx.fillStyle = 'rgba(241,230,204,.95)'; ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(46,28,12,.9)'; ctx.stroke();
+    ctx.font = '700 7.5px "Shippori Mincho", serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = a.auto.mode === 'offense' ? 'rgba(150,30,20,.95)' : 'rgba(46,28,12,.95)'; ctx.fillText(ch, x - 6, y - 35.5);
+  }
   inkText(fmtMen(armyMen(a)), x + 1, y + 9, 11, a.retreat ? 'rgba(140,50,30,.95)' : a.owner === S.player ? 'rgba(120,24,14,.98)' : undefined);
   if (!rogue) { const mm = clamp(a.morale / maxMorale(a.owner), 0, 1); inkBar(x + 1, y + 16, 22, mm, mm > 0.5 ? 'rgba(80,110,50,.9)' : mm > 0.25 ? 'rgba(170,130,40,.9)' : 'rgba(160,50,30,.9)'); }
 }

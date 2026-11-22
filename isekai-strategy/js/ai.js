@@ -8,6 +8,7 @@ function aiArmyTick() {
     aiNationArmies(n, byProv);
     aiFleets(n);
   }
+  autoArmies(byProv);
   rogueArmies();
 }
 
@@ -262,6 +263,19 @@ function aiPeace() {
     if (!S.wars.includes(w)) continue;
     const s = warScore(w), age = S.day - w.start;
     const pLead = w.att[0] === S.player || w.def[0] === S.player;
+    // プレイヤーが同盟国として参戦中：自国が大きく占領されていれば、敵が単独講和を求めてくる
+    if (!pLead && sideOf(w, S.player) && S.day - (w.lastOfferP || 0) > 180) {
+      const T = separatePeaceTerms(w, S.player);
+      if (T.share >= 20 && Math.random() < 0.4) {
+        w.lastOfferP = S.day;
+        const other = sideOf(w, S.player) === 'att' ? 'def' : 'att', ids = []; let g = 0;
+        for (const p of T.occ) { if (g >= T.need) break; ids.push(p.id); g += dev(p) / T.myDev * 100; }
+        hooks.modal({
+          title: '📜 単独講和の要求', body: `<b>${esc(nat(w[other][0]).name)}</b>が我が国に単独講和を求めている。<br>我が国の開発度の${Math.round(T.share)}%が占領されている。<br><br>要求：<b>${ids.map(i => esc(prov(i).name)).join('、')}</b> の割譲<br><span class="note">受諾すると我が国だけが戦争から抜ける（同盟国は戦争を続ける）。</span>`,
+          buttons: [{ label: '受諾して離脱する', fn: () => separatePeace(w, S.player, ids.filter(i => prov(i).owner === S.player)) }, { label: '拒否して戦い続ける' }],
+        });
+      }
+    }
     if (pLead) {
       const aiSide = w.att[0] === S.player ? 'def' : 'att';
       const sAI = aiSide === 'att' ? s : -s;
@@ -297,4 +311,83 @@ function aiAcceptsPeace(w, pSide, provIds, vassalize) {
   let cost = vassalize ? vassalPeaceCost(w, lose) : 0;
   for (const i of provIds) if (!(vassalize && prov(i).owner === w[lose][0])) cost += provPeaceCost(w, prov(i), lose);
   return sP > 0 && cost <= sP + 0.01;
+}
+
+// ===== プレイヤー軍の自律行動 =====
+const AUTO_MODES = {
+  manual:  { name: '手動', desc: '命令した通りにだけ動く' },
+  defend:  { name: '防衛', desc: '拠点の周辺を守る。自国・同盟国の州に入った敵や魔物を迎え撃ち、奪われた州を取り返す' },
+  offense: { name: '攻勢', desc: '戦争中、勝てる敵軍を撃破し、敵の州を次々と包囲・占領する。平時は防衛と同じ' },
+  hunt:    { name: '討伐', desc: '魔物の群れと反乱軍だけを狩る。占領された州の奪還も行う' },
+};
+const AUTO_RISK = { careful: { name: '慎重', k: 0.6 }, normal: { name: '通常', k: 0.85 }, bold: { name: '大胆', k: 1.2 } };
+const AUTO_RANGE = { 3: '近く', 8: '中域', 14: '広域' };
+function autoArmies(byProv) {
+  for (const a of [...S.armies]) if (a.owner === S.player && a.auto && a.auto.mode !== 'manual' && S.armies.includes(a)) autoArmy(a, byProv);
+}
+function nearestOwnSafe(a) {
+  const nid = a.owner, n = S.provinces.length, seen = new Uint8Array(n); seen[a.prov] = 1;
+  const q = [a.prov]; let h = 0;
+  while (h < q.length) {
+    const u = q[h++], p = prov(u);
+    if (!p.sea && p.controller === nid && !S.armies.some(b => b.prov === u && hostile(b.owner, nid))) return u;
+    for (const v of p.nb) if (!seen[v] && canEnter(nid, v, false)) { seen[v] = 1; q.push(v); }
+  }
+  return nat(nid).capital;
+}
+function autoArmy(a, byProv) {
+  if (a.inBattle || a.retreat || a.delve) return;
+  if (a.manualHold) { if (a.path.length) return; a.manualHold = false; }
+  if (prov(a.prov).sea && a.path.length) return;
+  const n = nat(a.owner), C = a.auto, risk = (AUTO_RISK[C.risk] || AUTO_RISK.normal).k, range = C.range || 8;
+  const home = C.home != null && prov(C.home).owner === n.id ? C.home : n.capital;
+  const cap = armyRegs(a) * 1000;
+  // 消耗したら後退して補充
+  if (a.resting) {
+    if (armyMen(a) >= cap * 0.9 && a.morale >= maxMorale(n.id) * 0.85) a.resting = false;
+    else { if (prov(a.prov).controller !== n.id && !a.path.length) moveArmyTo(a, nearestOwnSafe(a)); a.autoState = '後退して補充中'; return; }
+  }
+  if (armyMen(a) < cap * 0.5 || a.morale < maxMorale(n.id) * 0.4) { a.resting = true; moveArmyTo(a, nearestOwnSafe(a)); a.autoState = '後退して補充中'; return; }
+  const myPow = armyPower(a);
+  // 勝てない敵が迫ったら拠点へ退く
+  let threat = 0;
+  for (const q of [a.prov, ...adjOf(prov(a.prov))]) for (const b of byProv.get(q) || []) if (hostile(n.id, b.owner) && !b.retreat) threat += armyPower(b);
+  if (threat > myPow * risk * 1.4 && a.prov !== home) { moveArmyTo(a, home); a.target = home; a.autoState = '強敵を避けて退却中'; return; }
+  const atWarNow = warsOf(n.id).length > 0;
+  const mode = C.mode === 'offense' && !atWarNow ? 'defend' : C.mode;
+  // 防衛は拠点からの距離、それ以外は現在地からの距離で探す
+  const dArea = bfsDist(n.id, mode === 'defend' ? home : a.prov, range, a);
+  let best = null, bs = -1e9, why = '';
+  for (let pid = 0; pid < dArea.length; pid++) {
+    if (dArea[pid] < 0) continue;
+    const p = prov(pid); if (p.sea) continue;
+    const dist = dArea[pid], ownish = p.owner === n.id || (p.owner > 0 && friendly(n.id, p.owner));
+    let enemyPow = 0, rogueOnly = true;
+    for (const b of byProv.get(pid) || []) if (hostile(n.id, b.owner) && !b.retreat) { enemyPow += armyPower(b); if (!isRogue(b.owner)) rogueOnly = false; }
+    let sc, w;
+    if (enemyPow > 0) {
+      if (enemyPow > myPow * risk) continue;
+      if (mode === 'defend' && !ownish) continue;
+      if (mode === 'hunt' && !rogueOnly) continue;
+      sc = 120 - dist * 10 + (ownish ? 40 : 0); w = '敵軍を迎撃';
+    } else if (p.owner >= 0 && hostile(n.id, p.controller)) {
+      if (armyMen(a) < 1000 * Math.max(1, effFort(p))) continue;
+      if (isRogue(p.controller) && !ownish) continue;
+      if (mode === 'defend' && !ownish) continue;
+      if (mode === 'hunt' && !(ownish && isRogue(p.controller))) continue;
+      if (mode === 'offense' && !ownish && !hostile(n.id, p.owner)) continue;
+      sc = 70 - dist * 8 + dev(p) * 1.5 + (ownish ? 35 : 0) - effFort(p) * 6; w = ownish ? '奪還' : '包囲・占領';
+      if (p.siege && p.siege.by !== n.id && friendly(p.siege.by, n.id) && pid !== a.prov) sc -= 30;
+    } else continue;
+    if (pid === a.target) sc += 15;
+    if (sc > bs) { bs = sc; best = pid; why = w; }
+  }
+  if (best == null) {
+    if (a.prov !== home && (!a.path.length || a.target !== home)) { moveArmyTo(a, home); a.target = home; }
+    a.autoState = a.prov === home ? '拠点で待機中' : '拠点へ帰還中'; return;
+  }
+  a.autoState = `${prov(best).name}で${why}`;
+  if (best === a.prov) { a.path = []; a.prog = 0; a.target = best; return; }
+  if (a.target === best && a.path.length) return;
+  if (moveArmyTo(a, best)) a.target = best;
 }

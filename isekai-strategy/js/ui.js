@@ -279,7 +279,22 @@ function armyPanel(a) {
       <div class="btns full" style="margin-top:5px">${btn('army-split', a.id, '分割', { disabled: armyRegs(a) < 2 || a.inBattle, why: a.inBattle ? '交戦中' : armyRegs(a) < 2 ? '2連隊以上必要' : null })}${btn('army-merge', a.id, `統合${others.length ? '(' + others.length + ')' : ''}`, { disabled: !others.length || a.inBattle, why: !others.length ? '同じ州に自軍がいない' : a.inBattle ? '交戦中' : null })}${btn('army-disband', a.id, '解散', { cls: 'red', disabled: a.inBattle })}</div>`;
     const p = prov(a.prov);
     if (p.dungeon && !p.dungeon.cleared) h += `<div class="btns full" style="margin-top:5px">${btn('delve', a.id, `🕳 ダンジョン攻略（Lv${p.dungeon.lv}・${delveNeed(p.dungeon.lv)}日）`, { cls: 'gold', disabled: !canDelve(a), why: a.delve ? '攻略中' : a.inBattle ? '交戦中' : a.retreat ? '退却中' : '敵の支配地では攻略できない' })}<p class="note">成功率の目安：約${Math.round(clamp(0.3 + (armyPower(a) + (genOf(a) ? (genOf(a).att + genOf(a).def) * 1.5 : 0)) / (p.dungeon.lv * 6) * 0.35, 0.1, 0.95) * 100)}%（兵力・将軍で上がる）</p></div>`;
-    h += `<p class="note">右クリック（スマホは「移動」→タップ）で移動先を指定。海域を指定すると輸送艦で渡海する。自国が支配する州にいると毎月兵が補充される。</p>`;
+    h += `<p class="note">${document.body.classList.contains('m') ? '行き先をタップ（長押しで即移動）' : '右クリック'}で移動先を指定。海域を指定すると輸送艦で渡海する。自国が支配する州にいると毎月兵が補充される。</p>`;
+    // 自律行動
+    const C = a.auto || { mode: 'manual', risk: 'normal', range: 8 };
+    const seg = (act, cur, opts) => `<div class="seg">${Object.entries(opts).map(([k, v]) => `<button class="${String(k) === String(cur) ? 'on' : ''}" data-act="${act}" data-arg="${a.id}:${k}">${v}</button>`).join('')}</div>`;
+    h += `<h3>自律行動 <small>${C.mode === 'manual' ? '手動' : '自動で行動中'}</small></h3>`;
+    h += seg('auto-mode', C.mode, Object.fromEntries(Object.entries(AUTO_MODES).map(([k, v]) => [k, v.name])));
+    h += `<p class="note">${AUTO_MODES[C.mode].desc}</p>`;
+    if (C.mode !== 'manual') {
+      h += `<div class="kv" style="margin-top:6px"><span>積極性</span><span></span></div>` + seg('auto-risk', C.risk, Object.fromEntries(Object.entries(AUTO_RISK).map(([k, v]) => [k, v.name])));
+      h += `<p class="note" style="margin-top:2px">慎重：自軍の6割以下の敵だけ狙う／通常：8.5割以下／大胆：1.2倍までの敵にも挑む</p>`;
+      h += `<div class="kv" style="margin-top:6px"><span>行動範囲</span><span></span></div>` + seg('auto-range', C.range, AUTO_RANGE);
+      const home = C.home != null ? prov(C.home) : prov(me().capital);
+      h += `<div class="kv" style="margin-top:6px"><span>拠点</span><span>${esc(home.name)}</span><span>現在の行動</span><span>${esc(a.autoState || '様子見')}</span></div>`;
+      h += `<div class="btns" style="margin-top:6px">${btn('auto-home', a.id, '📍 今いる州を拠点にする', { disabled: prov(a.prov).owner !== S.player, why: '自国の州でのみ設定できる' })}</div>`;
+      h += `<p class="note">兵が半分を切るか士気が4割を切ると、自動で後退して補充する。手動で移動を命じると、到着するまでは命令を優先する。</p>`;
+    }
   }
   return h;
 }
@@ -395,7 +410,7 @@ function warCard(w, mine) {
   let h = `<div class="warcard"><div class="t">${esc(w.name)}</div><div class="note" style="margin-top:0">${dateStr(w.start)}開戦</div>
     <div class="wsbar"><i style="left:${left}%;width:${width}%;background:${v >= 0 ? 'var(--good)' : 'var(--bad)'}"></i><div class="mid"></div><span>戦勝点 ${v > 0 ? '+' : ''}${Math.round(v)}</span></div>
     <div class="sides"><div><b style="color:var(--ink-2)">${mine ? '味方' : '攻撃側'}</b>${col(my)}</div><div><b style="color:var(--ink-2)">${mine ? '敵' : '防衛側'}</b>${col(en)}</div></div>`;
-  if (mine) h += leader ? `<div class="btns full" style="margin-top:8px">${btn('peace', w.id, '🕊 講和交渉', { cls: 'gold' })}</div>` : `<p class="note">講和は戦争指導国（${esc(nat(w[side][0]).short)}）が行う。</p>`;
+  if (mine) h += leader ? `<div class="btns full" style="margin-top:8px">${btn('peace', w.id, '🕊 講和交渉', { cls: 'gold' })}</div>` : `<p class="note">全体の講和は戦争指導国（${esc(nat(w[side][0]).short)}）が行う。我が国の領土が勝手に割譲されることはない。</p><div class="btns full">${btn('sep-peace', w.id, '🕊 単独講和（この戦争から抜ける）')}</div>`;
   return h + `</div>`;
 }
 
@@ -499,6 +514,7 @@ function act(name, arg, ev) {
     case 'annex': { const o = nat(+arg); if (!annex(n, o)) hooks.log('外交併合できない', 'bad'); } break;
     case 'declare': confirmDeclare(+arg); break;
     case 'peace': openPeace(S.wars.find(w => w.id === +arg)); break;
+    case 'sep-peace': openSeparatePeace(S.wars.find(w => w.id === +arg)); break;
     case 'summon': summonRitual(); break;
     case 'adv-bench': { const c = n.advisors.find(x => x.id === +arg); if (c) { n.advisors = n.advisors.filter(x => x !== c); n.bench.push(c); } } break;
     case 'adv-up': { const c = n.bench.find(x => x.id === +arg); if (c && n.advisors.length < 3) { n.bench = n.bench.filter(x => x !== c); n.advisors.push(c); } } break;
@@ -506,6 +522,14 @@ function act(name, arg, ev) {
     case 'gen-new': { const g = recruitGeneral(n); if (g) hooks.log(`🎖 ${g.name}を将軍に任命した（${g.att}/${g.def}/${g.man}/${g.sie}）`, 'good'); } break;
     case 'learn': if (learnSkill(n, arg)) hooks.log(`📖 スキル「${SKILL_BY_ID[arg].name}」を習得した`, 'good'); break;
     case 'army-move': case 'fleet-move': moveMode = !moveMode; updateBanner(); break;
+    case 'auto-mode': case 'auto-risk': case 'auto-range': case 'auto-home': {
+      const [id, v] = String(arg).split(':'), a = S.armies.find(x => x.id === +id); if (!a) break;
+      a.auto = a.auto || { mode: 'manual', risk: 'normal', range: 8, home: a.prov };
+      if (name === 'auto-mode') { a.auto.mode = v; if (a.auto.home == null || prov(a.auto.home).owner !== S.player) a.auto.home = prov(a.prov).owner === S.player ? a.prov : me().capital; a.manualHold = false; a.autoState = ''; if (v !== 'manual') hooks.log(`🧭 ${a.name}を「${AUTO_MODES[v].name}」に設定した`, 'info'); }
+      if (name === 'auto-risk') a.auto.risk = v;
+      if (name === 'auto-range') a.auto.range = +v;
+      if (name === 'auto-home' && prov(a.prov).owner === S.player) { a.auto.home = a.prov; hooks.log(`📍 ${a.name}の拠点を${prov(a.prov).name}にした`, 'info'); }
+    } break;
     case 'army-stop': if (selArmy) { selArmy.path = []; selArmy.prog = 0; selArmy.delve = null; } break;
     case 'army-split': if (selArmy) { const b = splitArmy(selArmy); if (b) select({ type: 'army', id: b.id }); } break;
     case 'army-merge': if (selArmy) mergeArmies([selArmy, ...S.armies.filter(b => b !== selArmy && b.owner === selArmy.owner && b.prov === selArmy.prov && !b.inBattle && !b.retreat)]); break;
@@ -569,13 +593,15 @@ function openPeace(w) {
   const side = sideOf(w, S.player), lose = side === 'att' ? 'def' : 'att';
   const s = warScore(w), sP = side === 'att' ? s : -s;
   const enemy = nat(w[lose][0]);
-  const cand = S.provinces.filter(p => w[lose].includes(p.owner) && w[side].includes(p.controller)).sort((a, b) => dev(b) - dev(a));
+  const ced = cedableOwners(w, lose);
+  const cand = S.provinces.filter(p => ced.has(p.owner) && w[side].includes(p.controller)).sort((a, b) => dev(b) - dev(a));
   const vCost = vassalPeaceCost(w, lose), canV = !enemy.demonKing && !enemy.overlord && totalDev(enemy.id) * 2 < totalDev(S.player);
   const body = `<div class="wsbar"><i style="left:${sP >= 0 ? 50 : 50 + sP / 2}%;width:${Math.abs(sP) / 2}%;background:${sP >= 0 ? 'var(--good)' : 'var(--bad)'}"></i><div class="mid"></div><span>戦勝点 ${Math.round(sP)}</span></div>
     相手：<b>${esc(enemy.name)}</b><br>要求を選ぶ（合計コストが戦勝点以下なら受諾される）：
     <div class="plist">${canV ? `<label style="border:1px solid var(--gold)"><input type="checkbox" data-vassal="1"><span>👑 <b>${esc(enemy.name)}を属国化</b> <small style="color:var(--ink-3)">（この国の州の割譲は含まれなくなる）</small></span><em>${Math.round(vCost)}</em></label>` : `<div class="note">属国化：${enemy.demonKing ? '魔王国は属国にできない' : '開発度が自国の半分未満の国のみ可能'}</div>`}
     ${cand.map(p => `<label><input type="checkbox" data-pid="${p.id}"><span>${esc(p.name)} <small style="color:var(--ink-3)">${esc(nat(p.owner).short)}・開発${dev(p)}</small></span><em>${Math.round(provPeaceCost(w, p, lose))}</em></label>`).join('')}</div>
     ${!cand.length ? '<div class="note">割譲を要求できる占領地がない。</div>' : ''}
+    <div class="note">割譲を要求できるのは敵の戦争指導国（とその属国）の州だけ。敵の同盟国の州は、講和が結ばれると元の持ち主に返る。</div>
     <div>選択コスト：<b id="pc-total">0</b> / ${Math.max(0, Math.round(sP))}</div>
     <div class="note" id="pc-ae">領土を奪うと周辺国の警戒度が上がる。</div>`;
   const read = (el) => { const v = !!el.querySelector('[data-vassal]:checked'); const ids = [...el.querySelectorAll('[data-pid]:checked')].map(c => +c.dataset.pid); return { v, ids }; };
@@ -607,6 +633,26 @@ function openPeace(w) {
   });
 }
 
+function openSeparatePeace(w) {
+  if (!w) return;
+  const side = sideOf(w, S.player), other = side === 'att' ? 'def' : 'att', T = separatePeaceTerms(w, S.player), enemy = nat(w[other][0]);
+  const body = `${esc(enemy.name)}との<b>単独講和</b>で、我が国だけがこの戦争から抜ける。同盟国は戦争を続ける。<br><br>敵に占領されている我が国の州：開発度の<b>${Math.round(T.share)}%</b><br>${T.need ? `受諾には、開発度の<b>${Math.round(T.need)}%</b>以上にあたる州の割譲が必要。` : '占領が少ないので、白紙での離脱が受け入れられる見込み。'}
+    <div class="plist">${T.occ.map(p => `<label><input type="checkbox" data-sp="${p.id}"><span>${esc(p.name)} <small style="color:var(--ink-3)">開発${dev(p)}</small></span><em>${Math.round(dev(p) / T.myDev * 100)}%</em></label>`).join('') || '<div class="note">敵に占領されている州はない。</div>'}</div>
+    <div>割譲する割合：<b id="sp-total">0</b>% / 必要 ${Math.round(T.need)}%</div>`;
+  hooks.modal({
+    title: '🕊 単独講和', body,
+    mount: (el) => { const upd = () => { let t = 0; el.querySelectorAll('[data-sp]:checked').forEach(c => t += dev(prov(+c.dataset.sp)) / T.myDev * 100); const e = el.querySelector('#sp-total'); e.textContent = Math.round(t); e.style.color = t >= T.need - 0.01 ? 'var(--good)' : 'var(--bad)'; }; el.querySelectorAll('input').forEach(c => c.onchange = upd); },
+    buttons: [
+      { label: 'この条件で講和を申し込む', keep: true, fn: () => {
+        const ids = [...$('modal').querySelectorAll('[data-sp]:checked')].map(c => +c.dataset.sp);
+        closeModal();
+        if (aiAcceptsSeparate(w, S.player, ids)) separatePeace(w, S.player, ids);
+        else hooks.log(`${enemy.name}は単独講和を拒否した（割譲が足りない）`, 'bad');
+      } },
+      { label: 'やめる' },
+    ],
+  });
+}
 function select(sel, keepTab) {
   S.sel = sel; moveMode = false; updateBanner();
   if (!keepTab) tab = 'sel';
@@ -622,6 +668,7 @@ function orderMove(a, pid) {
   if (a.inBattle) { hooks.log('交戦中の軍は移動できない', 'bad'); return; }
   if (a.retreat) { hooks.log('退却中の軍には命令できない', 'bad'); return; }
   if (pid === a.prov) { a.path = []; a.prog = 0; return; }
+  if (a.auto && a.auto.mode !== 'manual') a.manualHold = true; // 手動命令を優先
   if (!moveArmyTo(a, pid)) {
     const cap = transportCap(S.player) - regsAtSea(S.player, a), need = armyRegs(a);
     hooks.log(`${prov(pid).name}へは進軍できない（${cap < need ? `海を渡るには輸送艦が${need}隻必要：現在${Math.max(0, cap)}隻／` : ''}通行権がない、または敵艦隊が封鎖中）`, 'bad');

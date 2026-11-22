@@ -912,12 +912,40 @@ function warScore(w) {
   return clamp(occD / dD * 100 - occA / dA * 100 + w.battle, -100, 100);
 }
 function provPeaceCost(w, p, loseSide) { return dev(p) / sideDev(w, loseSide) * 100; }
+// 講和で割譲できるのは、負けた側の戦争指導国とその属国の州だけ（同盟国の領土は勝手に渡せない）
+function cedableOwners(w, side) { const lead = w[side][0]; return new Set([lead, ...vassalsOf(lead).map(v => v.id).filter(id => w[side].includes(id))]); }
 function pickDemands(w, winSide, score) {
-  const lose = winSide === 'att' ? 'def' : 'att';
-  const cand = S.provinces.filter(p => w[lose].includes(p.owner) && w[winSide].includes(p.controller)).sort((a, b) => dev(b) - dev(a));
+  const lose = winSide === 'att' ? 'def' : 'att', own = cedableOwners(w, lose);
+  const cand = S.provinces.filter(p => own.has(p.owner) && w[winSide].includes(p.controller)).sort((a, b) => dev(b) - dev(a));
   const res = []; let tot = 0;
   for (const p of cand) { const c = provPeaceCost(w, p, lose); if (tot + c <= score + 0.01) { res.push(p.id); tot += c; } }
   return res;
+}
+// 単独講和：同盟国として参戦している国が、自分だけ戦争を抜ける
+function separatePeaceTerms(w, nid) {
+  const side = sideOf(w, nid), other = side === 'att' ? 'def' : 'att', myDev = Math.max(1, totalDev(nid));
+  const occ = S.provinces.filter(p => p.owner === nid && w[other].includes(p.controller)).sort((a, b) => dev(b) - dev(a));
+  const share = occ.reduce((s, p) => s + dev(p), 0) / myDev * 100;
+  return { occ, share, need: share < 8 ? 0 : Math.min(40, share), myDev };
+}
+function aiAcceptsSeparate(w, nid, cedeIds) {
+  const T = separatePeaceTerms(w, nid);
+  const given = cedeIds.reduce((s, id) => s + dev(prov(id)), 0) / T.myDev * 100;
+  return given >= T.need - 0.01;
+}
+function separatePeace(w, nid, cedeIds) {
+  if (!S.wars.includes(w) || !sideOf(w, nid)) return;
+  const side = sideOf(w, nid), other = side === 'att' ? 'def' : 'att';
+  const names = [];
+  for (const pid of cedeIds) { const p = prov(pid); const to = w[other].includes(p.controller) ? p.controller : w[other][0]; names.push(p.name); transferProvince(p, to); }
+  w[side] = w[side].filter(x => x !== nid);
+  for (const e of w[other]) { if (e > 0) { nat(nid).truces[e] = S.day + 360 * 5; nat(e).truces[nid] = S.day + 360 * 5; } }
+  for (const p of S.provinces) if (p.owner >= 0 && p.controller !== p.owner && !isRogue(p.controller) && !hostile(p.owner, p.controller)) p.controller = p.owner;
+  for (const a of S.armies) if (a.owner === nid && !prov(a.prov).sea && !canEnter(nid, a.prov, false)) { a.prov = nat(nid).capital; a.path = []; a.prog = 0; a.retreat = false; }
+  hooks.log(`🕊 ${nat(nid).name}は${w.name}から単独講和で離脱した${names.length ? '（割譲: ' + names.join('、') + '）' : ''}`, nid === S.player ? 'info' : 'info');
+  mapDirty = true;
+  if (!w[side].length) endWar(w);
+  checkDeaths();
 }
 function transferProvince(p, to) {
   const from = p.owner;
