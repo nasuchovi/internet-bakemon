@@ -139,6 +139,9 @@ button{font-family:inherit;color:inherit;}
 .rarity .stamp{width:62px;height:62px;font-size:22px;flex:none;}
 .rarity .r-num{font-size:13px;color:var(--ink-soft);}
 .rarity .r-num b{font-size:26px;color:var(--ink);font-weight:800;margin:0 3px;font-variant-numeric:tabular-nums;}
+.bl .v small.share{display:block;margin:2px 0 0;font-size:12px;}
+.bl .tier-d{display:block;font-size:13px;color:var(--ink-soft);line-height:1.7;margin-top:2px;}
+.bl .tier-d small{display:block;font-size:11px;margin-top:2px;}
 .comment{font-size:14.5px;color:var(--ink);border-left:3px solid var(--shu);padding:2px 0 2px 12px;}
 
 /* ---------- 一生 ---------- */
@@ -343,6 +346,7 @@ button{font-family:inherit;color:inherit;}
         <div class="bl" id="bl1"><span class="k">時 は</span><span class="v" id="bWhen"></span></div>
         <div class="bl" id="bl2"><span class="k">所 は</span><span class="v" id="bWhere"></span></div>
         <div class="bl" id="bl3"><span class="k">生 ま れ は</span><span class="v" id="bWho"></span></div>
+        <div class="bl" id="bl3b" hidden><span class="k">暮 ら し 向 き は</span><span class="v" id="bTier"></span><span class="tier-d" id="bTierD"></span></div>
         <div class="bl" id="bl4">
           <div class="rarity">
             <span class="stamp" id="bStamp">凡</span>
@@ -625,13 +629,22 @@ function startBirth(){
   $("bOdds").innerHTML = "この生まれは、およそ<br><b>" + fmtInt(op.a) + "</b>人に<b>" + op.b + "</b>人";
   $("bStamp").textContent = stampFor(odds);
   $("bComment").textContent = COMMENT[st];
-  ["bl1","bl2","bl3","bl4"].forEach(id => $(id).classList.remove("on"));
+  const tier = S.tier;
+  $("bl3b").hidden = !tier;
+  if (tier) {
+    $("bTier").innerHTML = ""; $("bTier").append(document.createTextNode(tier.label));
+    const sm = document.createElement("small"); sm.textContent = "同じ身分の家のうち、およそ" + Math.round(tier.share * 100) + "%"; sm.className = "share"; $("bTier").append(sm);
+    $("bTierD").textContent = tier.desc;
+    if (tier.src) { const sr = document.createElement("small"); sr.textContent = "典拠：" + tier.src; $("bTierD").append(sr); }
+  }
+  const BL = tier ? ["bl1","bl2","bl3","bl3b","bl4"] : ["bl1","bl2","bl3","bl4"];
+  ["bl1","bl2","bl3","bl3b","bl4"].forEach(id => $(id).classList.remove("on"));
   const live = $("btnLive"); live.style.opacity = 0; live.style.pointerEvents = "none";
   show("birth");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const step = reduce ? 0 : 700;
-  ["bl1","bl2","bl3","bl4"].forEach((id, i) => setTimeout(() => $(id).classList.add("on"), 200 + i * step));
-  setTimeout(() => { live.style.transition = "opacity .5s"; live.style.opacity = 1; live.style.pointerEvents = "auto"; }, 300 + 4 * step);
+  BL.forEach((id, i) => setTimeout(() => $(id).classList.add("on"), 200 + i * step));
+  setTimeout(() => { live.style.transition = "opacity .5s"; live.style.opacity = 1; live.style.pointerEvents = "auto"; }, 300 + BL.length * step);
 }
 
 /* ---------- 一生 ---------- */
@@ -845,7 +858,7 @@ function finish(){
   HeianPixel.draw($("kScene").getContext("2d"), S, { t: 0, age: S.age, year: S.year, dead: true });
   $("kBirth").innerHTML = "<b></b><span class='d'></span>";
   $("kBirth").querySelector("b").textContent = r.birthWareki + "（" + r.birthYear + "年）";
-  $("kBirth").querySelector(".d").textContent = r.region + "の" + r.birthLabel + "として　※およそ" + oddsText(r.birthP) + "の生まれ";
+  $("kBirth").querySelector(".d").textContent = r.region + "の" + r.birthLabel + "として" + (r.tier ? "（" + r.tier.label + "）" : "") + "　※およそ" + oddsText(r.birthP) + "の生まれ";
   $("kDeath").innerHTML = "<b></b><span class='d'></span>";
   $("kDeath").querySelector("b").textContent = r.deathWareki + "（" + r.deathYear + "年）　享年 " + r.kyonen;
   $("kDeath").querySelector(".d").textContent = (r.deathRegion !== r.region ? r.deathRegion + "にて　" : "") + "数え年";
@@ -975,7 +988,7 @@ function drawCard(r){
   let y = wrap(c, "『" + r.epithet + "』", L, 318 + (Rr - L) / 2 + 100, Rr - L, 66, "800 54px " + MIN);
   y += 44;
   const rows = [
-    ["生", r.birthWareki + "（" + r.birthYear + "年）", r.region + "の" + r.birthLabel + "　およそ" + oddsText(r.birthP)],
+    ["生", r.birthWareki + "（" + r.birthYear + "年）", r.region + "の" + r.birthLabel + (r.tier ? "（" + r.tier.label + "）" : "") + "　およそ" + oddsText(r.birthP)],
     ["没", r.deathWareki + "（" + r.deathYear + "年）　享年 " + r.kyonen + "（数え）", ""],
     ["死因", r.cause, r.causeDesc],
     ["身分", r.finalLabel, ""],

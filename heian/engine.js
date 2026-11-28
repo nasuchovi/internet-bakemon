@@ -100,6 +100,51 @@ const STATUS = {
 })();
 const BIRTH_KEYS = ["kouzoku","kugyo","kizoku","kanjin","kyomin","gozoku","gyomin","genin","nomin"];
 
+/* ---------------- 家の暮らし向き（同じ身分の中での差） ---------------- */
+// w: 生まれたときの財の倍率 / inc: 稼ぎの倍率 / en: 縁 / flags: 最初から持っているもの
+const TIERS = {
+  nomin: [
+    { id: "fugo", p: 0.10, short: "富豪", label: "富豪の輩の家", desc: "私営田や稲の貸し付けで蓄えのある、村の有力者の家です。", w: 4, inc: 1.3, en: 8, flags: { ox: 1, tools: 1 }, src: "Wikipedia「富豪層」（史料では「富豪之輩」）" },
+    { id: "mid", p: 0.45, label: "人並みの百姓の家", desc: "自分の田を耕して暮らす、ごく普通の家です。", w: 1, inc: 1 },
+    { id: "poor", p: 0.30, short: "田の少ない家", label: "田の少ない家", desc: "田が少なく、凶作の年はすぐに食べ物が尽きます。", w: 0.3, inc: 0.93 },
+    { id: "sakunin", p: 0.15, short: "作人", label: "人の田を請けて耕す家", desc: (y) => y >= 950 ? "自分の田を持たず、荘園や公田を請け負って耕し、地子（請料）を納めて暮らします（作人）。" : "自分の田がほとんどなく、人の田を手伝って食いつないでいます。", w: 0, inc: 0.88, src: (y) => y >= 950 ? "Wikipedia「作人」（10世紀に地子を払って荘園の田を請作した田堵に始まる）" : undefined }
+  ],
+  gyomin: [
+    { id: "fune", p: 0.25, short: "舟持ち", label: "舟を持つ家", desc: "自分の舟を持ち、人を乗せて漁に出る家です。", w: 2, inc: 1.2 },
+    { id: "mid", p: 0.50, label: "人並みの漁民の家", desc: "小さな舟で、家族と漁をして暮らしています。", w: 1, inc: 1 },
+    { id: "poor", p: 0.25, short: "雇われ", label: "人の舟に乗る家", desc: "舟を持たず、人の舟に乗って分け前をもらいます。", w: 0.3, inc: 0.9 }
+  ],
+  kyomin: [
+    { id: "ichi", p: 0.20, short: "商い", label: "市で商いをする家", desc: "東西の市に店を出して暮らす家です。", w: 3, inc: 1.25 },
+    { id: "mid", p: 0.50, label: "雑役で暮らす家", desc: "貴族の屋敷や役所の雑役で暮らしを立てています。", w: 1, inc: 1 },
+    { id: "poor", p: 0.30, short: "その日暮らし", label: "その日暮らしの家", desc: "決まった仕事がなく、その日の食べ物を探して暮らしています。", w: 0.2, inc: 0.88 }
+  ],
+  gozoku: [
+    { id: "gunji", p: 0.30, short: "郡司の家", label: "郡司を出す家", desc: "代々、郡の役人（郡司）を務めてきた、土地の名家です。", w: 1.5, inc: 1.2, en: 6, src: "Wikipedia「郡司」（在地首長としての権威を持つ）" },
+    { id: "tato", p: 0.70, label: "富豪の輩（田堵）の家", desc: "田を請け負い、人を使って耕す、新しく力をつけた家です。", w: 1, inc: 1, src: "Wikipedia「富豪層」" }
+  ],
+  kanjin: [
+    { id: "good", p: 0.20, short: "家産あり", label: "家産のある官人の家", desc: "役所勤めの給料のほかに、いくらかの田や蓄えがある家です。", w: 2, inc: 1.3 },
+    { id: "mid", p: 0.55, label: "並の官人の家", desc: "役所勤めで、どうにか暮らしを立てている家です。", w: 1, inc: 1 },
+    { id: "poor", p: 0.25, short: "つましい家", label: "つましい官人の家", desc: "位は低く、暮らしは庶民と大して変わりません。", w: 0.4, inc: 0.8 }
+  ],
+  kizoku: [
+    { id: "juryo", p: 0.30, short: "受領の家", label: "受領を務める家", desc: "父は地方の国司（受領）を務め、任国で蓄えた富があります。", w: 3, inc: 1.6, flags: { juryoHouse: 1 }, src: "Wikipedia「受領」（受領は莫大な蓄財が可能だった）" },
+    { id: "keishi", p: 0.45, short: "諸大夫", label: "摂関家に家司として仕える家", desc: "摂関家に仕えて引き立てを受ける、諸大夫の家です。", w: 1, inc: 1, en: 6, src: "Wikipedia「諸大夫」（家司として摂家に奉仕する家格）" },
+    { id: "raku", p: 0.25, short: "零落", label: "零落した家", desc: "位だけはありますが、暮らしは苦しい家です。『今昔物語集』の、芋粥を夢見る五位のように。", w: 0.3, inc: 0.6, en: -4, src: "『今昔物語集』巻26第17話" }
+  ],
+  kugyo: [
+    { id: "kindachi", p: 0.35, short: "君達", label: "君達（きんだち）の家", desc: "摂関家につらなり、子は将来の公卿と見なされる家です。", w: 1.8, inc: 1.5, en: 10, src: "Wikipedia「諸大夫」（藤原忠平の子孫などは「君達」と位置づけられた）" },
+    { id: "mid", p: 0.65, label: "並の公卿の家", desc: "公卿の家ですが、摂関家の一門ではありません。", w: 1, inc: 1 }
+  ]
+};
+function pickTier(st, year) {
+  const list = TIERS[st];
+  if (!list) return null;
+  const t = wpick(list.map(x => Object.assign({}, x, { w: x.p, wMul: x.w })));
+  return { id: t.id, short: t.short, label: t.label, desc: typeof t.desc === "function" ? t.desc(year) : t.desc, src: typeof t.src === "function" ? t.src(year) : t.src, share: t.p, wMul: t.wMul, inc: t.inc, en: t.en || 0, flags: t.flags || {} };
+}
+
 /* ---------------- 官位 ---------------- */
 const RANKS = ["無位","少初位","大初位","従八位","正八位","従七位","正七位","従六位","正六位",
   "従五位下","従五位上","正五位","従四位","正四位","従三位","正三位","従二位","正二位","従一位","正一位"];
@@ -182,7 +227,14 @@ function newLife(opt) {
   };
   if (st === "kouzoku") s.en = 50;
   if (st === "kugyo") s.en = 42;
-  s.logs.push({ age: 0, year, t: birthText(s), k: "birth" });
+  const tier = opt.tier === undefined ? pickTier(st, year) : opt.tier;
+  if (tier) {
+    s.tier = tier;
+    s.wealth *= tier.wMul;
+    s.en = clamp(s.en + tier.en, 0, 100);
+    Object.assign(s.flags, tier.flags);
+  }
+  s.logs.push({ age: 0, year, t: birthText(s) + (s.tier ? "暮らし向きは「" + s.tier.label + "」。" : ""), k: "birth", src: s.tier && s.tier.src });
   return s;
 }
 function birthText(s) {
@@ -200,7 +252,7 @@ function curLabel(s) {
   if (s.kokumo) return "国母";
   if (s.flags.nyobo) return "女房";
   if (s.st === "bushi" && s.flags.rodo) return "武士の郎党";
-  return STATUS[s.st].name;
+  return STATUS[s.st].name + (s.tier && s.tier.short && s.st === s.birthStatus ? "（" + s.tier.short + "）" : "");
 }
 function log(s, t, k, src) { s.yearLogs.push({ age: s.age, year: s.year, t, k: k || "n", src }); }
 function addRisk(s, p, cause, desc) { (s.risks = s.risks || []).push({ p, cause, desc }); }
@@ -437,9 +489,9 @@ function chGenpuku(s) {
   }
   if (s.st === "kouzoku" && s.year >= 814) {
     return branch(s, "元服 ― 臣籍降下", "数えで" + (s.age + 1) + "。元服の日、皇族のままでいるか、姓を賜って臣下になるかを問われました。", [
-      { label: "源の姓を賜り、臣下になる", desc: "官位を上げて公卿を目指せる（賜姓源氏）", apply: (st) => { st.flags.genpuku = 1; st.flags.shisei = 1; st.rank = 12; return ["「源」の姓を賜り、臣下になりました。天皇の子で臣下になった一世源氏は、従四位上から始まるのが通例です。親の七光りは、この時代とても明るく光ります。"]; } },
+      { label: "源の姓を賜り、臣下になる", desc: "官位を上げて公卿を目指せる（賜姓源氏）", apply: (st) => { st.flags.genpuku = 1; st.flags.shisei = 1; st.rank = 12; return ["「源」の姓を賜り、臣下になりました。天皇の子で臣下になった一世源氏は、従四位上から始まるのが通例です。皇族のままでは就ける官職が限られ、暮らしが安定しないため、自ら臣籍降下を願い出る例もありました。"]; } },
       { label: "親王のまま暮らす", desc: "収入は安定。ただし仕事はほぼない", apply: (st) => { st.flags.genpuku = 1; return ["親王のままでいることにしました。品位（ほんい）はありますが、仕事はあまりありません。"]; } }
-    ], "『類聚三代格』巻17（弘仁5年の賜姓の詔）／『西宮記』");
+    ], "『類聚三代格』巻17（弘仁5年の賜姓の詔）／『西宮記』／Wikipedia「臣籍降下」");
   }
   if (s.st === "kouzoku") return branch(s, "元服", "数えで" + (s.age + 1) + "。元服の儀を迎えました。", [
     { label: "親王として暮らす", desc: "源氏賜姓が始まるのは弘仁5年（814）から", apply: (st) => { st.flags.genpuku = 1; return ["親王として元服しました。"]; } }
@@ -987,7 +1039,7 @@ function prepareYear(s) {
       s.branchThisYear = true;
     }
     // 受領
-    else if (isOfficial(s) && !(s.flags.exile > 0) && s.rank >= 9 && s.rank <= 13 && s.juryo === 0 && a >= 28 && (s.flags.juryoAsked || -99) <= a - (s.flags.shinbumi > 0 ? 3 : 8) && R() < 0.12 + s.en / 500 + (s.flags.inshin ? 0.12 : 0) + (s.flags.shinbumi > 0 ? 0.25 : 0)) { s.flags.juryoAsked = a; q.push(chJuryo(s)); s.branchThisYear = true; }
+    else if (isOfficial(s) && !(s.flags.exile > 0) && s.rank >= 9 && s.rank <= 13 && s.juryo === 0 && a >= 28 && (s.flags.juryoAsked || -99) <= a - (s.flags.shinbumi > 0 ? 3 : 8) && R() < 0.12 + s.en / 500 + (s.flags.inshin ? 0.12 : 0) + (s.flags.shinbumi > 0 ? 0.25 : 0) + (s.flags.juryoHouse ? 0.08 : 0)) { s.flags.juryoAsked = a; q.push(chJuryo(s)); s.branchThisYear = true; }
     // 結婚
     else if ((!s.married || (!s.spouseAlive && s.flags.widowedAt != null && a - s.flags.widowedAt >= 1)) && s.st !== "so" && a >= (s.sex === "f" ? 13 : 15) && a <= (s.marriages > 0 ? 48 : 40) && !s.kokumo && R() < marryChance(s)) { q.push(chMarry(s)); s.branchThisYear = true; }
     // 衛士の任期明け
@@ -1055,8 +1107,9 @@ function runYear(s) {
   const ecoTags = yearTags(s);
   let inc, up;
   const hhMode = !!(d2.wpw && s.age >= 15);
-  if (hhMode) { inc = d2.wpw * hh.workers * rnd(0.75, 1.25); up = hh.mouths; }
-  else { inc = d2.income * rnd(0.75, 1.25); up = d2.upkeep + hh.extra; }
+  const tMul = s.tier && s.st === s.birthStatus ? s.tier.inc : 1;
+  if (hhMode) { inc = d2.wpw * tMul * hh.workers * rnd(0.75, 1.25); up = hh.mouths; }
+  else { inc = d2.income * tMul * rnd(0.75, 1.25); up = d2.upkeep + hh.extra; }
   if (s.st === "bushi" && s.flags.rodo) { inc = 8 * rnd(0.75, 1.25); up = 6 + hh.extra; }
   if (s.st === "so" && s.flags.nobleMonk) inc = 35 * rnd(0.8, 1.2);
   if (s.st === "kouzoku" && !s.flags.shisei && s.sex === "m") inc = d2.income;
@@ -1371,6 +1424,7 @@ function summary(s) {
   return {
     birthText: birthText(Object.assign({}, s, { year: s.birthYear, region: s.birthRegion, st: s.birthStatus })),
     birthLabel: birthLabel(s),
+    tier: s.tier ? { label: s.tier.label, share: s.tier.share } : null,
     birthYear: s.birthYear, deathYear: s.year,
     birthWareki: wareki(s.birthYear), deathWareki: wareki(s.year),
     region: REGION[s.birthRegion], deathRegion: REGION[s.region],
