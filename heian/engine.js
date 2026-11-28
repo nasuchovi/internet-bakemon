@@ -317,6 +317,22 @@ function setPlan(s, id) {
   s.logs.push(l);
   return l;
 }
+function planPrompt(s) {
+  const opts = planOptions(s);
+  if (!opts.length) return null;
+  const seen = s.flags.seenPlans || (s.flags.seenPlans = []);
+  const fresh = opts.filter(p => !seen.includes(p.id));
+  const invalid = !s.plan || !opts.some(p => p.id === s.plan.id);
+  if (!fresh.length && !invalid) return null;
+  fresh.forEach(p => seen.push(p.id));
+  let lead;
+  if (!s.plan) lead = "数えで" + (s.age + 1) + "。物心がつきました。この先をどう過ごしますか。選んだあとも、画面下のボタンでいつでも変えられます。";
+  else if (invalid) lead = "暮らしが変わりました。これからどう過ごしますか。";
+  else lead = "新しい過ごし方を選べるようになりました（" + fresh.map(p => "「" + p.label + "」").join("、") + "）。どうしますか。";
+  const options = opts.map(p => ({ label: p.label + (fresh.length && !invalid && fresh.some(f => f.id === p.id) ? "（新）" : ""), desc: p.desc, apply: (st) => { st.plan = plansFor(st).find(x => x.id === p.id); st.planAge = st.age; return ["過ごし方を「" + p.label + "」にしました。"]; } }));
+  if (!invalid) options.unshift({ label: "今のまま「" + s.plan.label + "」を続ける", desc: "変えない", apply: () => [] });
+  return { kind: "plan", title: "過ごし方", lead, options };
+}
 function ensurePlan(s) {
   const opts = planOptions(s);
   if (!opts.length) return;
@@ -1001,7 +1017,9 @@ function prepareYear(s) {
       s.branchThisYear = true;
     }
   }
-  // 節目：過ごし方と財の使い道
+  // 過ごし方：初めて選べるようになったときと、選択肢の中身が変わったときだけ選ぶ（以後は画面下のボタン）
+  q.push(() => planPrompt(s));
+  // 節目：財の使い道
   if (isMilestone(a)) {
     if (a >= 15) q.push(() => (s.st !== "genin" && !(s.st === "so" && s.flags.shido && s.wealth < 1)) ? { kind: "spend", title: "財の使い道", lead: "手元の財は " + fmtW(s.wealth) + " 石ほど。どう使いますか。", options: spendFor(s) } : null);
   }
