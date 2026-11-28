@@ -141,6 +141,7 @@ function palette(p) {
     case "kyomin": c = "#a7b0b4"; e = "#5c6870"; break;
     case "gozoku": c = "#8a6a44"; e = "#4e3a24"; break;
     case "bushi": c = "#5d6e4c"; e = "#2e3a26"; pa = "#3f4a33"; break;
+    case "eji": c = "#d6ccb0"; e = "#8e2a1e"; pa = "#8a7a5a"; break;
     case "so": c = "#3a3634"; e = "#8a6236"; break;
     case "kanjin": case "kizoku": case "kugyo": case "kouzoku":
       if (p.sex === "m") { c = rankColor(p.rank, p.year); e = "#e8e0cc"; pa = p.rank >= 9 ? "#6a4f7a" : "#d8d0bc"; }
@@ -173,7 +174,7 @@ function person(ctx, x, feet, p) {
   else if (p.st === "so") rows = T.monk;
   else if ((isNobleSt(p.st) || p.st === "kanjin") && p.sex === "m" && p.age >= 12) rows = T.mNoble;
   else if (isNobleSt(p.st) && p.sex === "f") rows = T.fNoble;
-  else if (p.st === "bushi" || p.st === "gozoku") rows = p.sex === "m" ? withHat(T.mCommon) : T.fCommon;
+  else if (p.st === "bushi" || p.st === "gozoku" || p.st === "eji") rows = p.sex === "m" ? withHat(T.mCommon) : T.fCommon;
   else rows = p.sex === "m" ? T.mCommon : T.fCommon;
   const w = rows[0].length, h = rows.length;
   const top = feet - h + 1 + (p.elder ? 1 : 0);
@@ -390,7 +391,7 @@ function draw(ctx, s, fx) {
 
   // 家畜
   if (s.flags.ox && kind === "hut") ox(ctx, 36);
-  if (s.st === "bushi") horse(ctx, 38);
+  if (s.st === "bushi" && !s.flags.rodo) horse(ctx, 38);
 
   // 家族
   const age = fx.age != null ? fx.age : s.age;

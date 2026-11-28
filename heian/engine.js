@@ -77,20 +77,21 @@ const STATUS = {
     birth: ["中級貴族（五位）の家の息子", "中級貴族（五位）の家の姫君"] },
   kanjin:  { name: "下級官人", p: 0.008, income: 6.6, upkeep: 5.2, haz: 0.9, sc: 2, w0: 10, official: true,
     birth: ["下級官人の家の息子", "下級官人の家の娘"] },
-  kyomin:  { name: "京の庶民", p: 0.015, income: 2.8, upkeep: 2.4, haz: 1.12, sc: 1, w0: 2,
+  kyomin:  { name: "京の庶民", p: 0.015, wpw: 1.2, income: 2.8, upkeep: 2.4, haz: 1.12, sc: 1, w0: 2,
     birth: ["京の庶民の家の息子", "京の庶民の家の娘"] },
   gozoku:  { name: "地方豪族", p: 0.03, income: 24, upkeep: 17, haz: 0.88, sc: 8, w0: 60,
     birth: ["地方豪族の家の息子", "地方豪族の家の娘"] },
-  gyomin:  { name: "漁民", p: 0.04, income: 2.45, upkeep: 2.05, haz: 1.05, sc: 1, w0: 1,
+  gyomin:  { name: "漁民", p: 0.04, wpw: 1.08, income: 2.45, upkeep: 2.05, haz: 1.05, sc: 1, w0: 1,
     birth: ["海辺の漁民の家の息子", "海辺の漁民の家の娘"] },
   genin:   { name: "下人", p: 0.05, income: 0, upkeep: 0, haz: 1.22, sc: 0, w0: 0,
     birth: ["下人（奴婢）の息子", "下人（奴婢）の娘"] },
-  nomin:   { name: "農民", p: 0, income: 2.5, upkeep: 2.1, haz: 1.0, sc: 1, w0: 1.5,
+  nomin:   { name: "農民", p: 0, wpw: 1.1, income: 2.5, upkeep: 2.1, haz: 1.0, sc: 1, w0: 1.5,
     birth: ["農民の家の息子", "農民の家の娘"] },
   // 途中でなれる身分
   so:      { name: "僧", income: 1.9, upkeep: 1.5, haz: 0.92, sc: 1, w0: 0 },
-  furo:    { name: "浮浪人", income: 1.95, upkeep: 1.7, haz: 1.15, sc: 1, w0: 0 },
-  bushi:   { name: "武士", income: 18, upkeep: 12, haz: 1.0, sc: 6, w0: 0 }
+  furo:    { name: "浮浪人", wpw: 0.92, income: 1.95, upkeep: 1.7, haz: 1.15, sc: 1, w0: 0 },
+  bushi:   { name: "武士", income: 18, upkeep: 12, haz: 1.0, sc: 6, w0: 0 },
+  eji:     { name: "衛士", income: 1.7, upkeep: 1.3, haz: 1.08, sc: 1, w0: 0 }
 };
 (function () {
   let s = 0;
@@ -198,6 +199,7 @@ function curLabel(s) {
   if (isOfficial(s)) return RANKS[s.rank] + (s.juryo > 0 ? "・受領" : "") + (s.rank >= 14 ? "（公卿）" : "");
   if (s.kokumo) return "国母";
   if (s.flags.nyobo) return "女房";
+  if (s.st === "bushi" && s.flags.rodo) return "武士の郎党";
   return STATUS[s.st].name;
 }
 function log(s, t, k, src) { s.yearLogs.push({ age: s.age, year: s.year, t, k: k || "n", src }); }
@@ -209,7 +211,7 @@ function adj(s, o) {
   if (o.toku) s.toku = clamp(s.toku + o.toku, 0, 100);
   if (o.w) s.wealth += o.w;
 }
-function sc(s) { return STATUS[s.st].sc || 1; }
+function sc(s) { if (s.st === "bushi" && s.flags.rodo) return 2; return STATUS[s.st].sc || 1; }
 function fmtW(w) {
   const a = Math.abs(w);
   const v = a >= 100 ? Math.round(a) : (a >= 10 ? a.toFixed(0) : a.toFixed(1));
@@ -314,6 +316,29 @@ function spendFor(s) {
     opt("荒れ地を開墾する", "以後ずっと財↑", 12, (st) => { st.flags.konden = (st.flags.konden || 0) + 1; return ["荒れ地を開墾しました。開いた田は自分のものです（墾田永年私財法のおかげです）。"]; });
     if (!s.flags.kishin && s.year >= 1000) opt("田を貴族に寄進して荘園にする", "国司の取り立てを避ける 財↓", 0, (st) => { st.flags.kishin = 1; return ["田を京の有力貴族に寄進し、荘園にしてもらいました。年貢の一部を上納する代わりに、国司が手を出しにくくなります。"]; });
   }
+  // ---- 財を元手にする ----
+  const notPoor = s.st !== "genin" && s.st !== "furo";
+  if (notPoor && W >= 4 * k) {
+    const amt = Math.round(Math.min(W * 0.5, 20 * k) * 10) / 10;
+    opt("近隣に稲を貸し付ける（私出挙）", "毎年3割ほどの利息 取りはぐれや恨みも", amt, (st) => {
+      st.loans = (st.loans || 0) + amt; adj(st, { toku: -2 });
+      return ["近隣の家々に稲を貸し付けました（私出挙）。稲の私出挙は何度も禁じられていますが、富豪の輩はやめません。あなたもその一人になりました。"];
+    });
+  }
+  if (s.st === "nomin" && !s.flags.tools) opt("鉄の鋤と鍬をそろえる", "以後ずっと財↑", 2, (st) => { st.flags.tools = 1; return ["鉄の鋤と鍬をそろえました。木の鍬とは、土の起き方がまるで違います。"]; });
+  if (s.st === "nomin" && s.year >= 900 && !s.flags.tato) opt("田堵として田を請け負う", "財↑ ただし凶作の年は大損", 3.5, (st) => { st.flags.tato = 1; return ["国衙や荘園の田を請け負って耕す、田堵になりました。人を雇い、種籾を用意する元手が要ります。当たれば大きく、外れれば借金です。"]; });
+  if (["kyomin", "gyomin", "gozoku", "bushi", "kanjin", "kizoku", "kugyo"].includes(s.st) && !(s.st === "bushi" && s.flags.rodo) && W >= 2 * k) {
+    const t = {
+      kyomin: ["東西の市で布と塩を仕入れて売る", "市での商いがうまくいきました。", "市で仕入れた品が売れ残りました。"],
+      gyomin: ["干物と塩を内陸の市へ運んで売る", "干物と塩が、山の村でよく売れました。", "運ぶ途中で荷が傷み、安く手放しました。"],
+      gozoku: ["国府の市で絹と布を売り買いする", "国府の市で、うまく売り抜けました。", "国府の市で、買い叩かれました。"],
+      bushi: ["馬を育てて売る", "育てた馬が、いい値で売れました。", "育てた馬が病で死にました。"]
+    }[s.st] || ["大宰府から届く唐物を買い付けて転売する", "唐物が都でよく売れました。", "買い付けた唐物が、偽物でした。"];
+    const amt = 2 * k;
+    opt(t[0], "1年後に増えるか減るか", amt, (st) => { st.flags.trade = { amt, ok: t[1], ng: t[2] }; return [t[0].replace(/する$/, "") + "ことにしました。結果は一年後です。"]; });
+  }
+  if ((s.st === "nomin" || s.st === "gozoku" || s.st === "gyomin") && !s.flags.kishin && !(s.flags.guard > 0)) opt("国司の館に付け届けをする", "数年は取り立てが緩む", 1.2 * k, (st) => { st.flags.guard = 5; return ["国司の館に絹と米を届けました。しばらくは、取り立てに来る使いの顔つきが穏やかになるはずです。"]; });
+  if (isOfficial(s) && s.rank >= 9 && s.rank <= 13 && s.juryo === 0 && !(s.flags.shinbumi > 0)) opt("除目に向けて申文と贈り物を用意する", "受領の口がかかりやすくなる", 4 * k, (st) => { st.flags.shinbumi = 3; return ["除目を前に、申文（任官の願い書）を書き、有力者に贈り物を届けました。除目のころの都は、申文を持って歩き回る人であふれています。"]; });
   if (isOfficial(s) && s.rank < 16 && s.year >= 900) {
     const cost = Math.max(8, 4 * k) * (s.rank >= 9 ? 3 : 1);
     opt("成功（じょうごう）で官位を買う", "官位↑", cost, (st) => {
@@ -380,13 +405,15 @@ function chComing(s) {
   const m = s.sex === "m";
   const o = [
     { label: "このまま村で暮らす", desc: "家を継ぎ、土地とともに生きる", apply: (st) => { st.flags.coming = 1; return ["村に残ることにしました。生まれた場所で生き、たぶん生まれた場所で死にます。"]; } },
-    { label: "京へ上る", desc: m ? "衛士や雑役として都へ。一旗あげられるか" : "都の貴族の家に下働きとして仕える", apply: (st) => {
+    { label: "京へ上る", desc: m ? "雑役や下働きの口を探しに都へ。一旗あげられるか" : "都の貴族の家に下働きとして仕える", apply: (st) => {
       st.flags.coming = 1; st.region = "kyo"; st.st = "kyomin"; st.wealth = Math.min(st.wealth, 1);
       adj(st, { en: 3 });
       return [m ? "都に上りました。思っていたより、道に死体が多い街でした。" : "都の貴族の家に下働きとして入りました。御簾の内側を見ることは、一度もありませんでした。"];
     } },
     { label: "出家する（私度僧）", desc: "勝手に頭を剃る。税は逃れられる。朝廷は禁止している", apply: (st) => { st.flags.coming = 1; return shukke(st, true); } }
   ];
+  if (m && (s.st === "nomin" || s.st === "gyomin")) o.push({ label: "衛士として都へ上る", desc: "国から選ばれ、宮城の門を守る。数年で帰れるはず", apply: (st) => { st.flags.coming = 1; becomeEji(st); return ["衛士として都へ上ることになりました。夜は宮門で篝火を焚き、昼は門を守ります。"]; } });
+  if (m && (s.st === "nomin" || s.st === "gyomin") && s.year >= 900) o.push({ label: "近くの武士の郎党になる", desc: "弓と馬の世界へ。戦があれば真っ先に危ない", apply: (st) => { st.flags.coming = 1; becomeRodo(st); return ["近くの兵（つわもの）の館に入り、郎党として仕えることになりました。主人の戦は、あなたの戦です。"]; } });
   if (s.st === "gozoku" && m && s.year >= 900) o.push({ label: "兵（つわもの）の道を選ぶ", desc: "一族を率いて武士になる", apply: (st) => { st.flags.coming = 1; st.st = "bushi"; adj(st, { hp: 4, en: 4 }); return ["弓と馬を手に、武士として生きることにしました。この選択が流行るのは、もう少し先のことです。"]; } });
   return branch(s, "人生の分岐点", "数えで" + (s.age + 1) + "。一人前とみなされる年になりました。この先、どう生きますか。", o);
 }
@@ -666,7 +693,7 @@ const EVENTS = [
   { p: 0.11, tag: "good_harvest", block: ["famine", "bad_harvest", "flood", "disaster", "war"], when: (s) => ["nomin", "gozoku"].includes(s.st), src: "『尾張国郡司百姓等解文』（国司による過重な徴収の訴え）", fx: (s) => { adj(s, { w: 0.9 * sc(s) }); log(s, pick(["豊作でした。増えた分は、だいたい国司が持っていきました。", "豊作でした。出挙で借りた稲を、今年は利息ごと返せました。"]), "good"); } },
   { p: 0.055, tag: "bad_harvest", block: ["good_harvest", "flood"], when: (s) => ["nomin", "gozoku", "furo"].includes(s.st), fx: (s) => { s.ytags.add("drought"); adj(s, { w: -1.2 * sc(s), hp: -4 }); log(s, "日照りでした。都の神泉苑では雨乞いの修法が行われたそうです。村には届きませんでした。", "bad"); } },
   { p: 0.055, tag: "bad_harvest", block: ["good_harvest", "drought"], when: (s) => ["nomin", "gozoku", "furo"].includes(s.st), fx: (s) => { s.ytags.add("rain"); adj(s, { w: -1.2 * sc(s), hp: -4 }); log(s, pick(["長雨で稲が腐りました。", "虫の害で、稲が一晩で枯れました。"]), "bad"); } },
-  { p: 0.04, when: (s) => isRural(s) && s.st !== "genin" && !s.flags.kishin && s.st !== "furo", src: "『尾張国郡司百姓等解文』（988年）", fx: (s) => { adj(s, { w: -0.8 * sc(s) }); log(s, pick(["新しい国司が着任しました。前の国司より、取り立てに熱心な方です。", "国司の使いが来て、決まりより多くの稲を取り立てていきました。尾張の百姓が訴えた手口と同じです。"]), "bad"); } },
+  { p: 0.04, when: (s) => isRural(s) && s.st !== "genin" && !s.flags.kishin && s.st !== "furo" && !(s.flags.guard > 0), src: "『尾張国郡司百姓等解文』（988年）", fx: (s) => { adj(s, { w: -0.8 * sc(s) }); log(s, pick(["新しい国司が着任しました。前の国司より、取り立てに熱心な方です。", "国司の使いが来て、決まりより多くの稲を取り立てていきました。尾張の百姓が訴えた手口と同じです。"]), "bad"); } },
   { p: 0.035, when: (s) => (s.st === "nomin" || s.st === "gyomin") && s.sex === "m" && s.age >= 17 && s.age < 60, src: "『養老令』賦役令／延暦14年（795）の雑徭半減", fx: (s) => { adj(s, { hp: -4 }); log(s, "国司のもとでの雑徭（ぞうよう＝年30日までの労役）に駆り出されました。国府の修理と、国司の私用の区別はつきませんでした。", "bad"); } },
   { p: 0.04, tag: "flood", block: ["good_harvest", "drought", "irrigation"], when: (s) => isRural(s), fx: (s) => { adj(s, { w: -0.6 * sc(s) }); log(s, "川があふれ、田が流されました。", "bad"); addRisk(s, 0.008, "洪水", "濁流は、夜に来ました。"); } },
   { p: 0.03, when: (s) => isRural(s) || s.st === "kyomin", src: "『今昔物語集』巻29（本朝付悪行）", fx: (s) => { adj(s, { w: -0.4 * sc(s) }); log(s, "盗賊に入られました。盗られて困るものは、あまりありませんでした。", "bad"); addRisk(s, 0.006, "盗賊に襲われて", "抵抗したのが、まずかったようです。"); } },
@@ -703,6 +730,11 @@ const EVENTS = [
   } },
   { p: 0.04, when: (s) => isOfficial(s) && s.rank < 9, fx: (s) => log(s, "季禄（官人の給与）の支給が、今年も遅れています。国の財政は、平安です。", "bad") },
   { p: 0.05, when: (s) => isOfficial(s) && (s.rank === 9 || s.rank === 10), src: "『今昔物語集』巻26第17話", fx: (s) => log(s, "同僚の五位が「一度でいいから、芋粥を飽きるほど食べてみたい」とこぼしていました。あなたも同じことを思っています。", "n") },
+  // ---- 衛士 ----
+  { p: 0.12, when: (s) => s.st === "eji", src: "大中臣能宣の歌（『詞花和歌集』）", fx: (s) => { adj(s, { hp: -1 }); log(s, "夜通し、宮門で篝火を焚いて番をしました。「みかきもり 衛士のたく火の 夜はもえ」と、のちに貴族が歌に詠む、あの火です。", "n"); } },
+  { p: 0.06, when: (s) => s.st === "eji", fx: (s) => { adj(s, { w: -0.3 }); log(s, "故郷から届くはずの食料が、今年も遅れています。", "bad"); } },
+  // ---- 郎党 ----
+  { p: 0.06, when: (s) => s.st === "bushi" && s.flags.rodo, fx: (s) => { adj(s, { hp: 1, en: 1 }); log(s, pick(["主人の狩りのお供をしました。獲物は主人のものです。", "毎朝、弓の稽古をしています。", "主人の館で、夜の警固につきました。"]), "n"); } },
   // ---- 僧 ----
   { p: 0.06, when: (s) => s.st === "so", src: "『紫式部日記』（中宮彰子の御産の加持）", fx: (s) => { adj(s, { toku: 2, w: 0.3 * sc(s) }); log(s, "貴族の屋敷で、物の怪調伏の加持祈祷をつとめました。物の怪は憑坐（よりまし）に移され、大声でわめいていました。", "n"); } },
   { p: 0.04, when: (s) => s.st === "so" && s.year >= 1086 && s.sex === "m", src: "『平家物語』巻一「願立」", fx: (s) => log(s, "白河法皇が「賀茂川の水、双六の賽、山法師。これぞ我が心にかなわぬもの」と嘆いているそうです。山法師とは、比叡山の僧のことです。", "n") },
@@ -723,11 +755,37 @@ const EVENTS = [
   { p: 0.02, when: (s) => s.age >= 10 && s.region !== "kyo", src: "『日本往生極楽記』", fx: (s) => { adj(s, { toku: 2 }); log(s, "旅の聖（ひじり）が村に来て、念仏を勧めていきました。", "n"); } }
 ];
 
+/* ---------------- 衛士・郎党・成り上がり ---------------- */
+function becomeEji(s) { s.st = "eji"; s.region = "kyo"; s.flags.ejiTerm = 3 + Math.floor(R() * 4); s.flags.ejiEver = 1; }
+function becomeRodo(s) { s.st = "bushi"; s.flags.rodo = 1; s.flags.rodoEver = 1; adj(s, { hp: 2 }); }
+function chEjiEnd(s) {
+  const o = [
+    { label: "故郷の村へ帰る", desc: "元の暮らしに戻る", apply: (st) => { st.st = "nomin"; st.region = st.birthRegion === "kyo" ? "kinai" : st.birthRegion; return ["衛士の務めを終え、故郷へ帰りました。都の話を、村で何度もすることになります。"]; } },
+    { label: "都に残る", desc: "京の庶民として暮らす", apply: (st) => { st.st = "kyomin"; return ["故郷には戻らず、都に残ることにしました。"]; } }
+  ];
+  if (s.year >= 900) o.push({ label: "都の武士に仕える", desc: "郎党になる。腕っぷししだい", apply: (st) => { becomeRodo(st); st.region = "kyo"; return ["門番ぶりを見込まれ、都の武士の郎党になりました。"]; } });
+  return branch(s, "人生の分岐点 ― 衛士の任期明け", "衛士の務めが明けました。この先、どうしますか。", o);
+}
+function chRise(s) {
+  return branch(s, "人生の分岐点 ― 富豪の輩", "貸し付けた稲の利息と、請け負った田の実りで、蔵がいっぱいになりました。村では「富豪の輩」と呼ばれています。", [
+    { label: "人を雇って田を広げ、名を上げる", desc: "地方豪族（大名田堵）になる", apply: (st) => { st.st = "gozoku"; st.flags.risen = 1; adj(st, { en: 6 }); return ["人を雇い、田を広げました。『新猿楽記』の大名田堵のように、農具と牛馬をそろえ、堰と用水を整える身になりました。もう、ただの農民ではありません。"]; } },
+    { label: "今のままでいい", desc: "目立つと国司ににらまれる", apply: () => ["今のままでいることにしました。出る杭は、国司に打たれます。"] }
+  ], "藤原明衡『新猿楽記』（大名田堵）／私出挙の禁令");
+}
+
 /* ---------------- 庶民の小さな出来事（選択式） ---------------- */
 function ev(title, lead, options, src) { return { title, lead, options, src }; }
 function merchant(y) { return y < 907 ? "唐の商人" : (y < 960 ? "唐や呉越の商人" : "宋の商人"); }
 const SMALL = [
-  { id: "kenden", when: (s) => (s.st === "nomin" || s.st === "gozoku") && !s.flags.kishin, build: (s) => ev("検田使が来た", "国司の検田使（田の広さを調べる役人）が村に来ました。", [
+  { id: "rodo", once: true, when: (s) => (s.st === "nomin" || s.st === "gyomin") && s.sex === "m" && s.age >= 16 && s.age <= 35 && s.year >= 900, build: (s) => ev("郎党の誘い", "近くの兵（つわもの）が、腕の立つ若者を郎党として集めています。", [
+    { label: "郎党になる", desc: "武士の世界へ。戦があれば危ない", apply: (st) => { becomeRodo(st); return ["郎党になりました。鍬を弓に持ち替えます。"]; } },
+    { label: "断る", desc: "村で暮らし続ける", apply: () => ["断りました。主人を持つと、主人の敵まで持つことになります。"] }
+  ], "『将門記』（動員された伴類）／『今昔物語集』巻25（兵の話）") },
+  { id: "ejiflee", once: true, when: (s) => s.st === "eji", build: (s) => ev("衛士の逃亡", "同じ衛士の仲間が、夜のうちに逃げようと誘ってきました。", [
+    { label: "一緒に逃げる", desc: "浮浪人になる", apply: (st) => { st.st = "furo"; st.region = pick(["kinai", "saigoku", "togoku"]); return ["夜のうちに都を抜け出しました。戸籍の上では、行方知れずの衛士です。"]; } },
+    { label: "務めを続ける", desc: "任期明けまで耐える", apply: () => ["務めを続けることにしました。翌朝、仲間の姿はありませんでした。"] }
+  ]) },
+  { id: "kenden", when: (s) => (s.st === "nomin" || s.st === "gozoku") && !s.flags.kishin && !(s.flags.guard > 0), build: (s) => ev("検田使が来た", "国司の検田使（田の広さを調べる役人）が村に来ました。", [
     { label: "酒と贈り物でもてなす", desc: "財↓ 田の記録が甘くなるかも", apply: (st) => { adj(st, { w: -0.6 * sc(st) }); if (R() < 0.7) { adj(st, { w: 0.9 * sc(st) }); return ["もてなしました。田の広さは、なぜか少なめに記録されました。"]; } return ["もてなしました。検田使は酒だけ飲んで、田はきっちり測っていきました。"]; } },
     { label: "正直に申告する", desc: "財↓ 何も起きない", apply: (st) => { adj(st, { w: -0.5 * sc(st), toku: 1 }); return ["正直に申告しました。正直者は、きっちり課税されました。"]; } },
     { label: "一部の田を隠す（隠田）", desc: "うまくいけば財↑ ばれたら大変", apply: (st) => { if (R() < 0.6) { adj(st, { w: 0.8 * sc(st) }); return ["田を隠し通しました。隠田の米は、格別の味がしました。"]; } adj(st, { w: -1.5 * sc(st), hp: -8 }); return ["ばれました。罰として、笞（むち）で打たれました。"]; } }
@@ -801,6 +859,46 @@ const SMALL = [
 ];
 
 /* ---------------- 1年の処理 ---------------- */
+/* ---------------- 家計（世帯）と、財を元手にした稼ぎ ---------------- */
+// 庶民は「働き手×1人あたりの稼ぎ − 食べる口」で収支を出す。幼い子が多い時期は赤字になりやすい
+function household(s) {
+  const home = s.children.filter(c => c.alive && !c.out && s.year - c.y >= 0);
+  const spouse = s.married && s.spouseAlive && s.st !== "so" && s.st !== "eji";
+  let workers = s.age >= 60 ? 0.5 : 1, mouths = 1;
+  if (spouse) { workers += s.age >= 60 ? 0.5 : 1; mouths += 1; }
+  for (const c of home) {
+    const a = s.year - c.y;
+    if (a < 10) mouths += 0.45;
+    else if (a < 15) { mouths += 0.7; workers += 0.4; }
+    else { mouths += 1; workers += 1; }
+  }
+  const small = home.filter(c => s.year - c.y < 15).length;
+  let extra = 0;
+  // 貴族は婿取り（妻方で子を育てる）が基本なので、子の養育費は母の側が多く負う
+  if (isNoble(s)) extra = small * (s.sex === "f" ? 3 : 1.5);
+  else if (s.st === "kanjin") extra = small * (s.sex === "f" ? 1.2 : 0.6);
+  else if (s.st === "gozoku" || s.st === "bushi") extra = (spouse ? 1.5 : 0) + small * 0.8;
+  return { workers, mouths, extra, size: 1 + (spouse ? 1 : 0) + home.length };
+}
+function investments(s, tags) {
+  const bad = tags.has("famine") || tags.has("disaster") || tags.has("war");
+  if (s.loans > 0) {
+    s.wealth += s.loans * 0.2;
+    if (R() < (bad ? 0.35 : 0.12)) {
+      const loss = s.loans * rnd(0.2, 0.5); s.loans -= loss;
+      log(s, bad ? "この年の災いで、稲を貸した家々が返せなくなりました。夜逃げした家もあります。" : "稲を貸した家が逃げ、貸した分の一部が戻りませんでした。", "bad");
+    } else if (R() < 0.08) { adj(s, { en: -2 }); log(s, "利息の取り立てに回りました。隣人の目が、年々冷たくなっています。", "n"); }
+  }
+  if (s.flags.trade) {
+    const t = s.flags.trade; s.flags.trade = 0;
+    const back = t.amt * (bad ? rnd(0.2, 1.1) : rnd(0.4, 2.0));
+    s.wealth += back;
+    log(s, back >= t.amt ? t.ok + "（元手 " + fmtW(t.amt) + " 石 → " + fmtW(back) + " 石）" : t.ng + "（元手 " + fmtW(t.amt) + " 石 → " + fmtW(back) + " 石）", back >= t.amt ? "good" : "bad");
+  }
+  if (s.flags.guard > 0) s.flags.guard--;
+  if (s.flags.shinbumi > 0) s.flags.shinbumi--;
+}
+
 function hpMult(s) { return clamp(1.6 - s.hp / 80, 0.45, 1.8); }
 
 function prepareYear(s) {
@@ -836,11 +934,15 @@ function prepareYear(s) {
       s.branchThisYear = true;
     }
     // 受領
-    else if (isOfficial(s) && !(s.flags.exile > 0) && s.rank >= 9 && s.rank <= 13 && s.juryo === 0 && a >= 28 && (s.flags.juryoAsked || -99) <= a - 8 && R() < 0.12 + s.en / 500 + (s.flags.inshin ? 0.12 : 0)) { s.flags.juryoAsked = a; q.push(chJuryo(s)); s.branchThisYear = true; }
+    else if (isOfficial(s) && !(s.flags.exile > 0) && s.rank >= 9 && s.rank <= 13 && s.juryo === 0 && a >= 28 && (s.flags.juryoAsked || -99) <= a - (s.flags.shinbumi > 0 ? 3 : 8) && R() < 0.12 + s.en / 500 + (s.flags.inshin ? 0.12 : 0) + (s.flags.shinbumi > 0 ? 0.25 : 0)) { s.flags.juryoAsked = a; q.push(chJuryo(s)); s.branchThisYear = true; }
     // 結婚
     else if ((!s.married || (!s.spouseAlive && s.flags.widowedAt != null && a - s.flags.widowedAt >= 1)) && s.st !== "so" && a >= (s.sex === "f" ? 13 : 15) && a <= (s.marriages > 0 ? 48 : 40) && !s.kokumo && R() < marryChance(s)) { q.push(chMarry(s)); s.branchThisYear = true; }
+    // 衛士の任期明け
+    else if (s.st === "eji" && s.flags.ejiTerm <= 0) { q.push(chEjiEnd(s)); s.branchThisYear = true; }
+    // 富豪の輩として成り上がる
+    else if (s.st === "nomin" && a >= 20 && !s.flags.riseAsked && s.wealth >= 18 && ((s.loans || 0) >= 5 || s.flags.tato)) { s.flags.riseAsked = 1; q.push(chRise(s)); s.branchThisYear = true; }
     // 庶民の出来事（選択式）
-    else if (a >= 14 && ["nomin", "gyomin", "kyomin", "gozoku", "furo"].includes(s.st) && R() < 0.2) {
+    else if (a >= 14 && ["nomin", "gyomin", "kyomin", "gozoku", "furo", "eji", "bushi"].includes(s.st) && R() < 0.2) {
       const yt = yearTags(s);
       const pool = SMALL.filter(e => e.when(s) && !blocked(e, yt) && !(s.flags["ev_" + e.id] && e.once));
       if (pool.length) { const e = pick(pool); s.flags["ev_" + e.id] = (s.flags["ev_" + e.id] || 0) + 1; q.push(Object.assign({ kind: "event" }, e.build(s))); s.branchThisYear = true; }
@@ -900,24 +1002,30 @@ function runYear(s) {
 
   // 経済
   const d2 = STATUS[s.st];
-  let inc = d2.income * rnd(0.75, 1.25);
+  const hh = household(s);
+  const ecoTags = yearTags(s);
+  let inc, up;
+  const hhMode = !!(d2.wpw && s.age >= 15);
+  if (hhMode) { inc = d2.wpw * hh.workers * rnd(0.75, 1.25); up = hh.mouths; }
+  else { inc = d2.income * rnd(0.75, 1.25); up = d2.upkeep + hh.extra; }
+  if (s.st === "bushi" && s.flags.rodo) { inc = 8 * rnd(0.75, 1.25); up = 6 + hh.extra; }
   if (s.st === "so" && s.flags.nobleMonk) inc = 35 * rnd(0.8, 1.2);
   if (s.st === "kouzoku" && !s.flags.shisei && s.sex === "m") inc = d2.income;
   if (isOfficial(s)) inc += rankIncome(s.rank);
   if (s.juryo > 0) inc += 150 * rnd(0.5, 1.5);
-  if (s.flags.ox) inc += 0.7;
+  if (s.flags.ox) inc += 0.6;
+  if (s.flags.tools) inc += 0.35;
+  if (s.flags.tato) inc += ecoTags.has("famine") || ecoTags.has("disaster") ? -0.8 : 0.9;
   if (s.flags.konden) inc += 3 * s.flags.konden;
   if (s.flags.nyobo) inc += 6;
   if (e.inc) inc *= (1 + e.inc);
   if (e.gamble) inc *= rnd(0.3, 2.0);
-  let up = d2.upkeep;
   if (s.st === "so" && s.flags.nobleMonk) up = 22;
   if (s.juryo > 0) up += 60;
-  const kids = s.children.filter(c => c.alive && s.year - c.y < 15).length;
-  up += kids * (isNoble(s) ? 2 : (s.st === "gozoku" || s.st === "bushi" ? 0.8 : 0.22));
   if (s.flags.kishin) inc *= 0.85;
   if (s.flags.exile > 0) inc *= 0.3;
   s.wealth += inc - up;
+  investments(s, ecoTags);
   if (s.flags.suikoDebt) { s.wealth -= s.flags.suikoDebt; s.flags.suikoDebt = 0; }
   // 出挙（借りの利息）
   if (s.wealth < 0 && s.st !== "genin") {
@@ -927,6 +1035,8 @@ function runYear(s) {
   }
   if (s.st === "genin") s.wealth = 0;
 
+  // 衛士の任期
+  if (s.st === "eji" && s.flags.ejiTerm > 0) s.flags.ejiTerm--;
   // 受領の任期
   if (s.juryo > 0) {
     if (R() < 0.07) { adj(s, { en: -8 }); s.juryo = 0; log(s, "任国の郡司と百姓に、苛政を朝廷へ訴えられました。任期途中で解任です。蓄えた財は、そのまま持ち帰りました。", "bad", "『尾張国郡司百姓等解文』"); }
@@ -941,6 +1051,12 @@ function runYear(s) {
     if (h.epi) epidemic(s, h.epi);
     if (h.fx) h.fx(s);
     if (s.forceDeath) break;
+  }
+  // 郎党の戦（その土地で戦乱がある年）
+  if (s.st === "bushi" && s.flags.rodo && s.ytags.has("war") && !s.forceDeath) {
+    addRisk(s, 0.06, "主人の戦で討たれて", "郎党は、主人より先に前へ出るものでした。");
+    if (R() < 0.3) { s.flags.rodo = 0; s.flags.rodoUp = 1; adj(s, { en: 8, w: 6 }); log(s, "戦で手柄を立て、主人からわずかな所領を与えられました。郎党から、一人前の武士になりました。", "good", "『今昔物語集』巻25（兵の話）"); }
+    else log(s, "主人に従って戦に出ました。生きて帰れただけで十分です。", "bad", "『将門記』（動員された伴類）");
   }
   // 政変の決着
   if (!s.forceDeath) for (const P of POLITICS) if (P.y === s.year) polResolve(s, P);
@@ -1073,6 +1189,25 @@ function family(s) {
       adj(s, { hp: -2 });
     }
   });
+  // 跡取りと、子の独立
+  if (s.st !== "so" && s.st !== "genin") {
+    const grown = s.children.filter(c => c.alive && !c.out && s.year - c.y >= 15);
+    if (grown.length && !s.children.some(c => c.alive && c.heir)) {
+      const h = grown.find(c => c.sex === (isNoble(s) || s.st === "kanjin" ? "m" : "m")) || grown[0];
+      h.heir = 1;
+      const n = s.children.indexOf(h) + 1;
+      if (!isNoble(s)) log(s, kanjiNum(n) + "人目の子を跡取りと決めました。家に残って、一緒に働きます。", "n");
+    }
+    s.children.forEach((c, i) => {
+      if (!c.alive || c.out || c.heir) return;
+      const ca = s.year - c.y;
+      if (ca >= 16 && R() < 0.25) {
+        c.out = 1;
+        const noble = isNoble(s) || s.st === "kanjin";
+        log(s, kanjiNum(i + 1) + "人目の子が" + (noble ? (c.sex === "m" ? "、婿として妻の家に通うようになり、手を離れました。" : "、婿を迎えて自分の対屋で暮らし始めました。") : "独立して、自分の所帯を持ちました。食べる口が一つ減りました。"), "n");
+      }
+    });
+  }
 }
 
 /* ---------------- 進行 API ---------------- */
@@ -1165,6 +1300,11 @@ function epithet(s) {
   if (s.flags.juryoEver && s.wealth > 300) return "倒れても土をつかんだ受領";
   if (s.st === "so") return (s.flags.shido ? "税から逃げた私度" : "仏にすがった") + (s.sex === "m" ? "僧" : "尼");
   if (s.flags.exiledEver && s.rank >= 9) return (s.flags.exileWhy || "政変") + "に敗れた貴族";
+  if (s.flags.risen) return "富を元手に成り上がった豪族";
+  if (s.flags.rodoUp) return "郎党から身を起こした武士";
+  if (s.st === "bushi" && s.flags.rodo) return "主人の戦に生きた郎党";
+  if (s.flags.ejiEver && s.st !== "so") return "都の篝火を見た衛士";
+  if ((s.loans || 0) >= 10) return "利息で肥えた富豪の輩";
   if (s.st === "furo") return "戸籍を捨てた浮浪人";
   if (s.st === "genin") return "名を残さなかった下人";
   if (s.birthStatus === "kanjin" && s.rank === 8) return "五位の壁に阻まれた官人";
