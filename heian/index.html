@@ -375,6 +375,7 @@ button{font-family:inherit;color:inherit;}
         <dt>死因</dt><dd id="kCause"></dd>
         <dt>最後の身分</dt><dd id="kRank"></dd>
         <dt>遺した財</dt><dd id="kZai"></dd>
+        <dt>連れ合い</dt><dd id="kSpouse"></dd>
         <dt>子</dt><dd id="kKids"></dd>
         <dt>史料</dt><dd id="kRecord"></dd>
       </dl>
@@ -448,8 +449,8 @@ button{font-family:inherit;color:inherit;}
 
 <div class="ctrl" id="ctrl" style="display:none">
   <div class="ctrl-in">
-    <button data-sp="slow">ゆっくり</button>
-    <button data-sp="mid" class="on">ふつう</button>
+    <button data-sp="slow" class="on">ゆっくり</button>
+    <button data-sp="mid">ふつう</button>
     <button data-sp="fast">はやい</button>
     <button id="btnPause">一時停止</button>
   </div>
@@ -551,7 +552,7 @@ function startBirth(){
 
 /* ---------- 一生 ---------- */
 const SPEED = { slow: 1100, mid: 520, fast: 140 };
-let speed = "mid", paused = false, timer = null, lastYearRow = -1;
+let speed = "slow", paused = false, timer = null, lastYearRow = -1;
 document.querySelectorAll(".ctrl [data-sp]").forEach(b => b.onclick = () => {
   speed = b.dataset.sp;
   document.querySelectorAll(".ctrl [data-sp]").forEach(x => x.classList.toggle("on", x === b));
@@ -641,7 +642,7 @@ function hud(r){
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
 
 /* ---------- 選択 ---------- */
-const KIND = { plan: "節目", spend: "財の使い道", branch: "人生の分岐点" };
+const KIND = { plan: "節目", spend: "財の使い道", branch: "人生の分岐点", event: "出来事" };
 function openChoice(c){
   $("cKind").textContent = KIND[c.kind] || "";
   $("cTitle").textContent = c.title;
@@ -696,6 +697,7 @@ function finish(){
   $("kCause").querySelector(".d").textContent = r.causeDesc;
   $("kRank").textContent = r.finalLabel;
   $("kZai").textContent = (r.wealth < 0 ? "借財 " : "") + H.fmtW(r.wealth) + " 石" + (r.wealth < 0 ? "（遺族が引き継ぎます）" : "");
+  $("kSpouse").textContent = r.married ? r.married + "人" + (r.married > 1 ? "（再婚" + (r.married - 1) + "回）" : "") : "生涯ひとり";
   $("kKids").textContent = r.kids ? r.kids + "人（うち成人できたのは" + r.grown + "人）" : "なし";
   const rec = recordText(S, r);
   $("kRecord").innerHTML = "<b></b><span class='d'></span>";

@@ -403,10 +403,12 @@ function chMarry(s) {
   if (s.st === "genin") lead = "主人が、あなたの結婚相手を決めてきました。";
   else if (noble) lead = m ? "ある家の姫君と、歌のやりとりが続いています。返事が来るようになりました。" : "毎晩のように恋文（歌）が届く男がいます。字は上手です。顔は、まだ見たことがありません。";
   else lead = m ? "歌垣で気になる相手ができました。" : "夜、戸を叩く男がいます。何度も来ます。";
-  if (s.marriages > 0) lead = "連れ合いを亡くしてしばらく経ちました。" + lead;
+  if (s.marriages > 0) lead = (s.flags.lastLoss === "divorce" ? "連れ合いと別れてしばらく経ちました。" : "連れ合いを亡くしてしばらく経ちました。") + lead;
   return branch(s, "結婚", lead, [
-    { label: s.st === "genin" ? "従う" : "結婚する", desc: "子ができ、家が続く。出産は命がけ", apply: (st) => {
-      st.married = true; st.spouseAlive = true; st.marriages++;
+    { label: s.st === "genin" ? "従う" : (s.marriages > 0 ? "再婚する" : "結婚する"), desc: "子ができ、家が続く。出産は命がけ", apply: (st) => {
+      const again = st.marriages > 0;
+      st.married = true; st.spouseAlive = true; st.marriages++; st.flags.widowedAt = null;
+      if (again && st.st !== "genin") return [noble ? "新しい相手と三日夜餅を食べました。二度目なので、段取りは慣れたものです。" : "新しい連れ合いと所帯を持ちました。この時代、再婚はまったく珍しくありません。"];
       if (st.st === "genin") return ["主人の決めた相手と夫婦になりました。生まれる子も、主人の財産になります。"];
       if (noble) return [m ? "三晩続けて通い、三日夜餅（みかよのもちい）を食べました。これで結婚成立です。" : "三晩通ってきた男と、三日夜餅を食べました。結婚成立です。翌月から、通ってくる日が少し減りました。"];
       return ["夫婦になりました。婚礼といっても、近所に餅を配るくらいです。"];
@@ -552,6 +554,13 @@ const EVENTS = [
   { p: 0.025, when: (s) => s.age >= 6, fx: (s) => log(s, pick([s.region === "kyo" ? "朱雀門のあたりに鬼が出たそうです。正体は、たぶん盗賊です。" : "隣村に鬼が出たそうです。正体は、たぶん盗賊です。", "狐に化かされた、と隣の家の男が言い張っています。周囲は酒のせいだと思っています。", "夜道で百鬼夜行を見た、という人が現れました。"]), "n") },
   { p: 0.035, when: (s) => s.st === "gyomin", fx: (s) => { adj(s, { w: 0.8 }); log(s, "大漁でした。干物にして、調（税）として納めました。", "good"); } },
   { p: 0.03, when: (s) => s.st === "gyomin", fx: (s) => { log(s, "嵐で舟が壊れました。", "bad"); adj(s, { w: -0.8 }); addRisk(s, 0.02, "海難", "嵐の夜、浜に戻ってきたのは舟の板だけでした。"); } },
+  { p: 0.035, when: (s) => isRural(s), fx: (s) => { adj(s, { w: -0.3 * sc(s) }); log(s, pick(["猪が田を荒らしました。", "鹿が稲穂を食べていきました。鹿よけの柵を、村総出で作り直しました。", "猿の群れが畑に下りてきました。"]), "bad"); } },
+  { p: 0.035, when: (s) => isRural(s), fx: (s) => { adj(s, { hp: 2 }); log(s, pick(["子どもたちが田んぼでドジョウをとってきました。今夜はごちそうです。", "山で栗と茸がたくさん採れました。", "川で鮎がよく獲れる年でした。"]), "good"); } },
+  { p: 0.03, when: (s) => isRural(s), fx: (s) => log(s, pick(["田植えの日、田楽の笛と太鼓が鳴り響きました。踊っているほうが、植えているほうより楽しそうです。", "蛍がたくさん飛ぶ夏でした。", "村の長老が「昔はもっと米がとれた」と言っています。毎年言っています。", "夜、盗賊が入らないよう、交代で見張りをしました。", "山の神の祭りで、餅をまきました。"]), "n") },
+  { p: 0.03, when: (s) => isRural(s), fx: (s) => log(s, pick(["行商人が来て、都の噂を話していきました。都では偉い人が、怨霊に悩まされているそうです。", "近くの寺の僧が雨乞いの祈祷をしました。三日後に降りました。僧は祈祷のおかげだと言っています。", "稲刈りのあと、収穫の半分近くが租と出挙の返済で消えました。"]), "n") },
+  { p: 0.04, when: (s) => isRural(s) && (s.region === "togoku" || s.region === "michinoku"), fx: (s) => { adj(s, { hp: -3 }); log(s, pick(["大雪で、家が半分埋まりました。", "冬が長く、蓄えの粟が春までもちませんでした。"]), "bad"); } },
+  { p: 0.015, when: (s) => isRural(s) && (s.region === "togoku" || s.region === "michinoku") && s.age >= 10, fx: (s) => { log(s, "山で熊に出くわしました。", "bad"); addRisk(s, 0.08, "熊に襲われて", "山菜採りの帰りでした。"); } },
+  { p: 0.03, when: (s) => isRural(s) && s.age >= 6, fx: (s) => { adj(s, { hp: -2 }); log(s, "雷が近くの大木に落ちました。村人は、誰の怨霊かで三日ほど揉めました。", "n"); } },
   // 都
   { p: 0.05, when: (s) => s.region === "kyo", fx: (s) => { adj(s, { w: -0.12 * Math.max(0, s.wealth) - 0.2 }); log(s, "近所から火が出ました。平安京は、よく燃える街です。", "bad"); addRisk(s, 0.004, "火事", "煙が先に来ました。"); } },
   { p: 0.04, when: (s) => s.st === "kyomin" && s.age >= 6, fx: (s) => { adj(s, { hp: -4 }); log(s, "貴族の牛車の前で道を開けるのが遅れ、従者に打たれました。", "bad"); } },
@@ -588,6 +597,79 @@ const EVENTS = [
   { p: 0.02, when: (s) => s.age >= 10, fx: (s) => { adj(s, { toku: 2 }); log(s, s.region === "kyo" ? "市の辻で、聖（ひじり）が踊りながら念仏を唱えていました。" : "旅の聖（ひじり）が村に来て、念仏を広めていきました。", "n"); } }
 ];
 
+/* ---------------- 庶民の小さな出来事（選択式） ---------------- */
+function ev(title, lead, options) { return { title, lead, options }; }
+const SMALL = [
+  { id: "kenden", when: (s) => (s.st === "nomin" || s.st === "gozoku") && !s.flags.kishin, build: (s) => ev("検田使が来た", "国司の検田使（田の広さを調べる役人）が村に来ました。", [
+    { label: "酒と贈り物でもてなす", desc: "財↓ 田の記録が甘くなるかも", apply: (st) => { adj(st, { w: -0.6 * sc(st) }); if (R() < 0.7) { adj(st, { w: 0.9 * sc(st) }); return ["もてなしました。田の広さは、なぜか少なめに記録されました。"]; } return ["もてなしました。検田使は酒だけ飲んで、田はきっちり測っていきました。"]; } },
+    { label: "正直に申告する", desc: "財↓ 何も起きない", apply: (st) => { adj(st, { w: -0.5 * sc(st), toku: 1 }); return ["正直に申告しました。正直者は、きっちり課税されました。"]; } },
+    { label: "一部の田を隠す", desc: "うまくいけば財↑ ばれたら大変", apply: (st) => { if (R() < 0.6) { adj(st, { w: 0.8 * sc(st) }); return ["田を隠し通しました。隠し田の米は、格別の味がしました。"]; } adj(st, { w: -1.5 * sc(st), hp: -8 }); return ["ばれました。罰として、むちで打たれました。"]; } }
+  ]) },
+  { id: "mizu", when: (s) => s.st === "nomin" || s.st === "gozoku", build: (s) => ev("水争い", "日照りが続き、隣の家と田の水をめぐって揉めています。", [
+    { label: "水を譲る", desc: "縁↑ 財↓", apply: (st) => { adj(st, { en: 4, w: -0.5 * sc(st) }); return ["水を譲りました。隣の家の稲はよく育ちました。あなたの稲は、それなりでした。"]; } },
+    { label: "夜中にこっそり水を引く", desc: "財↑ 縁↓ 喧嘩になるかも", apply: (st) => { adj(st, { w: 0.6 * sc(st), en: -4 }); if (R() < 0.3) { adj(st, { hp: -8 }); return ["水を引きました。翌朝ばれて、鍬を持った隣人と殴り合いになりました。"]; } return ["こっそり水を引きました。隣の家は、まだ気づいていません。"]; } },
+    { label: "村の長老に裁定を頼む", desc: "結果は長老しだい", apply: (st) => { if (R() < 0.5) { adj(st, { en: 1, w: 0.3 * sc(st) }); return ["長老はあなたの言い分を認めました。日ごろの付け届けのおかげです。"]; } adj(st, { w: -0.3 * sc(st) }); return ["長老は隣の家の言い分を認めました。隣の家の付け届けのほうが多かったようです。"]; } }
+  ]) },
+  { id: "tabiso", when: () => true, build: (s) => ev("旅の僧", "日暮れどき、旅の僧が一夜の宿を求めてきました。", [
+    { label: "泊めてあげる", desc: "徳↑ 財↓", apply: (st) => { adj(st, { toku: 5, w: -0.2 }); if (R() < 0.12) { adj(st, { w: -0.8 }); return ["泊めてあげました。翌朝、僧と一緒に鍋が消えていました。"]; } return ["泊めてあげました。僧は都の話と、ありがたいお経を置いていきました。"]; } },
+    { label: "断る", desc: "徳↓", apply: (st) => { adj(st, { toku: -2 }); return ["断りました。僧は、隣の家に泊まりました。"]; } }
+  ]) },
+  { id: "shoen", once: true, when: (s) => (s.st === "nomin" || s.st === "gozoku") && s.year >= 950 && !s.flags.kishin, build: (s) => ev("荘園への誘い", "近くの荘園の荘官が、「うちの荘園の寄人にならないか」と誘ってきました。", [
+    { label: "荘園の寄人になる", desc: "国司の取り立てを避けられる。年貢は荘園へ", apply: (st) => { st.flags.kishin = 1; return ["荘園の寄人になりました。国司の代わりに、荘園の領主へ年貢を納めます。払う相手が変わっただけ、とも言います。"]; } },
+    { label: "断る", desc: "国の公民のままでいる", apply: () => ["断りました。国司は、あなたのような公民が減って困っているそうです。"] }
+  ]) },
+  { id: "kanbyo", when: () => true, build: (s) => ev("隣家の病人", "隣の家で、ひどい熱の病人が出ました。看病の手が足りないようです。", [
+    { label: "看病する", desc: "徳↑↑ 縁↑ うつるかも", apply: (st) => { adj(st, { toku: 6, en: 4 }); addRisk(st, 0.04, "看病でうつった熱病", "隣の家の病人は、助かりました。"); return ["看病しました。"]; } },
+    { label: "戸を閉ざす", desc: "徳↓", apply: (st) => { adj(st, { toku: -3, en: -2 }); return ["戸を閉ざしました。賢い判断ですが、近所の目は冷たくなりました。"]; } }
+  ]) },
+  { id: "matsuri", when: (s) => s.st !== "furo", build: (s) => ev("秋祭り", "秋祭りで、田楽を踊る役を頼まれました。", [
+    { label: "踊る", desc: "縁↑↑", apply: (st) => { adj(st, { en: 5, hp: -1 }); return ["踊りました。翌年も頼まれることが、その場で決まりました。"]; } },
+    { label: "見物だけする", desc: "縁↑", apply: (st) => { adj(st, { en: 1 }); return ["見物だけしました。"]; } },
+    { label: "酒を飲みすぎる", desc: "縁↑ 体↓", apply: (st) => { adj(st, { en: 3, hp: -3 }); return ["酒を飲みすぎました。翌日の記憶がありません。村の全員が覚えています。"]; } }
+  ]) },
+  { id: "hoko", when: (s) => s.st !== "furo" && s.children.some(c => c.alive && s.year - c.y >= 8 && s.year - c.y <= 14 && !c.out), build: (s) => ev("子の奉公", "豪族の家から、子を下働きによこさないかと話がありました。", [
+    { label: "奉公に出す", desc: "財↑ 子は家を出る", apply: (st) => { const c = st.children.find(c => c.alive && st.year - c.y >= 8 && st.year - c.y <= 14 && !c.out); if (c) c.out = 1; adj(st, { w: 1.5, en: 2 }); return ["米と引き換えに、子が豪族の家へ行きました。年に一度、顔を見に行けます。"]; } },
+    { label: "断る", desc: "子は手元に置く", apply: () => ["断りました。食い扶持は減りませんが、家族は減りません。"] }
+  ]) },
+  { id: "kitsune", when: () => true, build: (s) => ev("罠にかかった狐", "仕掛けた罠に、狐がかかっていました。", [
+    { label: "逃がしてやる", desc: "徳↑", apply: (st) => { adj(st, { toku: 3 }); return [R() < 0.3 ? "逃がしてやりました。後日、戸口に栗が置かれていました。たぶん狐ではなく、隣のおばあさんです。" : "逃がしてやりました。狐は一度だけ振り返りました。"]; } },
+    { label: "皮を売る", desc: "財↑ 徳↓ 祟られるかも", apply: (st) => { adj(st, { w: 0.5, toku: -2 }); if (R() < 0.25) { adj(st, { hp: -5 }); return ["皮を売りました。その夜から、家の者が「狐に憑かれた」と言い出しました。"]; } return ["皮を売りました。いい値がつきました。"]; } }
+  ]) },
+  { id: "unkyaku", when: (s) => s.st === "nomin" && s.sex === "m" && s.year < 960 && s.age < 50, build: (s) => ev("調を都へ運ぶ", "調（布や特産物で納める税）を、都まで背負って運ぶ番が回ってきました。往復でひと月近くかかります。", [
+    { label: "自分で運ぶ", desc: "体↓ 都が見られる 帰り道が危ない", apply: (st) => { adj(st, { hp: -6, en: 2 }); addRisk(st, 0.02, "運脚の帰り道", "食料が尽きたのは、故郷まであと三日のところでした。"); return ["調を背負って都まで運びました。朱雀大路の広さに驚きました。帰りの食料は自分持ちです。"]; } },
+    { label: "人を雇って代わりに行かせる", desc: "財↓", apply: (st) => { adj(st, { w: -1.2 }); return ["米を払って、代わりの者に運ばせました。"]; } },
+    { label: "病と偽って逃れる", desc: "ばれると罰", apply: (st) => { adj(st, { toku: -2 }); if (R() < 0.3) { adj(st, { w: -1, hp: -4 }); return ["仮病がばれました。罰として、余計に納めさせられました。"]; } return ["仮病が通りました。村の別の誰かが、二回運ぶことになりました。"]; } }
+  ]) },
+  { id: "kaikon", once: true, when: (s) => s.st === "nomin", build: (s) => ev("荒れ地の開墾", "村はずれの荒れ地を、村の皆で開こうという話が持ち上がりました。", [
+    { label: "加わる", desc: "体↓ 以後ずっと財↑", apply: (st) => { adj(st, { hp: -5, en: 2 }); st.flags.konden = (st.flags.konden || 0) + 0.15; return ["開墾に加わりました。手のひらの皮が三回むけたころ、新しい田ができました。"]; } },
+    { label: "加わらない", desc: "縁↓", apply: (st) => { adj(st, { en: -3 }); return ["加わりませんでした。新しい田の分け前の話には、呼ばれませんでした。"]; } }
+  ]) },
+  { id: "ichi", when: (s) => s.st !== "kyomin", build: (s) => ev("遠くの市", "麻布と塩を交換しに、国府の近くの市まで行こうか迷っています。", [
+    { label: "市へ行く", desc: "財が増えるか減るか", apply: (st) => { const g = rnd(-0.5, 0.9); adj(st, { w: g, en: 1 }); return [g >= 0 ? "市で、いい取引ができました。" : "市で、よく分からない壺を買わされました。"]; } },
+    { label: "行かない", desc: "変化なし", apply: () => ["行きませんでした。"] }
+  ]) },
+  { id: "fune", when: (s) => s.st === "gyomin", build: (s) => ev("沖の大船", "沖に、見慣れない大きな船が見えます。", [
+    { label: "舟を出して近づく", desc: "宋の商船なら儲け。海賊なら…", apply: (st) => { if (R() < 0.5) { adj(st, { w: 1.5 }); return ["宋の商船でした。魚と引き換えに、珍しい陶器をもらいました。"]; } adj(st, { w: -0.8 }); addRisk(st, 0.06, "海賊に襲われて", "大きな船は、商船ではありませんでした。"); return ["海賊船でした。"]; } },
+    { label: "浜に隠れる", desc: "何もしない", apply: () => ["浜の岩陰に隠れて、船が去るのを待ちました。"] }
+  ]) },
+  { id: "shio", when: (s) => s.st === "gyomin", build: (s) => ev("塩焼き", "浜で塩を焼く仕事を手伝わないかと誘われました。", [
+    { label: "手伝う", desc: "財↑ 体↓", apply: (st) => { adj(st, { w: 0.8, hp: -3 }); return ["海水を煮詰めて、塩を焼きました。煙が目にしみました。"]; } },
+    { label: "断る", desc: "変化なし", apply: () => ["断りました。"] }
+  ]) },
+  { id: "rajomon", once: true, when: (s) => s.region === "kyo", build: (s) => ev("羅城門の噂", "荒れ果てた羅城門の楼上に、夜な夜な何かがいるという噂です。", [
+    { label: "見に行く", desc: "怖いもの見たさ", apply: (st) => { adj(st, { toku: -1, en: 1 }); return ["楼上では、老婆が死人の髪を抜いていました。かつらにして売るのだそうです。"]; } },
+    { label: "やめておく", desc: "近づかない", apply: () => ["やめておきました。賢明です。"] }
+  ]) },
+  { id: "utage", when: (s) => s.region === "kyo", build: (s) => ev("屋敷の下働き", "貴族の屋敷で、宴の下働きの人手を探しています。", [
+    { label: "働きに行く", desc: "財↑", apply: (st) => { adj(st, { w: 0.6 }); return [R() < 0.4 ? "働きました。帰りに、宴の残りの唐菓子をもらいました。" : "働きました。宴の間じゅう、庭で松明を持って立っていました。"]; } },
+    { label: "行かない", desc: "変化なし", apply: () => ["行きませんでした。"] }
+  ]) },
+  { id: "mikkoku", when: (s) => s.region === "kyo", build: (s) => ev("検非違使の手先", "検非違使の手先（放免）が、盗人の居場所を教えれば褒美をやると言っています。心当たりがあります。", [
+    { label: "教える", desc: "財↑ 縁↓ 恨まれるかも", apply: (st) => { adj(st, { w: 1, en: -3 }); addRisk(st, 0.02, "密告の報復", "夜道で、後ろから声をかけられました。"); return ["教えました。褒美の米は、思ったより少なめでした。"]; } },
+    { label: "黙っている", desc: "変化なし", apply: () => ["黙っていました。この街では、それが長生きの秘訣です。"] }
+  ]) }
+];
+
 /* ---------------- 1年の処理 ---------------- */
 function hpMult(s) { return clamp(1.6 - s.hp / 80, 0.45, 1.8); }
 
@@ -620,7 +702,12 @@ function prepareYear(s) {
     // 受領
     else if (isOfficial(s) && s.rank >= 9 && s.rank <= 13 && s.juryo === 0 && a >= 28 && (s.flags.juryoAsked || -99) <= a - 8 && R() < 0.12 + s.en / 500) { s.flags.juryoAsked = a; q.push(chJuryo(s)); s.branchThisYear = true; }
     // 結婚
-    else if (!s.married && s.st !== "so" && a >= (s.sex === "f" ? 13 : 15) && a <= 40 && !s.kokumo && R() < marryChance(s)) { q.push(chMarry(s)); s.branchThisYear = true; }
+    else if ((!s.married || (!s.spouseAlive && s.flags.widowedAt != null && a - s.flags.widowedAt >= 1)) && s.st !== "so" && a >= (s.sex === "f" ? 13 : 15) && a <= (s.marriages > 0 ? 48 : 40) && !s.kokumo && R() < marryChance(s)) { q.push(chMarry(s)); s.branchThisYear = true; }
+    // 庶民の出来事（選択式）
+    else if (a >= 14 && ["nomin", "gyomin", "kyomin", "gozoku", "furo"].includes(s.st) && R() < 0.2) {
+      const pool = SMALL.filter(e => e.when(s) && !(s.flags["ev_" + e.id] && e.once));
+      if (pool.length) { const e = pick(pool); s.flags["ev_" + e.id] = (s.flags["ev_" + e.id] || 0) + 1; q.push(Object.assign({ kind: "event" }, e.build(s))); s.branchThisYear = true; }
+    }
     // 晩年の出家
     else if (s.st !== "so" && a >= 50 && a % 5 === 2 && R() < 0.45) {
       q.push(branch(s, "人生の分岐点 ― 出家", "数えで" + (a + 1) + "。白髪も増え、来世のことを考えるようになりました。", [
@@ -630,31 +717,31 @@ function prepareYear(s) {
       s.branchThisYear = true;
     }
     // 連れ合いと死別後の出家
-    else if (s.married && !s.spouseAlive && s.st !== "so" && s.flags.widowedAt === a - 1 && a >= 30 && R() < 0.5) {
+    else if (s.married && !s.spouseAlive && s.flags.lastLoss === "death" && s.st !== "so" && s.flags.widowedAt === a - 1 && a >= 30 && R() < 0.5) {
       q.push(branch(s, "人生の分岐点", "連れ合いの四十九日が明けました。", [
         { label: "出家して菩提を弔う", desc: "徳↑↑", apply: (st) => shukke(st, false) },
-        { label: "俗世で生きていく", desc: "再婚もありうる", apply: (st) => { st.married = false; return ["俗世で生きていくことにしました。"]; } }
+        { label: "俗世で生きていく", desc: "再婚もありうる", apply: (st) => ["俗世で生きていくことにしました。"] }
       ]));
       s.branchThisYear = true;
     }
   }
   // 節目：過ごし方と財の使い道
   if (isMilestone(a)) {
+    q.push(() => {
     const plans = plansFor(s);
-    q.push({
+    return {
       kind: "plan", title: "これからの過ごし方", lead: "数えで" + (a + 1) + "。この先" + (a < 15 ? "しばらく" : "の数年") + "を、どう過ごしますか。",
       options: plans.map(p => ({ label: p.label, desc: p.desc, apply: (st) => { st.plan = p; st.planAge = st.age; return ["この先しばらくは「" + p.label + "」と決めました。"]; } }))
+    };
     });
-    if (a >= 15 && s.st !== "genin" && !(s.st === "so" && s.flags.shido && s.wealth < 1)) {
-      q.push({ kind: "spend", title: "財の使い道", lead: "手元の財は " + fmtW(s.wealth) + " 石ほど。どう使いますか。", options: spendFor(s) });
-    }
+    if (a >= 15) q.push(() => (s.st !== "genin" && !(s.st === "so" && s.flags.shido && s.wealth < 1)) ? { kind: "spend", title: "財の使い道", lead: "手元の財は " + fmtW(s.wealth) + " 石ほど。どう使いますか。", options: spendFor(s) } : null);
   }
 }
 
 function marryChance(s) {
   let p = 0.12 + s.en / 400 + (s.plan && s.plan.eff.marry ? s.plan.eff.marry : 0);
   if (s.flags.wantMarry) p += 0.15;
-  if (s.marriages > 0) p *= 0.6;
+  if (s.marriages > 0) p *= 0.85;
   if (s.age > 30) p *= 0.6;
   if (s.st === "genin") p = 0.1;
   return clamp(p, 0, 0.7);
@@ -797,8 +884,13 @@ function family(s) {
   // 配偶者
   if (s.married && s.spouseAlive) {
     if (R() < 0.022 + (s.age > 45 ? 0.02 : 0)) {
-      s.spouseAlive = false; s.flags.widowedAt = s.age;
+      s.spouseAlive = false; s.flags.widowedAt = s.age; s.flags.lastLoss = "death";
       log(s, (s.sex === "m" ? "妻" : "夫") + "が亡くなりました。", "bad"); adj(s, { hp: -3 });
+    } else if (s.age < 45 && s.st !== "genin" && R() < 0.014) {
+      s.spouseAlive = false; s.flags.widowedAt = s.age; s.flags.lastLoss = "divorce";
+      const noble = isNoble(s) || s.st === "kanjin";
+      log(s, noble ? (s.sex === "f" ? "夫が通ってこなくなりました。この時代、それがそのまま離婚です。" : "妻の家から、もう通ってこなくてよいと言われました。離婚です。") : "連れ合いが、別の村の誰かのところへ行ってしまいました。", "bad");
+      adj(s, { en: -2 });
     } else {
       // 出産
       const fertile = s.sex === "f" ? (s.age >= 14 && s.age <= 42) : (s.age >= 16 && s.age <= 60);
@@ -812,7 +904,7 @@ function family(s) {
           adj(s, { hp: -2 });
         } else {
           log(s, kanjiNum(n) + "人目の子（" + (sex === "m" ? "男" : "女") + "）が生まれました。", "good");
-          if (R() < 0.016) { s.spouseAlive = false; s.flags.widowedAt = s.age; log(s, "妻はお産のあと、そのまま亡くなりました。", "bad"); }
+          if (R() < 0.016) { s.spouseAlive = false; s.flags.widowedAt = s.age; s.flags.lastLoss = "death"; log(s, "妻はお産のあと、そのまま亡くなりました。", "bad"); }
         }
       }
     }
@@ -832,13 +924,23 @@ function family(s) {
 
 /* ---------------- 進行 API ---------------- */
 // 戻り値: {choice} | {logs, dead}
+function headChoice(s) {
+  while (s.queue.length) {
+    if (typeof s.queue[0] === "function") s.queue[0] = s.queue[0]();
+    if (s.queue[0]) return s.queue[0];
+    s.queue.shift();
+  }
+  return null;
+}
 function advance(s) {
   if (!s.alive) return { dead: true, logs: [] };
-  if (s.queue.length) return { choice: s.queue[0] };
+  let c = headChoice(s);
+  if (c) return { choice: c };
   if (!s.prepared) {
     s.prepared = true;
     prepareYear(s);
-    if (s.queue.length) return { choice: s.queue[0] };
+    c = headChoice(s);
+    if (c) return { choice: c };
   }
   s.yearLogs = s.pendingLogs || [];
   s.pendingLogs = [];
