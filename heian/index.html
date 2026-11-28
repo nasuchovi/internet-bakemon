@@ -170,7 +170,7 @@ button{font-family:inherit;color:inherit;}
 .zai .v.neg{color:var(--shu);}
 .zai .v small{font-size:11px;font-weight:600;color:var(--ink-soft);margin-left:2px;}
 
-.log{padding:12px 16px 120px;min-height:55vh;}
+.log{padding:12px 16px 230px;min-height:55vh;}
 .row{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:6px 0;font-size:14.5px;animation:rowin .35s ease;}
 @keyframes rowin{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
 .row .a{font-size:11.5px;color:var(--ink-faint);padding-top:3px;letter-spacing:.02em;white-space:nowrap;font-variant-numeric:tabular-nums;}
@@ -193,7 +193,16 @@ button{font-family:inherit;color:inherit;}
   background:linear-gradient(to top, var(--bg) 60%, rgba(230,219,195,0));
   pointer-events:none;
 }
-.ctrl-in{display:flex;gap:6px;max-width:532px;width:100%;pointer-events:auto;}
+.ctrl-col{display:flex;flex-direction:column;gap:6px;max-width:532px;width:100%;pointer-events:auto;}
+.ctrl-in{display:flex;gap:6px;width:100%;}
+.plan-bar{background:var(--paper);border:1px solid var(--rule);padding:7px 8px 8px;box-shadow:0 -4px 14px -8px rgba(60,40,20,.35);}
+.plan-now{font-size:12px;color:var(--ink);line-height:1.5;margin-bottom:6px;}
+.plan-now .cap{font-size:10.5px;letter-spacing:.2em;color:var(--shu);font-weight:700;margin-right:8px;}
+.plan-now small{color:var(--ink-soft);margin-left:4px;}
+.chips{display:flex;flex-wrap:wrap;gap:5px;}
+.chips button{font-size:12.5px;font-weight:700;padding:6px 9px;background:var(--paper2);border:1px solid var(--rule);cursor:pointer;letter-spacing:.03em;line-height:1.3;}
+.chips button[aria-pressed="true"]{background:var(--ai);color:var(--paper);border-color:var(--ai);}
+.chips button:focus-visible{outline:2px solid var(--shu);outline-offset:1px;}
 .ctrl button{
   flex:1;padding:10px 4px;font-size:13px;font-weight:700;letter-spacing:.08em;
   background:var(--paper);border:1px solid var(--ink-soft);cursor:pointer;
@@ -489,11 +498,17 @@ button{font-family:inherit;color:inherit;}
 </div>
 
 <div class="ctrl" id="ctrl" style="display:none">
+  <div class="ctrl-col">
+  <div class="plan-bar" id="planBar" hidden>
+    <p class="plan-now"><span class="cap">過ごし方</span><span id="planNow"></span></p>
+    <div class="chips" id="chips" role="group" aria-label="過ごし方を選ぶ"></div>
+  </div>
   <div class="ctrl-in">
     <button data-sp="slow" class="on">ゆっくり</button>
     <button data-sp="mid">ふつう</button>
     <button data-sp="fast">はやい</button>
     <button id="btnPause">一時停止</button>
+  </div>
   </div>
 </div>
 
@@ -618,7 +633,7 @@ function togglePause(){
   if (!paused) schedule(80);
 }
 $("btnLive").onclick = () => {
-  $("log").innerHTML = ""; $("log")._lastAge = undefined;
+  $("log").innerHTML = ""; $("log")._lastAge = undefined; $("chips")._key = "";
   lastYearRow = -1;
   paused = false; $("btnPause").textContent = "一時停止"; $("btnPause").classList.remove("on");
   show("life");
@@ -702,6 +717,29 @@ function addRow(l, target){
   }
 }
 
+function renderPlans(){
+  const bar = $("planBar");
+  const opts = S && S.alive ? H.planOptions(S) : [];
+  bar.hidden = !opts.length;
+  if (!opts.length) return;
+  const cur = S.plan ? S.plan.id : null;
+  const now = opts.find(o => o.id === cur);
+  $("planNow").innerHTML = "";
+  $("planNow").append(document.createTextNode(now ? now.label : "（まだ決めていません）"));
+  if (now) { const sm = document.createElement("small"); sm.textContent = now.desc; $("planNow").append(sm); }
+  const box = $("chips");
+  const key = opts.map(o => o.id).join(",") + "|" + cur;
+  if (box._key === key) return;
+  box._key = key;
+  box.innerHTML = "";
+  opts.forEach(o => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = o.short; b.title = o.label + "：" + o.desc;
+    b.setAttribute("aria-pressed", o.id === cur ? "true" : "false");
+    b.onclick = () => { const l = H.setPlan(S, o.id); if (l) addRow(l); renderPlans(); };
+    box.appendChild(b);
+  });
+}
 function hud(r){
   const age = r && r.age != null ? r.age : S.age, year = r && r.year != null ? r.year : S.year;
   $("hAge").textContent = age + 1;
@@ -711,6 +749,7 @@ function hud(r){
   $("hWho").textContent = H.curLabel(S) + (S.married && S.spouseAlive ? "・既婚" : "") + (S.children.filter(c => c.alive).length ? "・子" + S.children.filter(c => c.alive).length + "人" : "");
   const set = (k, v) => { $("v" + k).textContent = Math.round(v); $("f" + k).style.width = clamp(v, 0, 100) + "%"; };
   set("Hp", S.hp); set("Sai", S.sai); set("En", S.en); set("Toku", S.toku);
+  renderPlans();
   const z = $("vZai");
   z.innerHTML = H.fmtW(S.wealth) + "<small>石</small>";
   z.classList.toggle("neg", S.wealth < 0);

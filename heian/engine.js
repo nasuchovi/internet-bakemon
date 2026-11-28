@@ -288,6 +288,44 @@ function plansFor(s) {
   if (s.st === "gozoku" && m) o.push({ id: "p_bu", label: "武芸を磨く（兵の道）", desc: "体↑ 縁↑ 武士への道", eff: { hp: 1, en: 1.5, bu: 1 } });
   return o;
 }
+const PLAN_SHORT = {
+  g_serve: "主人に尽くす", g_work: "黙々と働く", g_run: "逃げる準備",
+  c_kanseki: "漢籍を学ぶ", c_waka: "和歌と管弦", c_help: "親の手伝い", c_run: "野山で遊ぶ", c_tera: "寺で経を習う",
+  s_gyo: "修行", s_kaji: "加持祈祷", s_nen: "念仏", s_sohei: "強訴に加わる",
+  f_sho: "荘園で働く", f_hijiri: "托鉢", f_tou: "群盗",
+  b_bu: "弓馬の道", b_ryo: "所領の経営", b_kyo: "権門に仕える",
+  n_work: "真面目に出仕", n_kenmon: "摂関家に取り入る", n_kanshi: "漢詩文", n_koi: "恋と和歌", n_imi: "物忌みで休む", n_bud: "仏道",
+  nf_nyobo: "宮仕え", nf_mono: "物語", nf_otoko: "男の品定め", nf_bud: "仏道",
+  p_mid: "ほどほどに働く", p_tera: "寺通い", p_sea: "遠くの漁場", p_ichi: "市で商い", p_bu: "武芸を磨く"
+};
+function planShort(p, s) {
+  if (p.id === "c_play") return s.sex === "m" ? "蹴鞠と遊び" : "雛遊び";
+  if (p.id === "p_hard") return s.st === "gozoku" ? "田を広げる" : "ひたすら働く";
+  if (p.id === "p_utagaki") return s.sex === "m" ? "妻問い" : "相手を待つ";
+  return PLAN_SHORT[p.id] || p.label;
+}
+// 過ごし方はいつでも変えられる（画面下のボタン）。年齢や身分が変わって選べなくなったら、自動で切り替える
+function planOptions(s) {
+  if (!s.alive || s.age < 6) return [];
+  return plansFor(s).map(p => Object.assign({}, p, { short: planShort(p, s) }));
+}
+function setPlan(s, id) {
+  const p = plansFor(s).find(x => x.id === id);
+  if (!p || (s.plan && s.plan.id === id)) return null;
+  s.plan = p; s.planAge = s.age;
+  const l = { age: s.age, year: s.year, t: "過ごし方を「" + p.label + "」に変えました。", k: "choice" };
+  s.logs.push(l);
+  return l;
+}
+function ensurePlan(s) {
+  const opts = planOptions(s);
+  if (!opts.length) return;
+  if (s.plan && opts.some(p => p.id === s.plan.id)) return;
+  const first = !s.plan;
+  const def = opts.find(p => p.id === "p_mid") || opts.find(p => p.id === "n_work") || opts[0];
+  s.plan = plansFor(s).find(p => p.id === def.id);
+  log(s, first ? "これからの過ごし方は「" + def.label + "」。画面下のボタンで、いつでも変えられます。" : "暮らしが変わったので、過ごし方を「" + def.label + "」にしました。", "choice");
+}
 function isMilestone(a) { return a === 6 || a === 12 || (a >= 15 && a % 5 === 0); }
 
 /* ---------------- 財の使い道（節目ごと） ---------------- */
@@ -966,13 +1004,6 @@ function prepareYear(s) {
   }
   // 節目：過ごし方と財の使い道
   if (isMilestone(a)) {
-    q.push(() => {
-    const plans = plansFor(s);
-    return {
-      kind: "plan", title: "これからの過ごし方", lead: "数えで" + (a + 1) + "。この先" + (a < 15 ? "しばらく" : "の数年") + "を、どう過ごしますか。",
-      options: plans.map(p => ({ label: p.label, desc: p.desc, apply: (st) => { st.plan = p; st.planAge = st.age; return ["この先しばらくは「" + p.label + "」と決めました。"]; } }))
-    };
-    });
     if (a >= 15) q.push(() => (s.st !== "genin" && !(s.st === "so" && s.flags.shido && s.wealth < 1)) ? { kind: "spend", title: "財の使い道", lead: "手元の財は " + fmtW(s.wealth) + " 石ほど。どう使いますか。", options: spendFor(s) } : null);
   }
 }
@@ -988,6 +1019,7 @@ function marryChance(s) {
 
 function runYear(s) {
   s.risks = s.risks || [];
+  ensurePlan(s);
   const a = s.age, e = (s.plan && s.plan.eff) || {};
   const before = { hp: s.hp, sai: s.sai, en: s.en, toku: s.toku };
 
@@ -1343,6 +1375,7 @@ function autoLife(opt) {
   const s = newLife(opt);
   let guard = 0;
   while (s.alive && guard++ < 2000) {
+    if (isMilestone(s.age) && s.flags._autoPlan !== s.age) { s.flags._autoPlan = s.age; const o = planOptions(s); if (o.length) setPlan(s, pick(o).id); }
     const r = advance(s);
     if (r.choice) {
       const ok = r.choice.options.map((o, i) => o.disabled ? -1 : i).filter(i => i >= 0);
@@ -1366,7 +1399,7 @@ function simulate(n, opt) {
 // node 側で wpick の regions 用に k を返せるよう調整
 const api = {
   newLife, advance, choose, summary, simulate, autoLife, wareki, REGION, STATUS, RANKS,
-  curLabel, fmtW, kanjiNum, isMilestone
+  curLabel, fmtW, kanjiNum, isMilestone, planOptions, setPlan
 };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.Heian = api;
