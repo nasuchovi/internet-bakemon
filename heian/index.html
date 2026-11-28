@@ -149,6 +149,7 @@ button{font-family:inherit;color:inherit;}
   border-bottom:1px solid var(--rule);
   padding:12px 16px 10px;
 }
+.scene{display:block;width:100%;max-width:400px;margin:0 auto 8px;aspect-ratio:2/1;image-rendering:pixelated;image-rendering:crisp-edges;border:1px solid var(--rule);background:var(--paper3);}
 .hud-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;}
 .hud-age{font-size:26px;font-weight:800;letter-spacing:.04em;line-height:1.1;}
 .hud-age small{font-size:12px;font-weight:600;color:var(--ink-soft);margin-right:3px;letter-spacing:.1em;}
@@ -235,15 +236,17 @@ button{font-family:inherit;color:inherit;}
 .kako-head{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:4px;}
 .kako-head h2{font-size:28px;font-weight:800;letter-spacing:.5em;}
 .kako-head .no{font-size:11px;color:var(--ink-soft);letter-spacing:.1em;text-align:right;}
+.kscene-wrap{position:relative;max-width:400px;margin:14px auto 0;}
+.kscene-wrap .scene{margin:0;}
 .ojo-stamp{
-  position:absolute;right:10px;top:84px;width:86px;height:86px;font-size:20px;line-height:1.15;text-align:center;
+  position:absolute;right:-6px;bottom:-34px;width:86px;height:86px;font-size:20px;line-height:1.15;text-align:center;
   border-radius:50%;border-width:3px;
   animation:stampin .5s cubic-bezier(.2,1.6,.4,1) .6s both;
 }
 .ojo-stamp.jigoku{color:#3d2a2a;border-color:#3d2a2a;background:rgba(40,20,20,.05);}
 .ojo-stamp.rinne{color:var(--ai);border-color:var(--ai);background:rgba(47,77,110,.05);}
 @keyframes stampin{from{transform:scale(2.2) rotate(-20deg);opacity:0;}to{transform:scale(1) rotate(-10deg);opacity:1;}}
-.epithet{font-size:clamp(21px,6vw,27px);font-weight:800;letter-spacing:.05em;margin:18px 96px 6px 0;line-height:1.45;}
+.epithet{font-size:clamp(21px,6vw,27px);font-weight:800;letter-spacing:.05em;margin:16px 92px 6px 0;line-height:1.45;}
 .epithet::before{content:"『";}
 .epithet::after{content:"』";}
 .kv{display:grid;grid-template-columns:76px 1fr;border-top:1px solid var(--rule);margin-top:12px;}
@@ -347,6 +350,7 @@ button{font-family:inherit;color:inherit;}
   <section id="screen-life" class="screen">
     <div class="sheet">
       <div class="hud">
+        <canvas id="scene" class="scene" width="128" height="64" role="img" aria-label="暮らしの様子"></canvas>
         <div class="hud-top">
           <div class="hud-age"><small>数え</small><span id="hAge">1</span><small style="margin-left:2px">歳</small></div>
           <div class="hud-when"><b id="hWareki"></b>（<span id="hYear"></span>）<br><span id="hRegion"></span></div>
@@ -368,7 +372,10 @@ button{font-family:inherit;color:inherit;}
   <section id="screen-death" class="screen">
     <div class="sheet kako">
       <div class="kako-head"><h2>過去帳</h2><div class="no" id="kNo"></div></div>
-      <span class="stamp ojo-stamp" id="kOjo">極楽往生</span>
+      <div class="kscene-wrap">
+        <canvas id="kScene" class="scene" width="128" height="64" role="img" aria-label="最期の情景"></canvas>
+        <span class="stamp ojo-stamp" id="kOjo">極楽往生</span>
+      </div>
       <p class="epithet" id="kEpithet"></p>
       <dl class="kv">
         <dt>生</dt><dd id="kBirth"></dd>
@@ -462,6 +469,7 @@ button{font-family:inherit;color:inherit;}
           <li>「財」は米の石高に換算したゲーム上の単位です。当時の一石は現代の一石より小さく、正確な換算ではありません。</li>
           <li>年齢は数え年で表示しています（生まれた年が1歳）。</li>
           <li>辞世の歌は、このゲームのための創作です。</li>
+          <li>ドット絵はこのゲームのための描き下ろしです。貴族の男性の服の色は『養老令』衣服令の位色（一位は深紫、二・三位は浅紫、四位は深緋、五位は浅緋、六位は深緑、七位は浅緑、八位は深縹、初位は浅縹）に合わせ、1000年以降は四位以上を黒とする平安中期の慣行に合わせています。</li>
           <li>説話や日記の逸話は、その時代の空気を伝える「典拠」として示しています。実際に誰の身にも起きたことを保証するものではありません。</li>
           <li>典拠の巻・段・条は、底本によって番号が異なることがあります。</li>
         </ul>
@@ -491,9 +499,10 @@ button{font-family:inherit;color:inherit;}
   </div>
 </div>
 
-<canvas id="cardCanvas" width="1080" height="1500"></canvas>
+<canvas id="cardCanvas" width="1080" height="1960"></canvas>
 
 <script src="engine.js"></script>
+<script src="pixel.js"></script>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -598,9 +607,32 @@ $("btnLive").onclick = () => {
   show("life");
   addRow(S.logs[0]);
   hud();
+  sceneFx = {}; sceneAge = 0; sceneYear = S.year; sceneDead = false;
+  drawScene(0); startSceneLoop();
   schedule(600);
 };
 function schedule(ms){ clearTimeout(timer); timer = setTimeout(tick, ms); }
+
+/* ---------- ドット絵 ---------- */
+const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+let sceneFx = {}, sceneAge = 0, sceneYear = 0, sceneDead = false, rafOn = false, lastDraw = 0;
+function setScene(r){
+  if (r && r.logs) sceneFx = HeianPixel.fxFromLogs(r.logs);
+  if (r && r.age != null) { sceneAge = r.age; sceneYear = r.year; }
+  sceneDead = !!(r && r.dead);
+  drawScene(performance.now());
+}
+function drawScene(now){
+  if (!S) return;
+  const c = $("scene").getContext("2d");
+  HeianPixel.draw(c, S, Object.assign({}, sceneFx, { t: REDUCE ? 0 : now, age: sceneAge, year: sceneYear, dead: sceneDead }));
+}
+function sceneLoop(now){
+  if (!rafOn) return;
+  if (now - lastDraw > 90) { lastDraw = now; if ($("screen-life").classList.contains("active")) drawScene(now); }
+  requestAnimationFrame(sceneLoop);
+}
+function startSceneLoop(){ if (rafOn || REDUCE) return; rafOn = true; requestAnimationFrame(sceneLoop); }
 
 const FILLER = {
   infant: ["すくすく育っています。今のところは。", "まだ生きています。", "よく泣き、よく乳を飲みました。", "熱を出しましたが、下がりました。"],
@@ -630,6 +662,7 @@ function tick(){
   }
   logs.forEach(l => addRow(l));
   hud(r);
+  setScene(r);
   if (r.dead) { setTimeout(finish, 1400); return; }
   schedule(logs.length ? SPEED[speed] * (logs.length > 1 ? 1.25 : 1) : SPEED[speed] * 0.35);
 }
@@ -687,6 +720,7 @@ function openChoice(c){
       $("choiceBg").classList.remove("show");
       H.choose(S, i);
       hud();
+      drawScene(performance.now());
       schedule(280);
     };
     box.appendChild(b);
@@ -714,6 +748,7 @@ function finish(){
   o.innerHTML = r.ojo.t.slice(0, 2) + "<br>" + r.ojo.t.slice(2);
   o.className = "stamp ojo-stamp " + r.ojo.k;
   $("kEpithet").textContent = r.epithet;
+  HeianPixel.draw($("kScene").getContext("2d"), S, { t: 0, age: S.age, year: S.year, dead: true });
   $("kBirth").innerHTML = "<b></b><span class='d'></span>";
   $("kBirth").querySelector("b").textContent = r.birthWareki + "（" + r.birthYear + "年）";
   $("kBirth").querySelector(".d").textContent = r.region + "の" + r.birthLabel + "として　※約" + fmtInt(r.odds) + "人に1人";
@@ -838,7 +873,12 @@ function drawCard(r){
   c.restore();
   // 二つ名
   c.fillStyle = INK; c.textAlign = "left";
-  let y = wrap(c, "『" + r.epithet + "』", L, 380, Rr - L, 66, "800 54px " + MIN);
+  const off = document.createElement("canvas"); off.width = 128; off.height = 64;
+  HeianPixel.draw(off.getContext("2d"), S, { t: 0, age: S.age, year: S.year, dead: true });
+  c.imageSmoothingEnabled = false;
+  c.drawImage(off, L, 318, Rr - L, (Rr - L) / 2);
+  c.strokeStyle = RULE; c.lineWidth = 2; c.strokeRect(L, 318, Rr - L, (Rr - L) / 2);
+  let y = wrap(c, "『" + r.epithet + "』", L, 318 + (Rr - L) / 2 + 100, Rr - L, 66, "800 54px " + MIN);
   y += 44;
   const rows = [
     ["生", r.birthWareki + "（" + r.birthYear + "年）", r.region + "の" + r.birthLabel + "　約" + fmtInt(r.odds) + "人に1人"],

@@ -915,7 +915,7 @@ function family(s) {
   // 配偶者
   if (s.married && s.spouseAlive) {
     if (R() < 0.022 + (s.age > 45 ? 0.02 : 0)) {
-      s.spouseAlive = false; s.flags.widowedAt = s.age; s.flags.lastLoss = "death";
+      s.spouseAlive = false; s.flags.widowedAt = s.age; s.flags.lastLoss = "death"; s.flags.spouseDeaths = (s.flags.spouseDeaths || 0) + 1;
       log(s, (s.sex === "m" ? "妻" : "夫") + "が亡くなりました。", "bad"); adj(s, { hp: -3 });
     } else if (s.age < 45 && s.st !== "genin" && R() < 0.014) {
       s.spouseAlive = false; s.flags.widowedAt = s.age; s.flags.lastLoss = "divorce";
@@ -935,7 +935,7 @@ function family(s) {
           adj(s, { hp: -2 });
         } else {
           log(s, kanjiNum(n) + "人目の子（" + (sex === "m" ? "男" : "女") + "）が生まれました。", "good");
-          if (R() < 0.016) { s.spouseAlive = false; s.flags.widowedAt = s.age; s.flags.lastLoss = "death"; log(s, "妻はお産のあと、そのまま亡くなりました。", "bad"); }
+          if (R() < 0.016) { s.spouseAlive = false; s.flags.widowedAt = s.age; s.flags.lastLoss = "death"; s.flags.spouseDeaths = (s.flags.spouseDeaths || 0) + 1; log(s, "妻はお産のあと、そのまま亡くなりました。", "bad"); }
         }
       }
     }
