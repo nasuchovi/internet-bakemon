@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#efe6d2">
+<title>550万分の1 ― 平安時代に生まれたら</title>
+<meta name="description" content="生まれる身分も、土地も、年も選べない。史料にもとづく確率で平安時代のどこかに生まれ、一生を生きる人生シミュレーター。">
+<!-- ▼公開時: 下の https://USERNAME.github.io/REPO/heian/ を実際のURLに置換▼ -->
+<meta property="og:title" content="550万分の1 ― 平安時代に生まれたら">
+<meta property="og:description" content="生まれる身分も、土地も、年も選べない。史料にもとづく確率で平安時代のどこかに生まれ、一生を生きる人生シミュレーター。">
+<meta property="og:url" content="https://USERNAME.github.io/REPO/heian/">
+<meta property="og:image" content="https://USERNAME.github.io/REPO/heian/ogp.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --paper:#f3ecdc;
+  --paper2:#e9dfc8;
+  --paper3:#ddd0b3;
+  --ink:#231d17;
+  --ink-soft:#6e6354;
+  --ink-faint:#a39782;
+  --rule:#cbbd9f;
+  --shu:#b5321e;
+  --shu-soft:#e9c9bd;
+  --ai:#2f4d6e;
+  --ai-soft:#d5dde3;
+  --kin:#9a7a36;
+  --moe:#4f6b3a;
+  --bg:#e6dbc3;
+  --min:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho","MS Mincho",serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  font-family:var(--min);
+  color:var(--ink);
+  background:var(--bg);
+  background-image:
+    radial-gradient(ellipse 90% 60% at 50% 0%, rgba(255,255,255,.55), transparent 70%),
+    repeating-linear-gradient(83deg, rgba(120,95,60,.035) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(-7deg, rgba(120,95,60,.03) 0 1px, transparent 1px 5px);
+  min-height:100vh;min-height:100dvh;
+  line-height:1.85;
+  font-feature-settings:"palt";
+}
+button{font-family:inherit;color:inherit;}
+#app{max-width:560px;margin:0 auto;padding:18px 14px 40px;}
+.sheet{
+  background:var(--paper);
+  background-image:
+    radial-gradient(circle at 20% 15%, rgba(255,255,255,.5), transparent 40%),
+    repeating-linear-gradient(90deg, rgba(140,110,70,.025) 0 1px, transparent 1px 4px);
+  border:1px solid var(--rule);
+  box-shadow:0 1px 0 rgba(255,255,255,.6) inset, 0 10px 30px -12px rgba(60,40,20,.35);
+  padding:28px 22px 30px;
+  position:relative;
+}
+.screen{display:none;}
+.screen.active{display:block;animation:fadein .5s ease;}
+@keyframes fadein{from{opacity:0;}to{opacity:1;}}
+
+/* ---------- 共通 ---------- */
+.eyebrow{
+  display:flex;justify-content:space-between;
+  font-size:11px;letter-spacing:.18em;color:var(--ink-soft);
+  border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:22px;
+}
+.btn{
+  display:block;width:100%;
+  padding:15px 16px;margin-top:12px;
+  font-size:17px;font-weight:700;letter-spacing:.25em;
+  background:var(--ink);color:var(--paper);
+  border:none;cursor:pointer;
+  box-shadow:0 2px 0 rgba(0,0,0,.25);
+  transition:transform .1s, opacity .2s;
+}
+.btn:active{transform:translateY(1px);}
+.btn.shu{background:var(--shu);}
+.btn.sub{
+  background:transparent;color:var(--ink);
+  border:1px solid var(--ink);font-size:14px;letter-spacing:.12em;padding:12px;
+}
+.btn.link{background:none;border:none;box-shadow:none;color:var(--ink-soft);font-size:13px;letter-spacing:.1em;text-decoration:underline;text-underline-offset:4px;padding:8px;}
+.stamp{
+  display:inline-flex;align-items:center;justify-content:center;
+  border:2.5px solid var(--shu);color:var(--shu);
+  font-weight:800;letter-spacing:.05em;
+  border-radius:6px;transform:rotate(-8deg);
+  background:rgba(181,50,30,.04);
+}
+
+/* ---------- 表紙 ---------- */
+.title-wrap{display:flex;flex-direction:row-reverse;justify-content:center;align-items:flex-start;gap:20px;margin:6px 0 18px;}
+.t-main{
+  writing-mode:vertical-rl;
+  font-size:clamp(46px,13vw,64px);font-weight:800;
+  letter-spacing:.06em;line-height:1.1;
+  text-orientation:mixed;
+}
+.t-main .n{text-combine-upright:all;}
+.t-sub{
+  writing-mode:vertical-rl;
+  font-size:clamp(19px,5.4vw,24px);font-weight:700;letter-spacing:.32em;
+  color:var(--ink);padding-top:42px;
+}
+.t-sub small{display:block;font-size:12px;letter-spacing:.3em;color:var(--ink-soft);margin-right:10px;font-weight:600;}
+.t-seal{
+  width:64px;height:64px;margin-top:150px;
+  font-size:15px;line-height:1.15;text-align:center;
+  writing-mode:vertical-rl;
+}
+.lede{font-size:14.5px;color:var(--ink);margin:4px 0 6px;}
+.lede p{margin-bottom:8px;}
+.lede b{color:var(--shu);}
+.odds-table{width:100%;border-collapse:collapse;font-size:13px;margin:14px 0 4px;}
+.odds-table td{border-bottom:1px dotted var(--rule);padding:5px 2px;}
+.odds-table td:last-child{text-align:right;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+.note{font-size:11.5px;color:var(--ink-soft);line-height:1.7;margin-top:8px;}
+
+/* ---------- 誕生 ---------- */
+.birth-lines{min-height:300px;padding:8px 0;}
+.bl{opacity:0;transform:translateY(6px);transition:opacity .6s, transform .6s;margin-bottom:18px;}
+.bl.on{opacity:1;transform:none;}
+.bl .k{font-size:12px;letter-spacing:.3em;color:var(--ink-soft);display:block;}
+.bl .v{font-size:24px;font-weight:800;letter-spacing:.06em;line-height:1.45;}
+.bl .v small{font-size:14px;font-weight:600;color:var(--ink-soft);margin-left:6px;}
+.rarity{
+  display:flex;align-items:center;gap:16px;
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  padding:14px 0;margin:6px 0 10px;
+}
+.rarity .stamp{width:62px;height:62px;font-size:22px;flex:none;}
+.rarity .r-num{font-size:13px;color:var(--ink-soft);}
+.rarity .r-num b{font-size:26px;color:var(--ink);font-weight:800;margin:0 3px;font-variant-numeric:tabular-nums;}
+.comment{font-size:14.5px;color:var(--ink);border-left:3px solid var(--shu);padding:2px 0 2px 12px;}
+
+/* ---------- 一生 ---------- */
+#screen-life .sheet{padding:0;}
+.hud{
+  position:sticky;top:0;z-index:5;
+  background:var(--paper2);
+  border-bottom:1px solid var(--rule);
+  padding:12px 16px 10px;
+}
+.hud-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.hud-age{font-size:26px;font-weight:800;letter-spacing:.04em;line-height:1.1;}
+.hud-age small{font-size:12px;font-weight:600;color:var(--ink-soft);margin-right:3px;letter-spacing:.1em;}
+.hud-when{font-size:12.5px;color:var(--ink-soft);text-align:right;line-height:1.5;}
+.hud-when b{color:var(--ink);font-weight:700;}
+.hud-who{font-size:13px;margin-top:4px;}
+.hud-who b{font-weight:800;}
+.bars{display:grid;grid-template-columns:repeat(4,1fr) 1.25fr;gap:8px;margin-top:9px;align-items:end;}
+.bar .lb{font-size:11px;color:var(--ink-soft);display:flex;justify-content:space-between;letter-spacing:.05em;}
+.bar .lb span:last-child{font-variant-numeric:tabular-nums;color:var(--ink);}
+.bar .tr{height:5px;background:var(--paper3);position:relative;overflow:hidden;}
+.bar .fl{position:absolute;left:0;top:0;bottom:0;background:var(--ink);transition:width .4s;}
+.bar.hp .fl{background:var(--shu);}
+.bar.toku .fl{background:var(--kin);}
+.zai{text-align:right;}
+.zai .lb{font-size:11px;color:var(--ink-soft);}
+.zai .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;}
+.zai .v.neg{color:var(--shu);}
+.zai .v small{font-size:11px;font-weight:600;color:var(--ink-soft);margin-left:2px;}
+
+.log{padding:12px 16px 120px;min-height:55vh;}
+.row{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:6px 0;font-size:14.5px;animation:rowin .35s ease;}
+@keyframes rowin{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+.row .a{font-size:11.5px;color:var(--ink-faint);padding-top:3px;letter-spacing:.02em;white-space:nowrap;font-variant-numeric:tabular-nums;}
+.row.first .a{color:var(--ink-soft);font-weight:700;}
+.row.yr{border-top:1px dotted var(--rule);}
+.row .t{line-height:1.75;}
+.row.k-faint .t{color:var(--ink-faint);font-size:13px;}
+.row.k-good .t{color:var(--moe);}
+.row.k-bad .t{color:#7a2d1f;}
+.row.k-hist .t{background:var(--paper2);border-left:3px solid var(--kin);padding:6px 10px;font-size:13.5px;}
+.row .src{display:block;font-size:11px;color:var(--ink-soft);margin-top:2px;}
+.row.k-choice .t{color:var(--ai);font-weight:600;}
+.row.k-birth .t{font-weight:700;}
+.row.k-death .t{color:var(--shu);font-weight:800;font-size:16px;}
+
+.ctrl{
+  position:fixed;left:0;right:0;bottom:0;z-index:8;
+  display:flex;justify-content:center;
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  background:linear-gradient(to top, var(--bg) 60%, rgba(230,219,195,0));
+  pointer-events:none;
+}
+.ctrl-in{display:flex;gap:6px;max-width:532px;width:100%;pointer-events:auto;}
+.ctrl button{
+  flex:1;padding:10px 4px;font-size:13px;font-weight:700;letter-spacing:.08em;
+  background:var(--paper);border:1px solid var(--ink-soft);cursor:pointer;
+}
+.ctrl button.on{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+
+/* 選択シート */
+.choice-bg{
+  position:fixed;inset:0;z-index:20;
+  background:rgba(35,29,23,.38);
+  display:none;align-items:flex-end;justify-content:center;
+}
+.choice-bg.show{display:flex;animation:fadein .25s ease;}
+.choice{
+  width:100%;max-width:560px;max-height:88vh;overflow:auto;
+  background:var(--paper);
+  border-top:3px solid var(--ink);
+  padding:20px 18px calc(22px + env(safe-area-inset-bottom));
+  animation:up .3s ease;
+}
+@keyframes up{from{transform:translateY(30px);opacity:.4;}to{transform:none;opacity:1;}}
+.choice .c-kind{font-size:11px;letter-spacing:.3em;color:var(--shu);font-weight:700;}
+.choice h3{font-size:21px;font-weight:800;letter-spacing:.08em;margin:2px 0 6px;}
+.choice .c-lead{font-size:14px;color:var(--ink);margin-bottom:12px;}
+.opt{
+  display:block;width:100%;text-align:left;
+  background:var(--paper2);border:1px solid var(--rule);
+  padding:11px 14px;margin-top:8px;cursor:pointer;
+  transition:background .15s, border-color .15s;
+}
+.opt:hover{border-color:var(--ink);}
+.opt:active{background:var(--paper3);}
+.opt b{display:block;font-size:15.5px;font-weight:800;letter-spacing:.04em;}
+.opt span{display:block;font-size:12.5px;color:var(--ink-soft);margin-top:1px;}
+.opt[disabled]{opacity:.42;cursor:not-allowed;}
+
+/* ---------- 過去帳 ---------- */
+.kako{position:relative;}
+.kako-head{display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:4px;}
+.kako-head h2{font-size:28px;font-weight:800;letter-spacing:.5em;}
+.kako-head .no{font-size:11px;color:var(--ink-soft);letter-spacing:.1em;text-align:right;}
+.ojo-stamp{
+  position:absolute;right:10px;top:84px;width:86px;height:86px;font-size:20px;line-height:1.15;text-align:center;
+  border-radius:50%;border-width:3px;
+  animation:stampin .5s cubic-bezier(.2,1.6,.4,1) .6s both;
+}
+.ojo-stamp.jigoku{color:#3d2a2a;border-color:#3d2a2a;background:rgba(40,20,20,.05);}
+.ojo-stamp.rinne{color:var(--ai);border-color:var(--ai);background:rgba(47,77,110,.05);}
+@keyframes stampin{from{transform:scale(2.2) rotate(-20deg);opacity:0;}to{transform:scale(1) rotate(-10deg);opacity:1;}}
+.epithet{font-size:clamp(21px,6vw,27px);font-weight:800;letter-spacing:.05em;margin:18px 96px 6px 0;line-height:1.45;}
+.epithet::before{content:"『";}
+.epithet::after{content:"』";}
+.kv{display:grid;grid-template-columns:76px 1fr;border-top:1px solid var(--rule);margin-top:12px;}
+.kv dt,.kv dd{padding:9px 0;border-bottom:1px solid var(--rule);font-size:14px;}
+.kv dt{font-size:12px;color:var(--ink-soft);letter-spacing:.2em;padding-top:11px;}
+.kv dd b{font-size:16px;font-weight:800;}
+.kv dd .d{display:block;font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+.kv dd .cause{color:var(--shu);font-size:19px;}
+.jisei{
+  margin:20px auto 6px;padding:16px 10px;
+  display:flex;flex-direction:row-reverse;justify-content:center;gap:14px;
+  background:var(--paper2);border:1px solid var(--rule);
+}
+.jisei .cap{writing-mode:vertical-rl;font-size:12px;letter-spacing:.4em;color:var(--ink-soft);border-left:1px solid var(--rule);padding-left:10px;}
+.jisei .poem{writing-mode:vertical-rl;white-space:pre-line;font-size:18px;font-weight:700;letter-spacing:.14em;line-height:2;min-height:220px;}
+.jisei .none{writing-mode:vertical-rl;font-size:14px;color:var(--ink-soft);letter-spacing:.14em;min-height:0;}
+.ojo-box{margin-top:14px;font-size:14px;}
+.ojo-box b{font-size:17px;}
+.stats-box{margin-top:18px;background:var(--paper2);border:1px solid var(--rule);padding:14px 14px 12px;}
+.stats-box .cap{font-size:11.5px;letter-spacing:.25em;color:var(--ink-soft);margin-bottom:8px;}
+.stat-line{display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px;padding:4px 0;border-bottom:1px dotted var(--rule);}
+.stat-line:last-of-type{border-bottom:none;}
+.stat-line b{font-size:17px;font-variant-numeric:tabular-nums;}
+.hist{display:flex;align-items:flex-end;gap:2px;height:64px;margin:12px 0 4px;}
+.hist i{flex:1;background:var(--ink-faint);min-height:1px;}
+.hist i.me{background:var(--shu);}
+.hist-ax{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-soft);}
+.share{margin-top:20px;}
+.share .cap{text-align:center;font-size:12px;letter-spacing:.3em;color:var(--ink-soft);}
+.fulllog{display:none;margin-top:16px;border-top:1px solid var(--rule);padding-top:8px;}
+.fulllog.show{display:block;}
+.fulllog .row{animation:none;}
+
+/* ---------- 出典 ---------- */
+.src-list{font-size:13.5px;}
+.src-list h3{font-size:15px;font-weight:800;letter-spacing:.12em;margin:18px 0 6px;border-bottom:1px solid var(--rule);padding-bottom:4px;}
+.src-list li{margin:0 0 7px 1.2em;}
+.src-list li span{display:block;font-size:12px;color:var(--ink-soft);}
+.src-list a{color:var(--ai);}
+
+#cardCanvas{display:none;}
+@media (prefers-reduced-motion: reduce){
+  .screen.active,.row,.choice,.ojo-stamp{animation:none !important;}
+  .bl{transition:none;}
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ========== 表紙 ========== -->
+  <section id="screen-title" class="screen active">
+    <div class="sheet">
+      <div class="eyebrow"><span>平安時代 人生シミュレーター</span><span>西暦794〜1185</span></div>
+      <div class="title-wrap">
+        <h1 class="t-main"><span class="n">550</span>万分の一</h1>
+        <p class="t-sub">平安時代に生まれたら<small>あなたは、誰に生まれるか選べない</small></p>
+        <span class="stamp t-seal">生死<br>不問</span>
+      </div>
+      <div class="lede">
+        <p>平安時代の日本の人口は、およそ<b>550万〜680万人</b>と推計されています。あなたはこれから、その中の<b>誰か一人</b>として生まれます。</p>
+        <p>身分も、土地も、生まれる年も、選べません。選べるのは、与えられた一生の過ごし方と、わずかな財の使い道だけです。</p>
+      </div>
+      <table class="odds-table" aria-label="生まれる確率">
+        <tr><td>農民</td><td>約 86%</td></tr>
+        <tr><td>下人（奴婢）</td><td>約 5%</td></tr>
+        <tr><td>漁民・地方豪族・京の庶民</td><td>約 8.5%</td></tr>
+        <tr><td>下級官人</td><td>約 0.8%</td></tr>
+        <tr><td>貴族（五位以上）・公卿・皇族</td><td>約 0.04%</td></tr>
+      </table>
+      <p class="note">※確率は人口推計や史料をもとにゲーム用に丸めた推定値です。</p>
+      <button class="btn shu" id="btnBorn">生 ま れ る</button>
+      <button class="btn link" id="btnSrc1">出典と注記</button>
+    </div>
+  </section>
+
+  <!-- ========== 誕生 ========== -->
+  <section id="screen-birth" class="screen">
+    <div class="sheet">
+      <div class="eyebrow"><span>出生</span><span id="bNo">―</span></div>
+      <div class="birth-lines">
+        <div class="bl" id="bl1"><span class="k">時 は</span><span class="v" id="bWhen"></span></div>
+        <div class="bl" id="bl2"><span class="k">所 は</span><span class="v" id="bWhere"></span></div>
+        <div class="bl" id="bl3"><span class="k">生 ま れ は</span><span class="v" id="bWho"></span></div>
+        <div class="bl" id="bl4">
+          <div class="rarity">
+            <span class="stamp" id="bStamp">凡</span>
+            <div class="r-num">この生まれは、およそ<br><b id="bOdds">1</b>人に1人</div>
+          </div>
+          <p class="comment" id="bComment"></p>
+        </div>
+      </div>
+      <button class="btn" id="btnLive" style="opacity:0;pointer-events:none">生 き る</button>
+    </div>
+  </section>
+
+  <!-- ========== 一生 ========== -->
+  <section id="screen-life" class="screen">
+    <div class="sheet">
+      <div class="hud">
+        <div class="hud-top">
+          <div class="hud-age"><small>数え</small><span id="hAge">1</span><small style="margin-left:2px">歳</small></div>
+          <div class="hud-when"><b id="hWareki"></b>（<span id="hYear"></span>）<br><span id="hRegion"></span></div>
+        </div>
+        <div class="hud-who">身分：<b id="hWho"></b></div>
+        <div class="bars">
+          <div class="bar hp"><div class="lb"><span>体</span><span id="vHp"></span></div><div class="tr"><div class="fl" id="fHp"></div></div></div>
+          <div class="bar"><div class="lb"><span>才</span><span id="vSai"></span></div><div class="tr"><div class="fl" id="fSai"></div></div></div>
+          <div class="bar"><div class="lb"><span>縁</span><span id="vEn"></span></div><div class="tr"><div class="fl" id="fEn"></div></div></div>
+          <div class="bar toku"><div class="lb"><span>徳</span><span id="vToku"></span></div><div class="tr"><div class="fl" id="fToku"></div></div></div>
+          <div class="zai"><div class="lb">財（石）</div><div class="v" id="vZai">0</div></div>
+        </div>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+
+  <!-- ========== 過去帳 ========== -->
+  <section id="screen-death" class="screen">
+    <div class="sheet kako">
+      <div class="kako-head"><h2>過去帳</h2><div class="no" id="kNo"></div></div>
+      <span class="stamp ojo-stamp" id="kOjo">極楽往生</span>
+      <p class="epithet" id="kEpithet"></p>
+      <dl class="kv">
+        <dt>生</dt><dd id="kBirth"></dd>
+        <dt>没</dt><dd id="kDeath"></dd>
+        <dt>死因</dt><dd id="kCause"></dd>
+        <dt>最後の身分</dt><dd id="kRank"></dd>
+        <dt>遺した財</dt><dd id="kZai"></dd>
+        <dt>子</dt><dd id="kKids"></dd>
+        <dt>史料</dt><dd id="kRecord"></dd>
+      </dl>
+      <div class="jisei" id="kJisei"></div>
+      <div class="ojo-box" id="kOjoBox"></div>
+
+      <div class="stats-box" id="kStats">
+        <p class="cap">同じ時代に生まれた人々と比べると（シミュレーション）</p>
+        <div id="kStatsBody"><p class="note">計算中……</p></div>
+      </div>
+
+      <div class="share">
+        <p class="cap">― 一生を報告する ―</p>
+        <button class="btn shu" id="btnShareX">Xでポストする</button>
+        <button class="btn sub" id="btnSaveImg">過去帳を画像で保存する</button>
+        <button class="btn sub" id="btnLog">一生の記録を読み返す</button>
+        <button class="btn" id="btnAgain">もう一度、生まれる</button>
+        <button class="btn link" id="btnSrc2">出典と注記</button>
+      </div>
+      <div class="fulllog" id="fullLog"></div>
+    </div>
+  </section>
+
+  <!-- ========== 出典 ========== -->
+  <section id="screen-src" class="screen">
+    <div class="sheet">
+      <div class="eyebrow"><span>出典と注記</span><span>典拠一覧</span></div>
+      <div class="src-list">
+        <p class="note" style="font-size:13px;color:var(--ink)">このゲームの確率・数値は、以下の研究と史料をもとにゲーム用に丸めた<b>推定値</b>です。史実を厳密に再現するものではありません。出来事の説明には、わかりやすさのための誇張や皮肉を含みます。</p>
+        <h3>人口と寿命</h3>
+        <ul>
+          <li>鬼頭宏『人口から読む日本の歴史』講談社学術文庫、2000年<span>平安初期（800年頃）約551万人、平安末期（1150年頃）約684万人という推計。タイトルの「550万」はここから。</span></li>
+          <li>今津勝紀「日本古代の人口と災害」ほか（<a href="https://ousar.lib.okayama-u.ac.jp/ja/63024" target="_blank" rel="noopener">岡山大学学術成果リポジトリ</a>）<span>9世紀前半の総人口を500万〜550万人程度と推定。飢饉・疫病の被害は地域ごとにモザイク状だったとする。</span></li>
+          <li>William Wayne Farris, <i>Population, Disease, and Land in Early Japan, 645–900</i>, Harvard University Press, 1985<span>古代の平均寿命（出生時）を28〜33歳程度と推計。天然痘・麻疹の反復流行が人口を抑えたとする。本ゲームの出生時平均寿命は、これに近づくよう調整（シミュレーション値で約29〜30歳）。</span></li>
+          <li>W. W. Farris, <i>Japan's Medieval Population</i>, University of Hawai'i Press, 2006</li>
+        </ul>
+        <h3>身分と制度</h3>
+        <ul>
+          <li>『公卿補任』<span>公卿（三位以上・参議）は毎年おおむね20〜30人程度。</span></li>
+          <li>『養老令』雑令（出挙の規定）<span>稲の貸し付けと利息。利率は時期により年3〜5割。</span></li>
+          <li>三善清行『意見十二箇条』（914年）<span>「天下の人民、三分の二は皆これ禿首の者なり」――税逃れの私度僧が多いことを訴える。</span></li>
+          <li>『尾張国郡司百姓等解文』（988年）<span>尾張守藤原元命の苛政を郡司・百姓が訴え、解任に至る。</span></li>
+          <li>『今昔物語集』巻28第38話<span>信濃守藤原陳忠の「受領は倒るる所に土をつかめ」。</span></li>
+          <li>清少納言『枕草子』「すさまじきもの」<span>除目で官職を得られなかった家の興ざめな様子。</span></li>
+          <li>『紫式部日記』<span>『源氏物語』の評判、漢字が読めることを隠した逸話。</span></li>
+          <li>藤原実資『小右記』寛仁2年（1018年）10月16日条<span>藤原道長「この世をば」の歌と、一同での唱和。</span></li>
+          <li>源信『往生要集』（985年）<span>地獄・極楽の描写。等活地獄の寿命五百歳など。</span></li>
+        </ul>
+        <h3>疫病・災害・戦乱</h3>
+        <ul>
+          <li>『日本紀略』『本朝世紀』『栄花物語』<span>疱瘡（天然痘）の流行（915・947・974・993〜995・1020年など）、長徳の疫病、赤斑瘡（998年）。</span></li>
+          <li>『続日本後紀』承和9年（842年）<span>鴨河原などの髑髏五千五百余頭を焼き葬らせた記事。</span></li>
+          <li>『日本三代実録』<span>富士山の貞観大噴火（864年）、応天門の変（866年）、貞観地震・津波（869年）、仁和地震（887年）。</span></li>
+          <li>鴨長明『方丈記』（1212年）<span>安元の大火（1177年）、治承の辻風と福原遷都（1180年）、養和の飢饉（1181〜82年、左京の死者四万二千三百余）、元暦の大地震（1185年）。</span></li>
+          <li>『将門記』『陸奥話記』『奥州後三年記』『平家物語』『吾妻鏡』ほか<span>平将門・藤原純友の乱、前九年・後三年合戦、保元・平治の乱、治承・寿永の乱、承久の乱、寛喜の飢饉。</span></li>
+        </ul>
+        <h3>ゲーム上の割り切り</h3>
+        <ul>
+          <li>身分の比率（農民約86%、下人約5%など）は、人口推計・現存戸籍の例・官人の定員などからの大まかな推定です。</li>
+          <li>「財」は米の石高に換算したゲーム上の単位です。当時の一石は現代の一石より小さく、正確な換算ではありません。</li>
+          <li>年齢は数え年で表示しています（生まれた年が1歳）。</li>
+          <li>辞世の歌は、このゲームのための創作です。</li>
+        </ul>
+      </div>
+      <button class="btn sub" id="btnSrcBack">戻る</button>
+    </div>
+  </section>
+
+</div>
+
+<div class="ctrl" id="ctrl" style="display:none">
+  <div class="ctrl-in">
+    <button data-sp="slow">ゆっくり</button>
+    <button data-sp="mid" class="on">ふつう</button>
+    <button data-sp="fast">はやい</button>
+    <button id="btnPause">一時停止</button>
+  </div>
+</div>
+
+<div class="choice-bg" id="choiceBg" role="dialog" aria-modal="true" aria-labelledby="cTitle">
+  <div class="choice">
+    <p class="c-kind" id="cKind"></p>
+    <h3 id="cTitle"></h3>
+    <p class="c-lead" id="cLead"></p>
+    <div id="cOpts"></div>
+  </div>
+</div>
+
+<canvas id="cardCanvas" width="1080" height="1500"></canvas>
+
+<script src="engine.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const H = window.Heian;
+
+/* ---------- 画面遷移 ---------- */
+let prevScreen = "title";
+function show(name){
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  $("screen-" + name).classList.add("active");
+  $("ctrl").style.display = name === "life" ? "flex" : "none";
+  window.scrollTo(0, 0);
+}
+function openSrc(from){ prevScreen = from; show("src"); }
+$("btnSrc1").onclick = () => openSrc("title");
+$("btnSrc2").onclick = () => openSrc("death");
+$("btnSrcBack").onclick = () => show(prevScreen);
+
+/* ---------- 統計（バックグラウンドで計算） ---------- */
+let SIM = null, simRun = null, simWait = [];
+function ensureSim(cb){
+  if (SIM) { cb && cb(SIM); return; }
+  if (cb) simWait.push(cb);
+  if (simRun) return;
+  const N = 3000, ages = [], causes = {};
+  simRun = true;
+  const chunk = () => {
+    const end = Math.min(N, ages.length + 150);
+    while (ages.length < end) { const s = H.autoLife(); ages.push(s.age); causes[s.cause] = (causes[s.cause] || 0) + 1; }
+    if (ages.length < N) { setTimeout(chunk, 16); return; }
+    ages.sort((a, b) => a - b);
+    SIM = { n: N, ages, causes, mean: ages.reduce((a, b) => a + b, 0) / N, under5: ages.filter(a => a < 5).length / N };
+    simWait.splice(0).forEach(f => f(SIM));
+  };
+  setTimeout(chunk, 400);
+}
+
+/* ---------- 誕生 ---------- */
+const COMMENT = {
+  nomin: "おめでとうございます。ほぼ全員がこれです。",
+  genin: "あなたは「人」ではなく、主人の「財産」として記録されます。",
+  gyomin: "海の幸に恵まれた家です。海の災いにも、同じくらい恵まれています。",
+  gozoku: "地方の有力者の家です。のちに「武士」と呼ばれる人たちの、ご先祖かもしれません。",
+  kyomin: "都会っ子です。都会は、疫病と火事と盗賊の本場でもあります。",
+  kanjin: "都の役人の家です。出世の上限は、生まれた時点でだいたい決まっています。",
+  kizoku: "当たりです。ただし上には上がいて、その上にはだいたい藤原氏がいます。",
+  kugyo: "大当たりです。この国の、上から数十軒の家です。",
+  kouzoku: "超大当たりです。ただし、皇位継承という名の別のくじが始まります。"
+};
+function stampFor(odds){
+  if (odds >= 10000) return "大当";
+  if (odds >= 1000) return "当";
+  if (odds >= 50) return "稀";
+  if (odds >= 15) return "並";
+  return "凡";
+}
+let S = null;      // 現在の人生
+let lifeNo = 0;
+function fmtInt(n){ return n.toLocaleString("ja-JP"); }
+
+$("btnBorn").onclick = startBirth;
+function startBirth(){
+  S = H.newLife();
+  lifeNo++;
+  ensureSim();
+  const st = S.birthStatus, odds = Math.max(1, Math.round(1 / H.STATUS[st].p));
+  $("bNo").textContent = "第" + fmtInt(Math.floor(Math.random() * 5500000) + 1) + "番目の誰か";
+  $("bWhen").innerHTML = H.wareki(S.birthYear) + "<small>西暦" + S.birthYear + "年</small>";
+  $("bWhere").textContent = H.REGION[S.birthRegion];
+  $("bWho").textContent = H.STATUS[st].birth[S.sex === "m" ? 0 : 1];
+  $("bOdds").textContent = fmtInt(odds);
+  $("bStamp").textContent = stampFor(odds);
+  $("bComment").textContent = COMMENT[st];
+  ["bl1","bl2","bl3","bl4"].forEach(id => $(id).classList.remove("on"));
+  const live = $("btnLive"); live.style.opacity = 0; live.style.pointerEvents = "none";
+  show("birth");
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const step = reduce ? 0 : 700;
+  ["bl1","bl2","bl3","bl4"].forEach((id, i) => setTimeout(() => $(id).classList.add("on"), 200 + i * step));
+  setTimeout(() => { live.style.transition = "opacity .5s"; live.style.opacity = 1; live.style.pointerEvents = "auto"; }, 300 + 4 * step);
+}
+
+/* ---------- 一生 ---------- */
+const SPEED = { slow: 1100, mid: 520, fast: 140 };
+let speed = "mid", paused = false, timer = null, lastYearRow = -1;
+document.querySelectorAll(".ctrl [data-sp]").forEach(b => b.onclick = () => {
+  speed = b.dataset.sp;
+  document.querySelectorAll(".ctrl [data-sp]").forEach(x => x.classList.toggle("on", x === b));
+  if (paused) togglePause();
+});
+$("btnPause").onclick = togglePause;
+function togglePause(){
+  paused = !paused;
+  $("btnPause").textContent = paused ? "再開" : "一時停止";
+  $("btnPause").classList.toggle("on", paused);
+  if (!paused) schedule(80);
+}
+$("btnLive").onclick = () => {
+  $("log").innerHTML = ""; $("log")._lastAge = undefined;
+  lastYearRow = -1;
+  paused = false; $("btnPause").textContent = "一時停止"; $("btnPause").classList.remove("on");
+  show("life");
+  addRow(S.logs[0]);
+  hud();
+  schedule(600);
+};
+function schedule(ms){ clearTimeout(timer); timer = setTimeout(tick, ms); }
+
+const FILLER = {
+  infant: ["すくすく育っています。今のところは。", "まだ生きています。", "よく泣き、よく乳を飲みました。", "熱を出しましたが、下がりました。"],
+  rural: ["田を耕し、稲を刈りました。", "特に何もない一年でした。それが一番です。", "去年と同じ一年でした。", "租を納めました。手元にはあまり残りませんでした。"],
+  noble: ["物忌みと方違えで、一年が終わりました。", "歌を詠み、歌を返されました。", "特に何もない一年でした。", "牛車で出仕し、牛車で帰りました。"],
+  kyo: ["市に出かけました。", "特に何もない一年でした。", "鴨川の水が少し増えて、また減りました。"],
+  so: ["経を読んで一年が過ぎました。", "托鉢に出ました。", "特に何もない一年でした。仏の教えのとおりです。"],
+  genin: ["働きました。", "主人の田を耕しました。自分の田はありません。", "去年と同じ一年でした。"]
+};
+function fillerFor(s){
+  if (s.age < 5) return FILLER.infant;
+  if (s.st === "so") return FILLER.so;
+  if (s.st === "genin") return FILLER.genin;
+  if (["kouzoku","kugyo","kizoku","kanjin"].includes(s.st)) return FILLER.noble;
+  if (s.region === "kyo") return FILLER.kyo;
+  return FILLER.rural;
+}
+
+function tick(){
+  if (paused || !S) return;
+  const r = H.advance(S);
+  if (r.choice) { openChoice(r.choice); return; }
+  let logs = r.logs;
+  const yr = { age: r.age, year: r.year };
+  if (!logs.length) {
+    if (Math.random() < 0.4) logs = [{ age: r.age, year: r.year, t: pick(fillerFor(S)), k: "faint" }];
+  }
+  logs.forEach(l => addRow(l));
+  hud(r);
+  if (r.dead) { setTimeout(finish, 1400); return; }
+  schedule(logs.length ? SPEED[speed] * (logs.length > 1 ? 1.25 : 1) : SPEED[speed] * 0.35);
+}
+function pick(a){ return a[Math.floor(Math.random() * a.length)]; }
+
+function addRow(l, target){
+  const box = target || $("log");
+  const row = document.createElement("div");
+  const first = box._lastAge !== l.age;
+  row.className = "row k-" + (l.k || "n") + (first ? " first" : "") + (first && box.childElementCount ? " yr" : "");
+  box._lastAge = l.age;
+  const a = document.createElement("span"); a.className = "a"; a.textContent = first ? "数え" + (l.age + 1) : "";
+  const t = document.createElement("span"); t.className = "t"; t.textContent = l.t;
+  if (l.src) { const s = document.createElement("span"); s.className = "src"; s.textContent = "― " + l.src; t.appendChild(s); }
+  row.append(a, t);
+  box.appendChild(row);
+  if (!target) {
+    const y = row.getBoundingClientRect().bottom + window.scrollY - window.innerHeight + 110;
+    if (y > window.scrollY) window.scrollTo({ top: y, behavior: speed === "fast" ? "auto" : "smooth" });
+  }
+}
+
+function hud(r){
+  const age = r && r.age != null ? r.age : S.age, year = r && r.year != null ? r.year : S.year;
+  $("hAge").textContent = age + 1;
+  $("hWareki").textContent = H.wareki(year);
+  $("hYear").textContent = year + "年";
+  $("hRegion").textContent = H.REGION[S.region];
+  $("hWho").textContent = H.curLabel(S) + (S.married && S.spouseAlive ? "・既婚" : "") + (S.children.filter(c => c.alive).length ? "・子" + S.children.filter(c => c.alive).length + "人" : "");
+  const set = (k, v) => { $("v" + k).textContent = Math.round(v); $("f" + k).style.width = clamp(v, 0, 100) + "%"; };
+  set("Hp", S.hp); set("Sai", S.sai); set("En", S.en); set("Toku", S.toku);
+  const z = $("vZai");
+  z.innerHTML = H.fmtW(S.wealth) + "<small>石</small>";
+  z.classList.toggle("neg", S.wealth < 0);
+}
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+/* ---------- 選択 ---------- */
+const KIND = { plan: "節目", spend: "財の使い道", branch: "人生の分岐点" };
+function openChoice(c){
+  $("cKind").textContent = KIND[c.kind] || "";
+  $("cTitle").textContent = c.title;
+  $("cLead").textContent = c.lead;
+  const box = $("cOpts"); box.innerHTML = "";
+  c.options.forEach((o, i) => {
+    const b = document.createElement("button");
+    b.className = "opt"; b.type = "button";
+    b.innerHTML = "<b></b><span></span>";
+    b.querySelector("b").textContent = o.label;
+    b.querySelector("span").textContent = o.disabled ? (o.reason || "選べない") + "　" + o.desc : o.desc;
+    if (o.disabled) b.disabled = true;
+    b.onclick = () => {
+      $("choiceBg").classList.remove("show");
+      H.choose(S, i);
+      hud();
+      schedule(280);
+    };
+    box.appendChild(b);
+  });
+  $("choiceBg").classList.add("show");
+  const first = box.querySelector(".opt:not([disabled])");
+  if (first) first.focus({ preventScroll: true });
+}
+
+/* ---------- 過去帳 ---------- */
+let RES = null;
+function recordText(s, r){
+  if (s.kokumo) return ["国母として、歴史書に名が残りました。", "ただし本名ではなく、「◯◯院」という院号で。"];
+  if (s.gaiseki || s.rank >= 14) return ["『公卿補任』に名前が載りました。", "毎年の官職と位階が、几帳面に記録されています。"];
+  if (s.rank >= 9 && s.st !== "so") return ["貴族の日記の端に、一度だけ名前が出てきます。", "「某、参ず」とだけ。"];
+  if (s.sex === "f" && s.flags.nyobo) return ["女房名だけが残りました。", "本名は、誰も書き留めませんでした。"];
+  return ["なし", "あなたのことを記した史料は、一枚も残っていません。この時代の、ほとんどの人と同じです。"];
+}
+function finish(){
+  clearTimeout(timer);
+  RES = H.summary(S);
+  const r = RES;
+  $("kNo").innerHTML = "第" + fmtInt(lifeNo) + "の生<br>" + r.deathWareki + " 記";
+  const o = $("kOjo");
+  o.innerHTML = r.ojo.t.slice(0, 2) + "<br>" + r.ojo.t.slice(2);
+  o.className = "stamp ojo-stamp " + r.ojo.k;
+  $("kEpithet").textContent = r.epithet;
+  $("kBirth").innerHTML = "<b></b><span class='d'></span>";
+  $("kBirth").querySelector("b").textContent = r.birthWareki + "（" + r.birthYear + "年）";
+  $("kBirth").querySelector(".d").textContent = r.region + "の" + r.birthLabel + "として　※約" + fmtInt(r.odds) + "人に1人";
+  $("kDeath").innerHTML = "<b></b><span class='d'></span>";
+  $("kDeath").querySelector("b").textContent = r.deathWareki + "（" + r.deathYear + "年）　享年 " + r.kyonen;
+  $("kDeath").querySelector(".d").textContent = (r.deathRegion !== r.region ? r.deathRegion + "にて　" : "") + "数え年";
+  $("kCause").innerHTML = "<b class='cause'></b><span class='d'></span>";
+  $("kCause").querySelector("b").textContent = r.cause;
+  $("kCause").querySelector(".d").textContent = r.causeDesc;
+  $("kRank").textContent = r.finalLabel;
+  $("kZai").textContent = (r.wealth < 0 ? "借財 " : "") + H.fmtW(r.wealth) + " 石" + (r.wealth < 0 ? "（遺族が引き継ぎます）" : "");
+  $("kKids").textContent = r.kids ? r.kids + "人（うち成人できたのは" + r.grown + "人）" : "なし";
+  const rec = recordText(S, r);
+  $("kRecord").innerHTML = "<b></b><span class='d'></span>";
+  $("kRecord").querySelector("b").textContent = rec[0];
+  $("kRecord").querySelector(".d").textContent = rec[1];
+  const j = $("kJisei");
+  j.innerHTML = "<span class='cap'>辞世</span>";
+  const p = document.createElement("span");
+  if (r.jisei) { const q = r.jisei.split("　"); p.className = "poem"; p.textContent = q.slice(0, 3).join("　") + "\n　　" + q.slice(3).join("　"); }
+  else { p.className = "none"; p.textContent = r.age < 5 ? "（まだ、言葉を覚えていませんでした）" : "（辞世を詠むには、若すぎました）"; }
+  j.appendChild(p);
+  $("kOjoBox").innerHTML = "<b></b><br><span></span>";
+  $("kOjoBox").querySelector("b").textContent = "往生判定：" + r.ojo.t;
+  $("kOjoBox").querySelector("span").textContent = r.ojo.d;
+  $("kStatsBody").innerHTML = "<p class='note'>計算中……</p>";
+  const fl = $("fullLog"); fl.innerHTML = ""; fl._lastAge = undefined; fl.classList.remove("show");
+  $("btnLog").textContent = "一生の記録を読み返す";
+  show("death");
+  ensureSim(renderStats);
+}
+function renderStats(sim){
+  const r = RES, ages = sim.ages, n = sim.n;
+  const longer = ages.filter(a => a > r.age).length / n;
+  const sameCause = (sim.causes[r.cause] || 0) / n;
+  const buckets = new Array(17).fill(0);
+  ages.forEach(a => buckets[Math.min(16, Math.floor(a / 5))]++);
+  const mx = Math.max(...buckets);
+  const meB = Math.min(16, Math.floor(r.age / 5));
+  let html = "";
+  html += line("あなたより長生きした人", Math.round(longer * 100) + "%");
+  html += line("5歳になる前に亡くなった人", Math.round(sim.under5 * 100) + "%");
+  html += line("出生時の平均寿命", sim.mean.toFixed(1) + "歳");
+  html += line("死因「" + r.cause + "」の人", (sameCause * 100 < 1 ? "1%未満" : Math.round(sameCause * 100) + "%"));
+  html += "<div class='hist' aria-hidden='true'>" + buckets.map((b, i) => "<i class='" + (i === meB ? "me" : "") + "' style='height:" + Math.max(2, b / mx * 100) + "%'></i>").join("") + "</div>";
+  html += "<div class='hist-ax'><span>0歳</span><span>寿命の分布（赤があなた）</span><span>80歳〜</span></div>";
+  html += "<p class='note'>" + fmtInt(n) + "人分の人生を同じ仕組みで自動生成した結果です。</p>";
+  $("kStatsBody").innerHTML = html;
+  RES.longer = longer;
+}
+function line(k, v){ return "<div class='stat-line'><span>" + k + "</span><b>" + v + "</b></div>"; }
+
+$("btnLog").onclick = () => {
+  const fl = $("fullLog");
+  if (!fl.childElementCount) S.logs.forEach(l => addRow(l, fl));
+  fl.classList.toggle("show");
+  $("btnLog").textContent = fl.classList.contains("show") ? "記録を閉じる" : "一生の記録を読み返す";
+};
+$("btnAgain").onclick = startBirth;
+
+/* ---------- 共有 ---------- */
+function pageUrl(){ return location.href.startsWith("http") ? location.href.split("#")[0].split("?")[0] : ""; }
+function shareText(){
+  const r = RES;
+  return "【平安人生記録】" + r.birthWareki + "、" + r.region + "の" + r.birthLabel + "として生まれ、数え" + r.kyonen + "で" + r.cause + "により死去。\n『" + r.epithet + "』\n往生判定：" + r.ojo.t + "\n#550万分の1 #平安時代に生まれたら";
+}
+$("btnShareX").onclick = () => {
+  if (!RES) return;
+  const url = pageUrl();
+  window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(shareText()) + (url ? "&url=" + encodeURIComponent(url) : ""), "_blank");
+};
+$("btnSaveImg").onclick = async () => {
+  if (!RES) return;
+  try { await document.fonts.ready; } catch (e) {}
+  drawCard(RES);
+  const blob = await new Promise(res => $("cardCanvas").toBlob(res, "image/png"));
+  if (!blob) return;
+  const file = new File([blob], "heian_kakocho.png", { type: "image/png" });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file] }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "heian_kakocho.png";
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+};
+
+function drawCard(r){
+  const cv = $("cardCanvas"), c = cv.getContext("2d");
+  const W = cv.width, Hh = cv.height;
+  const MIN = '"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif';
+  const PAPER = "#f3ecdc", INK = "#231d17", SOFT = "#6e6354", RULE = "#cbbd9f", SHU = "#b5321e", P2 = "#e9dfc8";
+  c.fillStyle = PAPER; c.fillRect(0, 0, W, Hh);
+  // 和紙の繊維
+  c.globalAlpha = 0.05; c.strokeStyle = "#7a5f3a";
+  for (let i = 0; i < 260; i++) { c.beginPath(); const x = Math.random() * W, y = Math.random() * Hh; c.moveTo(x, y); c.lineTo(x + Math.random() * 60 - 30, y + Math.random() * 8 - 4); c.stroke(); }
+  c.globalAlpha = 1;
+  c.strokeStyle = INK; c.lineWidth = 4; c.strokeRect(40, 40, W - 80, Hh - 80);
+  c.lineWidth = 1.5; c.strokeRect(54, 54, W - 108, Hh - 108);
+  const L = 100, Rr = W - 100;
+  c.textBaseline = "alphabetic";
+  c.fillStyle = SOFT; c.font = "600 26px " + MIN; c.textAlign = "left";
+  c.fillText("550万分の1 ― 平安時代に生まれたら", L, 130);
+  c.fillStyle = INK; c.textAlign = "left"; c.font = "800 92px " + MIN;
+  c.fillText("過 去 帳", L, 250);
+  c.fillRect(L, 280, Rr - L, 4);
+  // 印
+  const sx = Rr - 92, sy = 200;
+  c.save(); c.translate(sx, sy); c.rotate(-0.17);
+  const col = r.ojo.k === "gokuraku" ? SHU : (r.ojo.k === "rinne" ? "#2f4d6e" : "#3d2a2a");
+  c.strokeStyle = col; c.lineWidth = 6; c.beginPath(); c.arc(0, 0, 78, 0, Math.PI * 2); c.stroke();
+  c.lineWidth = 2; c.beginPath(); c.arc(0, 0, 68, 0, Math.PI * 2); c.stroke();
+  c.fillStyle = col; c.font = "800 38px " + MIN; c.textAlign = "center";
+  const ch = r.ojo.t.split("");
+  if (ch.length === 4) { c.fillText(ch[0] + ch[1], 0, -6); c.fillText(ch[2] + ch[3], 0, 38); }
+  else { c.fillText(ch.slice(0, 2).join(""), 0, -6); c.fillText(ch.slice(2).join(""), 0, 38); }
+  c.restore();
+  // 二つ名
+  c.fillStyle = INK; c.textAlign = "left";
+  let y = wrap(c, "『" + r.epithet + "』", L, 380, Rr - L, 66, "800 54px " + MIN);
+  y += 44;
+  const rows = [
+    ["生", r.birthWareki + "（" + r.birthYear + "年）", r.region + "の" + r.birthLabel + "　約" + fmtInt(r.odds) + "人に1人"],
+    ["没", r.deathWareki + "（" + r.deathYear + "年）　享年 " + r.kyonen + "（数え）", ""],
+    ["死因", r.cause, r.causeDesc],
+    ["身分", r.finalLabel, ""],
+    ["子", r.kids ? r.kids + "人（成人 " + r.grown + "人）" : "なし", ""]
+  ];
+  rows.forEach(([k, v, d]) => {
+    c.strokeStyle = RULE; c.lineWidth = 2; c.beginPath(); c.moveTo(L, y); c.lineTo(Rr, y); c.stroke();
+    c.fillStyle = SOFT; c.font = "600 26px " + MIN; c.fillText(k, L, y + 52);
+    c.fillStyle = k === "死因" ? SHU : INK; c.font = "800 38px " + MIN;
+    let yy = wrap(c, v, L + 130, y + 56, Rr - L - 130, 48, "800 38px " + MIN);
+    if (d) { c.fillStyle = SOFT; yy = wrap(c, d, L + 130, yy + 42, Rr - L - 130, 36, "500 25px " + MIN); }
+    y = yy + 28;
+  });
+  c.strokeStyle = RULE; c.beginPath(); c.moveTo(L, y); c.lineTo(Rr, y); c.stroke();
+  // 辞世
+  y += 40;
+  c.fillStyle = P2; c.fillRect(L, y, Rr - L, 230);
+  c.fillStyle = SOFT; c.font = "600 24px " + MIN; c.fillText("辞世", L + 24, y + 44);
+  c.fillStyle = INK;
+  if (r.jisei) {
+    const parts = r.jisei.split("　");
+    c.font = "700 36px " + MIN;
+    c.fillText(parts.slice(0, 3).join("　"), L + 24, y + 112);
+    c.fillText("　　" + parts.slice(3).join("　"), L + 24, y + 172);
+  } else {
+    c.font = "600 32px " + MIN; c.fillStyle = SOFT;
+    c.fillText(r.age < 5 ? "（まだ、言葉を覚えていませんでした）" : "（辞世を詠むには、若すぎました）", L + 24, y + 140);
+  }
+  y += 230;
+  // 下部
+  c.fillStyle = SOFT; c.font = "600 26px " + MIN; c.textAlign = "left";
+  if (typeof r.longer === "number") c.fillText("同じ時代の人のうち、あなたより長生きした人：" + Math.round(r.longer * 100) + "%", L, Hh - 140);
+  c.textAlign = "right"; c.fillStyle = INK; c.font = "800 30px " + MIN;
+  c.fillText("#550万分の1", Rr, Hh - 86);
+}
+function wrap(c, text, x, y, maxW, lh, font){
+  c.font = font;
+  let line = "";
+  for (const ch of text) {
+    if (c.measureText(line + ch).width > maxW && line) { c.fillText(line, x, y); y += lh; line = ch; }
+    else line += ch;
+  }
+  if (line) c.fillText(line, x, y);
+  return y;
+}
+</script>
+</body>
+</html>
