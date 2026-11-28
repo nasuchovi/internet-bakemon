@@ -386,7 +386,7 @@ function draw(ctx, s, fx) {
 
   // 墓（先立った家族）
   let gx = 2;
-  const graves = (s.flags.spouseDeaths || 0) + s.children.filter(c => !c.alive).length;
+  const graves = (s.flags.spouseDeaths || 0) + s.children.filter(c => !c.alive).length + (s.flags.kinDeaths || 0);
   for (let i = 0; i < Math.min(graves, 7); i++) { grave(ctx, gx, true); gx += 5; }
 
   // 家畜
@@ -397,7 +397,16 @@ function draw(ctx, s, fx) {
   const age = fx.age != null ? fx.age : s.age;
   const year = fx.year != null ? fx.year : s.year;
   const baseP = { st: s.st, rank: s.rank, year, nyobo: s.flags.nyobo };
-  let x = 52;
+  // 一緒に暮らす親・祖父母（祖父母 → 父母の順に、本人の左へ）
+  const H = root.Heian;
+  const elders = (H && H.kinAtHome ? H.kinAtHome(s) : []).slice().sort((a, b) => (a.side ? 0 : 1) - (b.side ? 0 : 1)).slice(0, 4);
+  let x = elders.length ? Math.max(24, 52 - elders.length * 10) : 52;
+  for (const k of elders) {
+    const kst = k.st === "kouzoku" ? "kugyo" : k.st;
+    const kr = kst === "kugyo" ? 14 : kst === "kizoku" ? 9 : kst === "kanjin" ? 5 : 0;
+    const kp = person(ctx, x, FEET, { st: kst, rank: kr, year, sex: k.sex, age: Math.max(18, k.age), elder: k.age >= 55, nyobo: false });
+    x += kp.w + 2;
+  }
   if (fx.dead) {
     grave(ctx, x - 2, false);
   } else {

@@ -506,6 +506,16 @@ button{font-family:inherit;color:inherit;}
           <li>『和名類聚抄』<span>「歓喜団」の項の注に「八種唐菓子」の名が見える。</span></li>
           <li>神泉苑の祈雨<span>平安時代を通じて神泉苑で請雨経法などの祈雨が行われた（『日本三代実録』貞観17年条ほか）。</span></li>
         </ul>
+        <h3>家族</h3>
+        <ul>
+          <li>庶民の家族<span>古代の戸籍では、一つの戸に戸主の母・庶母・姑などが名を連ねる例がある（ただし同籍は同居を意味しないとする説もある。田中禎昭、国立歴史民俗博物館研究報告235集ほか）。ゲームでは、子どものうちは両親と父方の祖父母、大人になってからは故郷にいれば老いた親と暮らすものとしています。</span></li>
+          <li>貴族の家族<span>婿取り婚が多く、子は母方の家で育ち、外祖父（母方の祖父）が後ろ盾となった（国立国会図書館「本の万華鏡」第38回、Wikipedia「外戚」）。ゲームでは、貴族の子は両親と母方の祖父母のもとで育ち、娘は大人になっても親の家に残るものとしています。</span></li>
+          <li>五十日の祝い<span>生後五十日の祝いで、父か外祖父が餅を子の口に含ませた（寛弘5年＝1008年、敦成親王の五十日の祝いは『紫式部日記』に詳しい）。</span></li>
+          <li>袴着<span>平安時代の貴族の間で、男女の別なく3〜7歳に行われた（Wikipedia「袴着」）。</span></li>
+          <li>譲状・処分状<span>所領などの財産を親族に譲る証文。10世紀初頭から作られた（Wikipedia「譲状」）。</span></li>
+          <li>祖父母の昔話<span>『日本霊異記』上巻第2縁（狐を妻とする話）、『日本書紀』雄略紀22年7月条（浦嶋子）、『竹取物語』（9世紀後半〜10世紀前半の成立）。祖父の思い出話は、ゲーム内の史実イベントから選ばれます。</span></li>
+          <li>喪の期間<span>令の服喪の期間は裏付けを確認できなかったため、ゲームでは扱っていません。</span></li>
+        </ul>
         <h3>名付け</h3>
         <ul>
           <li>庶民の名（〜950年ごろ）<span>戸籍・木簡に見える実名を使用：大嶋郷戸籍（孔王部黒人・刀良・阿古売・佐久良売など。『葛飾区史』）、筑前国川辺里戸籍（肥君猪手・物部牧夫）、平城京木簡（牛養・馬甘・犬万呂・猪手・龍麻呂・鯛麻呂。奈良文化財研究所なぶんけんブログ「変わった人名」）、出雲国大税賑給歴名帳の女性名（姉売・荒売・呰売・子日女など。田籠博「古代出雲国の女性名について」）。氏は地域の戸籍に多いもの（東国の孔王部・刑部、美濃の県主族・秦人、九州の卜部・葛野部・物部など）。</span></li>
@@ -905,7 +915,7 @@ function finish(){
   o.className = "stamp ojo-stamp " + r.ojo.k;
   $("kEpithet").textContent = r.epithet;
   $("kName").innerHTML = "<b></b><span class='d'></span>"; $("kName").querySelector("b").textContent = r.name;
-  $("kName").querySelector(".d").textContent = r.spouses.length ? "連れ合い：" + r.spouses.join("、") : "";
+  $("kName").querySelector(".d").textContent = [r.parents.join("　"), r.spouses.length ? "連れ合い：" + r.spouses.join("、") : ""].filter(Boolean).join("　／　");
   HeianPixel.draw($("kScene").getContext("2d"), S, { t: 0, age: S.age, year: S.year, dead: true });
   $("kBirth").innerHTML = "<b></b><span class='d'></span>";
   $("kBirth").querySelector("b").textContent = r.birthWareki + "（" + r.birthYear + "年）";

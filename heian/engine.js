@@ -300,7 +300,7 @@ function myName(s) { return s.nm && s.nm.custom ? s.nm.custom : nameOf(s.nm, s.a
 function renameSelf(s, how) {
   if (how && how.custom != null) { const t = String(how.custom).trim().slice(0, 12); s.nm.custom = t || null; }
   else { s.nm = makeName(s.birthStatus, s.sex, s.birthYear, s.birthRegion, { tier: s.tier && s.tier.id, avoid: [myName(s)] }); }
-  s.logs[0].t = s.logs[0].t.replace(/名は「[^」]*」。$/, "名は「" + myName(s) + "」。");
+  s.logs[0].t = s.logs[0].t.replace(/名は「[^」]*」。/, "名は「" + myName(s) + "」。");
   return myName(s);
 }
 function childName(c, year) { return nameOf(c.nm, year - c.y, c.sex); }
@@ -366,8 +366,15 @@ function newLife(opt) {
     s.en = clamp(s.en + tier.en, 0, 100);
     Object.assign(s.flags, tier.flags);
   }
-  s.logs.push({ age: 0, year, t: birthText(s) + (s.tier ? "暮らし向きは「" + s.tier.label + "」。" : "") + "名は「" + myName(s) + "」。", k: "birth", src: s.tier && s.tier.src });
+  s.kin = makeKin(s);
+  s.logs.push({ age: 0, year, t: birthText(s) + (s.tier ? "暮らし向きは「" + s.tier.label + "」。" : "") + "名は「" + myName(s) + "」。" + kinIntro(s), k: "birth", src: s.tier && s.tier.src });
   return s;
+}
+function kinIntro(s) {
+  if (!s.kin) return "";
+  const f = s.kin.find(k => k.rel === "父"), m = s.kin.find(k => k.rel === "母");
+  const g = s.kin.filter(k => k.side);
+  return "父は" + (kinName(f) ? "「" + kinName(f) + "」" : "") + "（数え" + (f.age + 1) + "）、母は" + (kinName(m) ? "「" + kinName(m) + "」" : "") + "（数え" + (m.age + 1) + "）。" + (g.length ? g.map(x => x.side + "の" + x.rel).join("・") + "も健在です。" : "祖父母は、もういません。");
 }
 function birthText(s) {
   return wareki(s.year) + "（" + s.year + "年）、" + REGION[s.region] + "にて、" + STATUS[s.st].birth[s.sex === "m" ? 0 : 1] + "として生まれる。";
@@ -985,12 +992,6 @@ const EVENTS = [
   { p: 0.05, when: (s) => s.st === "genin", fx: (s) => { adj(s, { hp: -3 }); log(s, pick([s.year < 900 ? "戸籍に、あなたは「奴（ぬ）」「婢（ひ）」として記されています。名はあっても、姓はありません。" : "主人の家では、あなたは「下人」と呼ばれます。名はあっても、姓はありません。", "主人が別の家と取引し、あなたの兄弟が譲り渡されていきました。", "朝から晩まで主人の田で働きました。明日も同じです。"]), "bad"); } },
   // ---- 浮浪人 ----
   { p: 0.05, when: (s) => s.st === "furo", fx: (s) => { adj(s, { hp: -3 }); log(s, "国司の役人に「浮浪人」として捕まりかけました。走って逃げました。", "bad"); } },
-  // ---- 子ども時代 ----
-  { p: 0.035, when: (s) => s.age >= 2 && s.age < 15 && !s.flags.orphan, fx: (s) => {
-    const who = R() < 0.5 ? "父" : "母";
-    s.flags.orphan = 1; adj(s, { hp: -3, w: -0.25 * Math.max(0, s.wealth) });
-    log(s, who + "が亡くなりました。この時代、親が子の成人を見届けられるとは限りません。", "bad");
-  } },
   // ---- 全般 ----
   { p: 0.04, when: (s) => s.age >= 8, fx: (s) => { adj(s, { hp: -6 }); const k = R(); if (k < 0.34) log(s, "瘧病（わらわやみ）にかかり、熱と震えを繰り返しました。光源氏が北山の聖を訪ねた、あの病です。", "bad", "『源氏物語』若紫巻"); else log(s, k < 0.67 ? "ひどい腹下しで寝込みました。" : "咳の出る病が流行り、寝込みました。", "bad"); } },
   { p: 0.02, when: (s) => s.age >= 10 && s.region !== "kyo", src: "『日本往生極楽記』", fx: (s) => { adj(s, { toku: 2 }); log(s, "旅の聖（ひじり）が村に来て、念仏を勧めていきました。", "n"); } }
@@ -1099,6 +1100,137 @@ const SMALL = [
   ], "検非違使の下部「放免」（倉本一宏の解説ほか）") }
 ];
 
+/* ---------------- 親と祖父母 ---------------- */
+// 庶民の戸籍の一つの戸には、母・庶母・姑などが同籍する例がある（同居していたかは議論がある）。
+// 貴族は婿取りが多く、子は母方の家で育ち、外祖父（母方の祖父）が大きな後ろ盾になった。
+function kinAliveP(age) { return age < 45 ? 0.8 : age < 55 ? 0.6 : age < 65 ? 0.38 : age < 75 ? 0.16 : 0.04; }
+function makeKin(s) {
+  const st = s.st, noble = isNoble(s) || st === "kanjin";
+  const fa = Math.round(rnd(noble ? 22 : 19, noble ? 45 : 40)), ma = Math.round(rnd(15, Math.min(fa, 34)));
+  const nmF = st === "kouzoku" ? { call: "帝" } : adultNm(st, "m", s.year - fa, s.region, { uji: s.nm && s.nm.uji, tsuji: s.nm && s.nm.tsuji });
+  if (s.nm && s.nm.uji && nmF.uji !== undefined && st !== "kouzoku") nmF.uji = s.nm.uji;
+  const momSt = st === "kouzoku" ? "kugyo" : st;
+  const nmM = adultNm(momSt, "f", s.year - ma, s.region, {});
+  const kin = [
+    { rel: "父", sex: "m", age: fa, alive: true, nm: nmF, st },
+    { rel: "母", sex: "f", age: ma, alive: true, nm: nmM, st: momSt }
+  ];
+  // 祖父母（父方・母方）
+  [["父方", fa, nmF], ["母方", ma, nmM]].forEach(([side, pa, pnm]) => {
+    ["m", "f"].forEach(sx => {
+      const ga = pa + Math.round(rnd(17, 30));
+      if (R() < kinAliveP(ga)) kin.push({ rel: (sx === "m" ? "祖父" : "祖母"), side, sex: sx, age: ga, alive: true, st: side === "父方" ? st : momSt,
+        nm: st === "kouzoku" && side === "父方" ? { call: sx === "m" ? "上皇" : "皇太后" } : adultNm(side === "父方" ? st : momSt, sx, s.year - ga, s.region, sx === "m" ? { uji: side === "父方" ? pnm.uji : pnm.uji } : {}) });
+    });
+  });
+  return kin;
+}
+function kinName(k) { return nameOf(k.nm, 40, k.sex) || k.nm.call || ""; }
+function kinLabel(k) { return (k.side ? k.side + "の" : "") + k.rel + (kinName(k) ? "「" + kinName(k) + "」" : ""); }
+function kinOf(s, rel) { return (s.kin || []).find(k => k.rel === rel && k.alive); }
+function parentsAlive(s) { return (s.kin || []).filter(k => (k.rel === "父" || k.rel === "母") && k.alive).length; }
+// 住まいを共にしている年長の家族（ドット絵と家計に使う）
+function kinAtHome(s) {
+  if (!s.kin) return [];
+  const noble = isNoble(s) || s.st === "kanjin";
+  const home = s.st === s.birthStatus && s.region === s.birthRegion && !["so", "eji", "furo", "genin"].includes(s.st);
+  return s.kin.filter(k => {
+    if (!k.alive) return false;
+    if (s.age < 15) return noble ? (k.rel === "父" || k.rel === "母" || k.side === "母方") : (k.rel === "父" || k.rel === "母" || k.side === "父方");
+    if (!home) return false;
+    if (noble) return s.sex === "f" && (k.rel === "父" || k.rel === "母"); // 婿取り：娘は親の家に残る
+    return k.rel === "父" || k.rel === "母" || (k.side === "父方");
+  });
+}
+// 毎年：年をとり、亡くなることもある
+function kinYear(s) {
+  if (!s.kin) return;
+  const tags = s.ytags || new Set();
+  const harsh = tags.has("famine") || tags.has("epidemic") ? 1.8 : 1;
+  for (const k of s.kin) {
+    if (!k.alive) continue;
+    k.age++;
+    const h = baseHazard(k.age) * (STATUS[k.st] ? STATUS[k.st].haz : 1) * harsh;
+    if (R() < h) {
+      k.alive = false; k.diedAt = s.age;
+      s.flags.kinDeaths = (s.flags.kinDeaths || 0) + 1;
+      const away = s.region !== s.birthRegion && s.age >= 15;
+      log(s, (away ? "故郷から知らせが届きました。" : "") + kinLabel(k) + "が、数えで" + (k.age + 1) + "で亡くなりました。", "bad");
+      adj(s, { hp: s.age < 15 && (k.rel === "父" || k.rel === "母") ? -3 : -1 });
+      if (k.rel === "父" || k.rel === "母") {
+        if (s.age < 15) {
+          adj(s, { w: -0.25 * Math.max(0, s.wealth) });
+          if (parentsAlive(s) === 0 && s.st !== "genin") log(s, "両親を亡くし、親類の家に引き取られることになりました。", "bad");
+          if (isNoble(s)) adj(s, { en: -5 });
+        } else if (k.rel === "父" && s.st !== "genin" && s.st !== "so") {
+          const gain = Math.max(0.5, sc(s) * rnd(1, 4));
+          s.wealth += gain;
+          if (isNoble(s) || s.st === "gozoku" || s.st === "kanjin") log(s, "父は処分状（譲状）を書き残していました。家財と田の一部を受け継ぎました。", "n", "Wikipedia「譲状」（10世紀初頭から作成された財産譲渡の証文）");
+          else log(s, "父の田と家財を受け継ぎました。", "n");
+        }
+      }
+      if (k.rel === "祖父" && k.side === "母方" && isNoble(s) && s.age < 20) { adj(s, { en: -6 }); log(s, "外祖父は、あなたのいちばんの後ろ盾でした。", "bad", "Wikipedia「外戚」"); }
+    }
+  }
+}
+// 子ども時代と、年老いた親にまつわる出来事
+const KIN_EVENTS = [
+  { p: 1, when: (s) => s.age === 0 && (isNoble(s)), src: "『紫式部日記』寛弘5年11月1日条（敦成親王の五十日の祝い）ほか", fx: (s) => {
+    const g = s.kin.find(k => k.rel === "祖父" && k.side === "母方" && k.alive);
+    log(s, "生まれて五十日目の祝い（五十日の祝い）。" + (g ? "外祖父の「" + kinName(g) + "」" : "父") + "が、重湯に溶かした餅を口に含ませてくれました。", "good");
+  } },
+  { p: 0.45, once: "hakama", when: (s) => s.age >= 2 && s.age <= 6 && isNoble(s), src: "Wikipedia「袴着」（平安貴族の間で、男女の別なく3〜7歳で行われた）", fx: (s) => { adj(s, { en: 2 }); log(s, "袴着の儀が行われ、初めて袴を着けました。家の者がみな集まり、成長を祝ってくれました。", "good"); } },
+  { p: 0.18, when: (s) => s.age >= 4 && s.age < 13 && s.kin.some(k => k.rel === "祖母" && k.alive && storyFor(s, k)), fx: (s) => {
+    const g = s.kin.find(k => k.rel === "祖母" && k.alive && storyFor(s, k));
+    const st = storyFor(s, g); (g.told = g.told || []).push(st.id);
+    log(s, kinLabel(g) + "が、" + st.t, "n", st.src);
+  } },
+  { p: 0.15, when: (s) => s.age >= 5 && s.age < 15 && s.kin.some(k => k.rel === "祖父" && k.alive) && oldStory(s), fx: (s) => {
+    const g = s.kin.find(k => k.rel === "祖父" && k.alive); const h = oldStory(s);
+    log(s, kinLabel(g) + "が、若いころの話をしてくれました。" + h.y + "年、" + h.name + "のときのことです。", "n", h.src);
+  } },
+  { p: 0.08, when: (s) => s.age >= 5 && s.age < 15 && isRural(s) && kinOf(s, "父"), fx: (s) => { adj(s, { hp: 1 }); log(s, "父の「" + kinName(kinOf(s, "父")) + "」に連れられて、田の水を見回りました。", "n"); } },
+  { p: 0.08, when: (s) => s.age >= 5 && s.age < 15 && isRural(s) && kinOf(s, "母"), src: "賦役令（調は布などで納める）", fx: (s) => log(s, "母の「" + kinName(kinOf(s, "母")) + "」が、夜遅くまで麻の糸を紡いでいました。調に納める布になります。", "n") },
+  { p: 0.06, when: (s) => s.age >= 6 && s.age < 15 && isNoble(s) && s.kin.some(k => k.rel === "祖父" && k.side === "母方" && k.alive), src: "Wikipedia「外戚」", fx: (s) => { adj(s, { en: 2 }); log(s, "外祖父の屋敷で育てられています。外祖父は、あなたの行く末を何かと気にかけてくれます。", "good"); } }
+];
+const STORIES = [
+  { id: "kitsune", t: "昔話を聞かせてくれました。狐が女に化けて人の妻になり、正体がばれても夫に「来て寝よ」と言われた話です。", src: "『日本霊異記』上巻第2縁" },
+  { id: "urashima", t: "昔話を聞かせてくれました。釣りに出た浦嶋子が、捕らえた大亀が女に化けたのを妻とし、海のかなたの蓬萊山（とこよのくに）へ渡った話です。", src: "『日本書紀』雄略紀22年7月条（浦嶋子）" },
+  { id: "taketori", from: 900, t: "竹の中から見つかった、かぐや姫の物語を聞かせてくれました。", src: "『竹取物語』（9世紀後半〜10世紀前半の成立。『源氏物語』絵合巻は「物語の出で来はじめの祖」と呼ぶ）" }
+];
+function storyFor(s, g) { return STORIES.find(x => !(g.told || []).includes(x.id) && (!x.from || s.year >= x.from)); }
+function oldStory(s) {
+  const g = s.kin && s.kin.find(k => k.rel === "祖父" && k.alive); if (!g) return null;
+  const from = s.year - g.age + 15, to = s.year - 1;
+  const c = HIST.filter(h => {
+    const y = Array.isArray(h.y) ? h.y[0] : h.y;
+    return y >= from && y <= to && (!h.reg || h.reg.includes(s.region)) && !h.when && /（[^）]*(乱|変|地震|噴火|飢饉|大火|合戦|入寇|疫|津波)[^）]*）/.test(h.t || "");
+  });
+  if (!c.length) return null;
+  const h = c[c.length - 1];
+  const m = (h.t.match(/（([^）]*)）/g) || []).pop();
+  return { y: Array.isArray(h.y) ? h.y[0] : h.y, name: m ? m.slice(1, -1) : "大きな出来事", src: h.src };
+}
+function kinEvents(s) {
+  if (!s.kin) return;
+  for (const ev of KIN_EVENTS) {
+    if (ev.once && s.flags["kin_" + ev.once]) continue;
+    if (!ev.when(s) || R() >= ev.p) continue;
+    if (ev.once) s.flags["kin_" + ev.once] = 1;
+    const b = s.yearLogs.length; ev.fx(s);
+    if (ev.src) for (let i = b; i < s.yearLogs.length; i++) if (!s.yearLogs[i].src) s.yearLogs[i].src = ev.src;
+  }
+}
+// 年老いた親の看病（分岐点）
+function chKinCare(s, k) {
+  const k1 = kinLabel(k);
+  return branch(s, "老いた親", k1 + "が病に伏せっています。数えで" + (k.age + 1) + "。", [
+    { label: "そばで看病する", desc: "体↓ 徳↑ 縁↑", apply: (st) => { adj(st, { hp: -3, toku: 4, en: 2 }); k.cared = 1; return ["つきっきりで看病しました。"]; } },
+    { label: "僧を呼んで祈祷してもらう", desc: "財↓ 徳↑", apply: (st) => { adj(st, { w: -Math.max(0.5, 1 * sc(st)), toku: 2 }); return ["僧を呼んで、祈祷してもらいました。"]; } },
+    { label: "いつもどおり働く", desc: "徳↓", apply: (st) => { adj(st, { toku: -2 }); return ["いつもどおり働きました。誰かが働かなければ、皆が飢えます。"]; } }
+  ]);
+}
+
 /* ---------------- 1年の処理 ---------------- */
 /* ---------------- 家計（世帯）と、財を元手にした稼ぎ ---------------- */
 // 庶民は「働き手×1人あたりの稼ぎ − 食べる口」で収支を出す。幼い子が多い時期は赤字になりやすい
@@ -1113,6 +1245,7 @@ function household(s) {
     else if (a < 15) { mouths += 0.7; workers += 0.4; }
     else { mouths += 1; workers += 1; }
   }
+  if (s.age >= 15 && s.kin && !isNoble(s) && s.st !== "kanjin") for (const k of kinAtHome(s)) { mouths += 1; workers += k.age < 60 ? 0.6 : 0.15; }
   const small = home.filter(c => s.year - c.y < 15).length;
   let extra = 0;
   // 貴族は婿取り（妻方で子を育てる）が基本なので、子の養育費は母の側が多く負う
@@ -1178,6 +1311,8 @@ function prepareYear(s) {
     else if (isOfficial(s) && !(s.flags.exile > 0) && s.rank >= 9 && s.rank <= 13 && s.juryo === 0 && a >= 28 && (s.flags.juryoAsked || -99) <= a - (s.flags.shinbumi > 0 ? 3 : 8) && R() < 0.12 + s.en / 500 + (s.flags.inshin ? 0.12 : 0) + (s.flags.shinbumi > 0 ? 0.25 : 0) + (s.flags.juryoHouse ? 0.08 : 0)) { s.flags.juryoAsked = a; q.push(chJuryo(s)); s.branchThisYear = true; }
     // 結婚
     else if ((!s.married || (!s.spouseAlive && s.flags.widowedAt != null && a - s.flags.widowedAt >= 1)) && s.st !== "so" && a >= (s.sex === "f" ? 13 : 15) && a <= (s.marriages > 0 ? 48 : 40) && !s.kokumo && R() < marryChance(s)) { q.push(chMarry(s)); s.branchThisYear = true; }
+    // 老いた親の看病
+    else if (a >= 18 && s.kin && R() < 0.06 && s.kin.some(k => k.alive && (k.rel === "父" || k.rel === "母") && k.age >= 50 && !k.cared)) { const k = s.kin.find(k => k.alive && (k.rel === "父" || k.rel === "母") && k.age >= 50 && !k.cared); k.cared = 1; q.push(chKinCare(s, k)); s.branchThisYear = true; }
     // 衛士の任期明け
     else if (s.st === "eji" && s.flags.ejiTerm <= 0) { q.push(chEjiEnd(s)); s.branchThisYear = true; }
     // 富豪の輩として成り上がる
@@ -1246,7 +1381,7 @@ function runYear(s) {
   const hhMode = !!(d2.wpw && s.age >= 15);
   const tMul = s.tier && s.st === s.birthStatus ? s.tier.inc : 1;
   if (hhMode) { inc = d2.wpw * tMul * hh.workers * rnd(0.75, 1.25); up = hh.mouths; }
-  else { inc = d2.income * tMul * rnd(0.75, 1.25); up = d2.upkeep + hh.extra; }
+  else { inc = d2.income * tMul * rnd(0.75, 1.25) * (s.age < 15 && s.kin ? [0.72, 0.88, 1][parentsAlive(s)] : 1); up = d2.upkeep + hh.extra; }
   if (s.st === "bushi" && s.flags.rodo) { inc = 8 * rnd(0.75, 1.25); up = 6 + hh.extra; }
   if (s.st === "so" && s.flags.nobleMonk) inc = 35 * rnd(0.8, 1.2);
   if (s.st === "kouzoku" && !s.flags.shisei && s.sex === "m") inc = d2.income;
@@ -1337,6 +1472,8 @@ function runYear(s) {
 
   // 家族
   family(s);
+  kinYear(s);
+  kinEvents(s);
 
   // 加齢
   if (a >= 40) adj(s, { hp: -0.6 });
@@ -1582,6 +1719,7 @@ function summary(s) {
     birthLabel: birthLabel(s),
     name: myName(s) + (s.nm && s.nm.dharma && !s.nm.custom && s.nm.secular ? "（俗名 " + s.nm.secular + "）" : ""),
     spouses: (s.spouses || []).slice(),
+    parents: (s.kin || []).filter(k => k.rel === "父" || k.rel === "母").map(k => k.rel + "：" + (kinName(k) || "（名は伝わらない）")),
     childNames: s.children.map(c => ({ name: childName(c, s.year), alive: c.alive, dieAge: c.dieAge })),
     tier: s.tier ? { label: s.tier.label, share: s.tier.share } : null,
     birthYear: s.birthYear, deathYear: s.year,
@@ -1629,7 +1767,7 @@ function simulate(n, opt) {
 // node 側で wpick の regions 用に k を返せるよう調整
 const api = {
   newLife, advance, choose, summary, simulate, autoLife, wareki, REGION, STATUS, RANKS,
-  curLabel, fmtW, kanjiNum, isMilestone, planOptions, setPlan, myName, renameSelf, spouseName, childName, makeName, nameOf
+  curLabel, fmtW, kanjiNum, isMilestone, planOptions, setPlan, myName, renameSelf, kinAtHome, kinName, spouseName, childName, makeName, nameOf
 };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.Heian = api;
