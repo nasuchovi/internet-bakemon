@@ -217,6 +217,7 @@ button{font-family:inherit;color:inherit;}
 .choice .c-kind{font-size:11px;letter-spacing:.3em;color:var(--shu);font-weight:700;}
 .choice h3{font-size:21px;font-weight:800;letter-spacing:.08em;margin:2px 0 6px;}
 .choice .c-lead{font-size:14px;color:var(--ink);margin-bottom:12px;}
+.choice .c-src{font-size:11.5px;color:var(--ink-soft);margin:-6px 0 10px;}
 .opt{
   display:block;width:100%;text-align:left;
   background:var(--paper2);border:1px solid var(--rule);
@@ -461,6 +462,7 @@ button{font-family:inherit;color:inherit;}
     <p class="c-kind" id="cKind"></p>
     <h3 id="cTitle"></h3>
     <p class="c-lead" id="cLead"></p>
+    <p class="c-src" id="cSrc" hidden></p>
     <div id="cOpts"></div>
   </div>
 </div>
@@ -647,6 +649,8 @@ function openChoice(c){
   $("cKind").textContent = KIND[c.kind] || "";
   $("cTitle").textContent = c.title;
   $("cLead").textContent = c.lead;
+  $("cSrc").hidden = !c.src;
+  $("cSrc").textContent = c.src ? "典拠：" + c.src : "";
   const box = $("cOpts"); box.innerHTML = "";
   c.options.forEach((o, i) => {
     const b = document.createElement("button");

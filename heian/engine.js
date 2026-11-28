@@ -125,9 +125,9 @@ function naturalCause(s) {
   const a = s.age, rich = s.noble || s.st === "kugyo";
   if (a < 5) return wpick([
     { w: 34, c: "痢病（下痢）", d: "この時代、子どもの命を最も多く奪ったのは、ありふれたお腹の病でした。" },
-    { w: 24, c: "咳病（風邪をこじらせて）", d: "ただの風邪でした。ただの風邪で、十分でした。" },
+    { w: 24, c: "咳病（しわぶきやみ）", d: "ただの咳の病でした。ただの咳の病で、十分でした。" },
     { w: 26, c: "物の怪", d: "加持祈祷が行われましたが、物の怪のほうが強かったようです。" },
-    { w: rich ? 2 : 16, c: "栄養失調", d: "家族の分の粥も、あなたに回されていました。" }
+    { w: rich ? 2 : 16, c: "飢え", d: "家族の分の粥も、あなたに回されていました。" }
   ]);
   if (a < 15) return wpick([
     { w: 30, c: "痢病（下痢）", d: "井戸の水が悪かったのかもしれません。誰にも分かりませんでした。" },
@@ -226,14 +226,14 @@ function plansFor(s) {
   ];
   if (a < 15) {
     if (isNoble(s) || s.st === "kanjin") return [
-      { id: "c_kanseki", label: "漢籍の素読に励む", desc: "才↑↑", eff: { sai: 3.5, hp: -0.3 } },
+      { id: "c_kanseki", label: "漢籍（『史記』『文選』など）を学ぶ", desc: "才↑↑", eff: { sai: 3.5, hp: -0.3 } },
       { id: "c_waka", label: "和歌と管弦を習う", desc: "才↑ 縁↑", eff: { sai: 2, en: 2 } },
-      { id: "c_play", label: m ? "蹴鞠と遊びに明け暮れる" : "貝合わせと遊びに明け暮れる", desc: "体↑ 縁↑", eff: { hp: 1.5, en: 1 } }
+      { id: "c_play", label: m ? "蹴鞠と遊びに明け暮れる" : "雛遊び（ひいな遊び）に明け暮れる", desc: "体↑ 縁↑", eff: { hp: 1.5, en: 1 } }
     ];
     return [
       { id: "c_help", label: "親の仕事を手伝う", desc: "財↑ 体↓", eff: { inc: 0.12, hp: -0.3 } },
       { id: "c_run", label: "野山を走り回る", desc: "体↑ 川や崖が危ない", eff: { hp: 1.8, risk: 0.004, riskC: "溺死", riskD: "夏の川遊びでした。" } },
-      { id: "c_tera", label: "寺で読み書きを習う", desc: "才↑ 徳↑", eff: { sai: 2.5, toku: 1, inc: -0.05 } }
+      { id: "c_tera", label: "寺の童子として経を習う", desc: "才↑ 徳↑", eff: { sai: 2.5, toku: 1, inc: -0.05 } }
     ];
   }
   if (s.st === "so") {
@@ -280,7 +280,7 @@ function plansFor(s) {
     { id: "p_mid", label: "ほどほどに働く", desc: "変化なし", eff: {} },
     { id: "p_tera", label: "寺に通い、念仏を唱える", desc: "徳↑↑ 財↓", eff: { toku: 3, inc: -0.15 } }
   ];
-  if (a < 35 && !s.married) o.push({ id: "p_utagaki", label: m ? "歌垣と夜這いに精を出す" : "歌垣に出かけて相手を探す", desc: "縁↑ 結婚↑", eff: { en: 2.5, marry: 0.25 } });
+  if (a < 35 && !s.married) o.push({ id: "p_utagaki", label: m ? "妻問い（想う相手のもとへ夜に通う）に精を出す" : "通ってくる相手を待つ", desc: "縁↑ 結婚↑", eff: { en: 2.5, marry: 0.25 } });
   if (s.st === "gyomin") o[0] = { id: "p_sea", label: "遠くの漁場まで船を出す", desc: "財↑↑ 海が危ない", eff: { inc: 0.6, risk: 0.012, riskC: "海難", riskD: "その日の海は、朝だけ穏やかでした。" } };
   if (s.st === "kyomin") o[1] = { id: "p_ichi", label: "東西の市で商いをする", desc: "財が大きく増えたり減ったり", eff: { gamble: 1 } };
   if (s.st === "gozoku" && m) o.push({ id: "p_bu", label: "武芸を磨く（兵の道）", desc: "体↑ 縁↑ 武士への道", eff: { hp: 1, en: 1.5, bu: 1 } });
@@ -335,7 +335,7 @@ function rankCap(s) {
 }
 
 /* ---------------- 人生の分岐点 ---------------- */
-function branch(s, title, lead, options) { return { kind: "branch", title, lead, options }; }
+function branch(s, title, lead, options, src) { return { kind: "branch", title, lead, options, src }; }
 
 function chGenpuku(s) {
   const m = s.sex === "m";
@@ -402,7 +402,7 @@ function chMarry(s) {
   let lead;
   if (s.st === "genin") lead = "主人が、あなたの結婚相手を決めてきました。";
   else if (noble) lead = m ? "ある家の姫君と、歌のやりとりが続いています。返事が来るようになりました。" : "毎晩のように恋文（歌）が届く男がいます。字は上手です。顔は、まだ見たことがありません。";
-  else lead = m ? "歌垣で気になる相手ができました。" : "夜、戸を叩く男がいます。何度も来ます。";
+  else lead = m ? "隣の村に、気になる相手ができました。何度か夜に通っています。" : "夜、戸を叩く男がいます。何度も来ます。";
   if (s.marriages > 0) lead = (s.flags.lastLoss === "divorce" ? "連れ合いと別れてしばらく経ちました。" : "連れ合いを亡くしてしばらく経ちました。") + lead;
   return branch(s, "結婚", lead, [
     { label: s.st === "genin" ? "従う" : (s.marriages > 0 ? "再婚する" : "結婚する"), desc: "子ができ、家が続く。出産は命がけ", apply: (st) => {
@@ -411,7 +411,7 @@ function chMarry(s) {
       if (again && st.st !== "genin") return [noble ? "新しい相手と三日夜餅を食べました。二度目なので、段取りは慣れたものです。" : "新しい連れ合いと所帯を持ちました。この時代、再婚はまったく珍しくありません。"];
       if (st.st === "genin") return ["主人の決めた相手と夫婦になりました。生まれる子も、主人の財産になります。"];
       if (noble) return [m ? "三晩続けて通い、三日夜餅（みかよのもちい）を食べました。これで結婚成立です。" : "三晩通ってきた男と、三日夜餅を食べました。結婚成立です。翌月から、通ってくる日が少し減りました。"];
-      return ["夫婦になりました。婚礼といっても、近所に餅を配るくらいです。"];
+      return ["夫婦になりました。庶民の婚礼の様子は、史料にほとんど残っていません。"];
     } },
     { label: s.st === "genin" ? "拒む" : "見送る", desc: "まだ一人でいる", apply: (st) => {
       if (st.st === "genin") { adj(st, { hp: -6, en: -3 }); return ["拒みました。主人の機嫌を損ね、食事を減らされました。"]; }
@@ -598,7 +598,7 @@ const EVENTS = [
 ];
 
 /* ---------------- 庶民の小さな出来事（選択式） ---------------- */
-function ev(title, lead, options) { return { title, lead, options }; }
+function ev(title, lead, options, src) { return { title, lead, options, src }; }
 const SMALL = [
   { id: "kenden", when: (s) => (s.st === "nomin" || s.st === "gozoku") && !s.flags.kishin, build: (s) => ev("検田使が来た", "国司の検田使（田の広さを調べる役人）が村に来ました。", [
     { label: "酒と贈り物でもてなす", desc: "財↓ 田の記録が甘くなるかも", apply: (st) => { adj(st, { w: -0.6 * sc(st) }); if (R() < 0.7) { adj(st, { w: 0.9 * sc(st) }); return ["もてなしました。田の広さは、なぜか少なめに記録されました。"]; } return ["もてなしました。検田使は酒だけ飲んで、田はきっちり測っていきました。"]; } },
@@ -756,7 +756,7 @@ function runYear(s) {
   if (s.plan && a >= 3) {
     adj(s, { hp: e.hp || 0, sai: e.sai || 0, en: e.en || 0, toku: e.toku || 0 });
     if (e.risk) addRisk(s, e.risk, e.riskC, e.riskD);
-    if (e.nyobo && s.sex === "f" && !s.flags.nyobo && R() < 0.25 + s.en / 200 + (s.flags.wantNyobo ? 0.2 : 0)) { s.flags.nyobo = 1; log(s, "女房として宮中に出仕することになりました。「" + pick(["式部", "少納言", "中納言", "小大君", "右近", "小式部", "伊勢", "大輔"]) + "」と呼ばれます。本名で呼ばれることは、もうありません。", "good"); }
+    if (e.nyobo && s.sex === "f" && !s.flags.nyobo && R() < 0.25 + s.en / 200 + (s.flags.wantNyobo ? 0.2 : 0)) { s.flags.nyobo = 1; log(s, "女房として宮中に出仕することになりました。「" + pick(["式部", "少納言", "中納言", "宰相", "侍従", "衛門", "右近", "小式部", "伊勢", "大輔"]) + "」と呼ばれます。本名で呼ばれることは、もうありません。", "good"); }
     if (e.free && R() < e.free) { s.st = "nomin"; s.wealth = 0; log(s, "長年の働きを認められ、主人から解放されました。今日からは、税を払う側です。", "good"); }
     if (e.bu && s.sex === "m" && s.st === "gozoku" && s.year >= 900 && R() < 0.06) { s.st = "bushi"; log(s, "一族を率いる武士として、名が知られるようになりました。", "good"); }
   }
@@ -820,7 +820,7 @@ function runYear(s) {
     for (const ev of shuffle(EVENTS)) {
       if (n >= 2) break;
       if (!ev.when(s)) continue;
-      if (R() < ev.p) { ev.fx(s); n++; }
+      if (R() < ev.p) { const b = s.yearLogs.length; ev.fx(s); n++; if (ev.src) for (let i = b; i < s.yearLogs.length; i++) if (!s.yearLogs[i].src) s.yearLogs[i].src = ev.src; }
     }
   }
 
@@ -958,7 +958,8 @@ function choose(s, idx) {
   const o = c.options[idx];
   if (!o || o.disabled) { s.queue.unshift(c); return null; }
   const lines = o.apply(s) || [];
-  s.pendingLogs = (s.pendingLogs || []).concat(lines.map(t => ({ age: s.age, year: s.year, t, k: "choice" })));
+  const src = o.src || c.src;
+  s.pendingLogs = (s.pendingLogs || []).concat(lines.map((t, i) => ({ age: s.age, year: s.year, t, k: "choice", src: i === lines.length - 1 ? src : undefined })));
   return lines;
 }
 
