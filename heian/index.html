@@ -140,6 +140,11 @@ button{font-family:inherit;color:inherit;}
 .rarity .r-num{font-size:13px;color:var(--ink-soft);}
 .rarity .r-num b{font-size:26px;color:var(--ink);font-weight:800;margin:0 3px;font-variant-numeric:tabular-nums;}
 .bl .v small.share{display:block;margin:2px 0 0;font-size:12px;}
+.name-ctl,.name-edit{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.name-edit[hidden]{display:none;}
+.mini{font-size:12px;font-weight:700;padding:5px 10px;background:var(--paper2);border:1px solid var(--rule);cursor:pointer;letter-spacing:.04em;}
+.mini:focus-visible{outline:2px solid var(--shu);outline-offset:1px;}
+#nameInput{font:inherit;font-size:16px;padding:5px 8px;border:1px solid var(--ink-soft);background:var(--paper);color:var(--ink);width:12em;max-width:100%;}
 .bl .tier-d{display:block;font-size:13px;color:var(--ink-soft);line-height:1.7;margin-top:2px;}
 .bl .tier-d small{display:block;font-size:11px;margin-top:2px;}
 .comment{font-size:14.5px;color:var(--ink);border-left:3px solid var(--shu);padding:2px 0 2px 12px;}
@@ -160,6 +165,7 @@ button{font-family:inherit;color:inherit;}
 .hud-when b{color:var(--ink);font-weight:700;}
 .hud-who{font-size:13px;margin-top:4px;}
 .hud-who b{font-weight:800;}
+.hud-who .hud-name{font-size:15px;color:var(--ink);}
 .bars{display:grid;grid-template-columns:repeat(4,1fr) 1.25fr;gap:8px;margin-top:9px;align-items:end;}
 .bar .lb{font-size:11px;color:var(--ink-soft);display:flex;justify-content:space-between;letter-spacing:.05em;}
 .bar .lb span:last-child{font-variant-numeric:tabular-nums;color:var(--ink);}
@@ -346,6 +352,10 @@ button{font-family:inherit;color:inherit;}
         <div class="bl" id="bl1"><span class="k">時 は</span><span class="v" id="bWhen"></span></div>
         <div class="bl" id="bl2"><span class="k">所 は</span><span class="v" id="bWhere"></span></div>
         <div class="bl" id="bl3"><span class="k">生 ま れ は</span><span class="v" id="bWho"></span></div>
+        <div class="bl" id="bl3n"><span class="k">名 は</span><span class="v" id="bName"></span>
+          <span class="name-ctl"><button type="button" class="mini" id="btnReroll">別の名にする</button><button type="button" class="mini" id="btnEditName">名を書き換える</button></span>
+          <span class="name-edit" id="nameEdit" hidden><input id="nameInput" maxlength="12" aria-label="名前"><button type="button" class="mini" id="btnNameOk">決める</button></span>
+          <span class="tier-d" id="bNameD"></span></div>
         <div class="bl" id="bl3b" hidden><span class="k">暮 ら し 向 き は</span><span class="v" id="bTier"></span><span class="tier-d" id="bTierD"></span></div>
         <div class="bl" id="bl4">
           <div class="rarity">
@@ -376,7 +386,7 @@ button{font-family:inherit;color:inherit;}
           <div class="hud-age"><small>数え</small><span id="hAge">1</span><small style="margin-left:2px">歳</small></div>
           <div class="hud-when"><b id="hWareki"></b>（<span id="hYear"></span>）<br><span id="hRegion"></span></div>
         </div>
-        <div class="hud-who">身分：<b id="hWho"></b></div>
+        <div class="hud-who"><b id="hName" class="hud-name"></b>　身分：<b id="hWho"></b></div>
         <div class="bars">
           <div class="bar hp"><div class="lb"><span>体</span><span id="vHp"></span></div><div class="tr"><div class="fl" id="fHp"></div></div></div>
           <div class="bar"><div class="lb"><span>才</span><span id="vSai"></span></div><div class="tr"><div class="fl" id="fSai"></div></div></div>
@@ -399,6 +409,7 @@ button{font-family:inherit;color:inherit;}
       </div>
       <p class="epithet" id="kEpithet"></p>
       <dl class="kv">
+        <dt>名</dt><dd id="kName"></dd>
         <dt>生</dt><dd id="kBirth"></dd>
         <dt>没</dt><dd id="kDeath"></dd>
         <dt>死因</dt><dd id="kCause"></dd>
@@ -494,6 +505,18 @@ button{font-family:inherit;color:inherit;}
           <li>『菅家文草』巻9<span>寛平6年（894）9月14日、遣唐使の派遣を公卿に再審議させるよう求めた菅原道真の奏状。</span></li>
           <li>『和名類聚抄』<span>「歓喜団」の項の注に「八種唐菓子」の名が見える。</span></li>
           <li>神泉苑の祈雨<span>平安時代を通じて神泉苑で請雨経法などの祈雨が行われた（『日本三代実録』貞観17年条ほか）。</span></li>
+        </ul>
+        <h3>名付け</h3>
+        <ul>
+          <li>庶民の名（〜950年ごろ）<span>戸籍・木簡に見える実名を使用：大嶋郷戸籍（孔王部黒人・刀良・阿古売・佐久良売など。『葛飾区史』）、筑前国川辺里戸籍（肥君猪手・物部牧夫）、平城京木簡（牛養・馬甘・犬万呂・猪手・龍麻呂・鯛麻呂。奈良文化財研究所なぶんけんブログ「変わった人名」）、出雲国大税賑給歴名帳の女性名（姉売・荒売・呰売・子日女など。田籠博「古代出雲国の女性名について」）。氏は地域の戸籍に多いもの（東国の孔王部・刑部、美濃の県主族・秦人、九州の卜部・葛野部・物部など）。</span></li>
+          <li>平安中期以降の百姓<span>氏＋二字の実名（東大寺領猪名荘の田堵・秦成重、名田名の恒貞・国弘・弘重、『新猿楽記』の田中豊益）の字を組み合わせています。この時代の庶民女性の実名を示す史料は乏しく、ゲームでは古代の戸籍の女性名を流用しています（史料上は「秦氏女」のように実家の氏に「氏女」をつけて記されることが多い。坂田聡『苗字と名前の歴史』）。</span></li>
+          <li>奴婢<span>氏を持たず、名だけで戸籍に記された（コトバンク「奴婢」）。名は紀寺・東大寺の奴婢の例（太者・粳売・垂水麻呂・広山女など）。</span></li>
+          <li>童名・幼名<span>坂本信道「古代童名一覧稿」に見える名（乙若丸・金剛丸・千寿丸・苔雄丸・光仙丸、くま君・小千代君など）、藤原頼通の幼名「田鶴君」、牛飼童の春童丸・犬男丸。</span></li>
+          <li>貴族男性の実名<span>元服で幼名を改めて二字の実名を名乗り、家ごとに通字があった（摂関家の忠平・師輔・道長・頼通・師実・師通など。Wikipedia「諱」）。子は父の通字を受け継ぐようにしています。</span></li>
+          <li>賜姓源氏・親王<span>嵯峨源氏・仁明源氏の一字名（信・弘・常・定・明・融・多・光など。鳥取県立公文書館の教材、林陸朗「嵯峨源氏の研究」による）。親王の名は実例（道康・時康・恒貞・為平・敦成など）。</span></li>
+          <li>貴族女性の名<span>実名はほとんど記録に残らず、家の中では生まれ順に大君・中君・三君…と呼ばれた（『新猿楽記』の右衛門尉の娘たちなど）。女房名は父や夫の官職からつけられた（藤式部・清少納言・和泉式部など。Wikipedia「女房名」）。実名（「〜子」）は叙位や入内などの記録に残る程度（角田文衞『日本の女性名』）。</span></li>
+          <li>下級官人の氏<span>官司請負制のもとで家業ごとに固定した氏（菅原・大江・中原・清原・坂上・小槻・和気・丹波・賀茂・安倍・大中臣。Wikipedia「官司請負制」）。</span></li>
+          <li>法名<span>師の名から一字をもらう例（良源の弟子・源信）。僧の名の字は良源・源信・明尊・仁海・覚運などから。尼の法名の史料は乏しく、ゲームでは僧と同じ字の組み合わせを使っています。</span></li>
         </ul>
         <h3>疫病・災害・戦乱</h3>
         <ul>
@@ -616,6 +639,29 @@ let lifeNo = 0;
 function fmtInt(n){ return n.toLocaleString("ja-JP"); }
 
 $("btnBorn").onclick = startBirth;
+const NAME_NOTE = {
+  old: "戸籍に見える名にならっています（「〜麻呂」「〜売」など）。",
+  noble_m: "いまは幼名です。元服すると、家の通字を使った実名を名乗ります。",
+  noble_f: "家の中での呼び名です。貴族の女性の実名は、ほとんど記録に残りません。",
+  genin: "奴婢は戸籍に氏を持たず、名だけで記されました。",
+  new_m: "いまは童名です。大人になると、氏と二字の実名で呼ばれます。"
+};
+function renderBirthName(){
+  $("bName").textContent = H.myName(S);
+  const nm = S.nm || {};
+  let note = "";
+  if (S.birthStatus === "genin") note = NAME_NOTE.genin;
+  else if (nm.call && !nm.given) note = NAME_NOTE.noble_f;
+  else if (nm.tsuji || S.birthStatus === "kouzoku") note = NAME_NOTE.noble_m;
+  else if (nm.child) note = NAME_NOTE.new_m;
+  else note = NAME_NOTE.old;
+  $("bNameD").textContent = note + "（くわしくは「出典と注記」へ）";
+}
+$("btnReroll").onclick = () => { H.renameSelf(S); renderBirthName(); };
+$("btnEditName").onclick = () => { $("nameEdit").hidden = false; $("nameInput").value = H.myName(S); $("nameInput").focus(); $("nameInput").select(); };
+function applyName(){ H.renameSelf(S, { custom: $("nameInput").value }); $("nameEdit").hidden = true; renderBirthName(); }
+$("btnNameOk").onclick = applyName;
+$("nameInput").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); applyName(); } });
 function startBirth(){
   S = H.newLife();
   lifeNo++;
@@ -637,8 +683,10 @@ function startBirth(){
     $("bTierD").textContent = tier.desc;
     if (tier.src) { const sr = document.createElement("small"); sr.textContent = "典拠：" + tier.src; $("bTierD").append(sr); }
   }
-  const BL = tier ? ["bl1","bl2","bl3","bl3b","bl4"] : ["bl1","bl2","bl3","bl4"];
-  ["bl1","bl2","bl3","bl3b","bl4"].forEach(id => $(id).classList.remove("on"));
+  renderBirthName();
+  $("nameEdit").hidden = true;
+  const BL = tier ? ["bl1","bl2","bl3","bl3n","bl3b","bl4"] : ["bl1","bl2","bl3","bl3n","bl4"];
+  ["bl1","bl2","bl3","bl3n","bl3b","bl4"].forEach(id => $(id).classList.remove("on"));
   const live = $("btnLive"); live.style.opacity = 0; live.style.pointerEvents = "none";
   show("birth");
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -796,6 +844,7 @@ function hud(r){
   $("hWareki").textContent = H.wareki(year);
   $("hYear").textContent = year + "年";
   $("hRegion").textContent = H.REGION[S.region];
+  $("hName").textContent = H.myName(S);
   $("hWho").textContent = H.curLabel(S) + (S.married && S.spouseAlive ? "・既婚" : "") + (S.children.filter(c => c.alive).length ? "・子" + S.children.filter(c => c.alive).length + "人" : "");
   const set = (k, v) => { $("v" + k).textContent = Math.round(v); $("f" + k).style.width = clamp(v, 0, 100) + "%"; };
   set("Hp", S.hp); set("Sai", S.sai); set("En", S.en); set("Toku", S.toku);
@@ -855,6 +904,8 @@ function finish(){
   o.innerHTML = r.ojo.t.slice(0, 2) + "<br>" + r.ojo.t.slice(2);
   o.className = "stamp ojo-stamp " + r.ojo.k;
   $("kEpithet").textContent = r.epithet;
+  $("kName").innerHTML = "<b></b><span class='d'></span>"; $("kName").querySelector("b").textContent = r.name;
+  $("kName").querySelector(".d").textContent = r.spouses.length ? "連れ合い：" + r.spouses.join("、") : "";
   HeianPixel.draw($("kScene").getContext("2d"), S, { t: 0, age: S.age, year: S.year, dead: true });
   $("kBirth").innerHTML = "<b></b><span class='d'></span>";
   $("kBirth").querySelector("b").textContent = r.birthWareki + "（" + r.birthYear + "年）";
@@ -868,7 +919,9 @@ function finish(){
   $("kRank").textContent = r.finalLabel;
   $("kZai").textContent = (r.wealth < 0 ? "借財 " : "") + H.fmtW(r.wealth) + " 石" + (r.wealth < 0 ? "（遺族が引き継ぎます）" : "");
   $("kSpouse").textContent = r.married ? r.married + "人" + (r.married > 1 ? "（再婚" + (r.married - 1) + "回）" : "") : "生涯ひとり";
-  $("kKids").textContent = r.kids ? r.kids + "人（うち成人できたのは" + r.grown + "人）" : "なし";
+  $("kKids").innerHTML = "";
+  $("kKids").append(document.createTextNode(r.kids ? r.kids + "人（うち成人できたのは" + r.grown + "人）" : "なし"));
+  if (r.kids) { const d = document.createElement("span"); d.className = "d"; d.textContent = r.childNames.map(c => c.name + (c.alive ? "" : "（数え" + (c.dieAge + 1) + "で没）")).join("、"); $("kKids").append(d); }
   const rec = recordText(S, r);
   $("kRecord").innerHTML = "<b></b><span class='d'></span>";
   $("kRecord").querySelector("b").textContent = rec[0];
@@ -924,7 +977,7 @@ $("btnAgain").onclick = startBirth;
 function pageUrl(){ return location.href.startsWith("http") ? location.href.split("#")[0].split("?")[0] : ""; }
 function shareText(){
   const r = RES;
-  return "【平安人生記録】" + r.birthWareki + "、" + r.region + "の" + r.birthLabel + "として生まれ、数え" + r.kyonen + "で" + r.cause + "により死去。\n『" + r.epithet + "』\n往生判定：" + r.ojo.t + "\n#550万分の1 #平安時代に生まれたら";
+  return "【平安人生記録】" + r.name + "。" + r.birthWareki + "、" + r.region + "の" + r.birthLabel + "として生まれ、数え" + r.kyonen + "で" + r.cause + "により死去。\n『" + r.epithet + "』\n往生判定：" + r.ojo.t + "\n#550万分の1 #平安時代に生まれたら";
 }
 function setShareHref(){
   const url = pageUrl();
@@ -986,6 +1039,7 @@ function drawCard(r){
   c.drawImage(off, L, 318, Rr - L, (Rr - L) / 2);
   c.strokeStyle = RULE; c.lineWidth = 2; c.strokeRect(L, 318, Rr - L, (Rr - L) / 2);
   let y = wrap(c, "『" + r.epithet + "』", L, 318 + (Rr - L) / 2 + 100, Rr - L, 66, "800 54px " + MIN);
+  c.fillStyle = SOFT; y = wrap(c, r.name, L, y + 58, Rr - L, 44, "700 34px " + MIN); c.fillStyle = INK;
   y += 44;
   const rows = [
     ["生", r.birthWareki + "（" + r.birthYear + "年）", r.region + "の" + r.birthLabel + (r.tier ? "（" + r.tier.label + "）" : "") + "　およそ" + oddsText(r.birthP)],
