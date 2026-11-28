@@ -465,29 +465,26 @@ function chGenpei(s) {
 // y: 年 or [開始, 終了], reg: 地域配列（null=全国）, when: 追加条件
 const HIST = [
   { y: 794, t: "都が平安京に移されました。ここから約四百年、「平安」と呼ばれる時代が始まります。名前ほど平安ではありません。", k: "hist" },
-  { y: 810, when: isNoble, t: "上皇と天皇が対立し、都が二つに割れかけました（薬子の変）。", k: "hist", src: "『日本後紀』" },
   { y: 818, reg: ["togoku"], tags: ["disaster"], t: "東国で大きな地震がありました（弘仁地震）。", k: "hist", src: "『類聚国史』", fx: (s) => { adj(s, { w: -0.4 * sc(s) }); addRisk(s, 0.012, "地震", "家が潰れ、そのまま梁の下にいました。"); } },
-  { y: 842, when: isNoble, t: "嵯峨上皇が亡くなった直後、伴健岑・橘逸勢が謀反の罪で流され、皇太子が廃されました（承和の変）。", k: "hist", src: "『続日本後紀』承和9年7月条" },
   { y: 842, reg: ["kyo"], t: "朝廷の命令で、島田や鴨川の河原などに捨て置かれていた髑髏、あわせて五千五百余りが焼かれ、葬られました。この街では、遺体は河原に置いておくものでした。", k: "hist", src: "『続日本後紀』巻12 承和9年10月条" },
   { y: 863, reg: ["kyo"], t: "神泉苑で御霊会が開かれました。非業の死を遂げた人々の霊を鎮め、疫病を払うためです。都の人々にも見物が許されました。", k: "hist", src: "『日本三代実録』貞観5年5月20日条" },
   { y: 864, reg: ["togoku"], tags: ["disaster"], t: "富士山が噴火しました（貞観大噴火）。流れた溶岩が湖を埋め、のちに樹海になります。", k: "hist", src: "『日本三代実録』" },
-  { y: 866, when: isNoble, t: "応天門が燃えました。犯人探しの結果、大納言伴善男が流罪となり、なぜか藤原氏だけが得をしました（応天門の変）。", k: "hist", src: "『日本三代実録』" },
   { y: 869, reg: ["michinoku"], tags: ["disaster"], t: "陸奥で巨大な地震と津波がありました（貞観地震）。溺死者は千人ほどと記録されています。", k: "hist", src: "『日本三代実録』", fx: (s) => { adj(s, { w: -0.6 * sc(s) }); addRisk(s, s.st === "gyomin" ? 0.25 : 0.06, "津波", "海が、山のように盛り上がってきました。"); } },
   { y: 887, reg: ["kinai", "saigoku"], tags: ["disaster"], t: "畿内から西国にかけて大きな地震がありました（仁和地震）。", k: "hist", src: "『日本三代実録』", fx: (s) => addRisk(s, 0.012, "地震", "揺れが止まったとき、家の屋根が上にありませんでした。") },
   { y: 894, when: isNoble, t: "菅原道真が「唐は衰え、渡海は危うい。遣唐使を送るかどうか、公卿で議定してほしい」と奏上しました。遣唐使は取りやめになりました。", k: "hist", src: "『菅家文草』巻9（寛平6年9月14日の奏状）" },
-  { y: 901, when: isNoble, t: "右大臣菅原道真が大宰府へ左遷されました。このあと都で雷が鳴るたびに、関係者は気が気でなくなります。", k: "hist", src: "『日本紀略』" },
   { y: 902, when: (s) => isRural(s) && s.st !== "genin", t: "朝廷が、百姓が課役を逃れるために田を有力者へ「寄進」したことにするのを禁じました（延喜の荘園整理令）。逆に言えば、それだけ流行っていたということです。", k: "hist", src: "『類聚三代格』延喜2年3月13日太政官符" },
   { y: 914, t: "三善清行が朝廷に意見書を出し、天下の民の三分の二が、課役を逃れるために勝手に頭を剃った者になっていると訴えました（意見十二箇条）。", k: "hist", src: "三善清行『意見十二箇条』第11条（『本朝文粋』巻2）" },
   { y: 915, epi: "hoso", tags: ["epidemic"], t: "疱瘡（天然痘）が全国で流行しています。「疱瘡」という呼び名は、この年に世間で生まれたと記録されています。", k: "hist", src: "『日本紀略』延喜15年" },
   { y: 915, reg: ["michinoku"], tags: ["disaster", "famine"], t: "北の山（十和田）が大噴火しました。出羽国では灰が二寸積もり、桑畑が枯れたと報告されています。日本の有史以来、最大級の噴火とされます。", k: "hist", src: "『扶桑略記』延喜15年7月13日条／気象庁「十和田」", fx: (s) => { adj(s, { w: -0.8 * sc(s), hp: -5 }); addRisk(s, 0.03, "十和田の噴火", "空が、昼なのに暗くなりました。"); } },
-  { y: 930, reg: ["kyo"], t: "内裏の清涼殿に雷が落ち、死者が出ました。全員が、道真の祟りだと確信しました。", k: "hist", src: "『日本紀略』延長8年", fx: (s) => { if (s.st === "kugyo") addRisk(s, 0.04, "落雷（道真の祟り）", "清涼殿で会議中でした。祟られる心当たりは、たぶんありました。"); } },
+  { y: 909, when: isNoble, t: "左大臣藤原時平が、三十九歳で亡くなりました。道真の祟りだと噂されています。", k: "hist", src: "『大鏡』（時平伝）", fx: (s) => { if (s.flags.pol_shotai === "win") { adj(s, { en: -4 }); log(s, "時平についていたあなたは、なんとなく落ち着かない日々を過ごしています。", "bad"); } } },
+  { y: 923, when: isNoble, t: "菅原道真が右大臣に戻され、正二位を贈られました。左遷の詔は焼き捨てられたそうです。祟りを鎮めるためです。", k: "hist", src: "『日本紀略』延長元年", fx: (s) => { if (s.flags.pol_shotai === "lose") { adj(s, { en: 6 }); log(s, "道真を慕っていたあなたの立場も、少しだけ良くなりました。", "good"); } } },
+  { y: 930, reg: ["kyo"], t: "内裏の清涼殿に雷が落ち、死者が出ました。全員が、道真の祟りだと確信しました。", k: "hist", src: "『日本紀略』延長8年", fx: (s) => { if (s.st === "kugyo" || s.flags.pol_shotai === "win") addRisk(s, s.flags.pol_shotai === "win" ? 0.08 : 0.04, "落雷（道真の祟り）", "清涼殿で会議中でした。祟られる心当たりは、たぶんありました。"); } },
   { y: 939, reg: ["togoku"], tags: ["war"], t: "平将門が坂東の国府を次々に落とし、「新皇」を名乗りました。あなたの村は、どちらの味方か聞かれる前に焼かれました。", k: "hist", src: "『将門記』", fx: (s) => { adj(s, { w: -0.8 * sc(s), hp: -6 }); addRisk(s, s.st === "bushi" ? 0.12 : 0.035, "平将門の乱", "兵が通り過ぎていきました。あなたは通り過ぎられませんでした。"); } },
   { y: [939, 941], reg: ["saigoku"], tags: ["war"], t: "藤原純友が瀬戸内の海賊を率いて暴れています。", k: "hist", src: "『日本紀略』『本朝世紀』", fx: (s) => { addRisk(s, s.st === "gyomin" ? 0.05 : 0.012, "藤原純友の乱", "海賊は、漁師の舟から先に奪っていきました。"); } },
   { y: 935, reg: ["saigoku"], t: "土佐守の任期を終えた紀貫之の一行が、船で都へ帰っていきました。一行の誰かが、女のふりをして仮名の日記を書いているそうです。", k: "hist", src: "紀貫之『土佐日記』" },
   { y: 947, epi: "hoso", tags: ["epidemic"], t: "また疱瘡が流行しています。内裏の中にまで広がっています。", k: "hist", src: "『日本紀略』天暦元年" },
   { y: 960, when: isNoble, t: "清涼殿で、村上天皇の主催する歌合が開かれました（天徳内裏歌合）。のちのちまで歌合の手本とされる、晴れの舞台です。", k: "hist", src: "『殿上日記』『村上天皇御記』" },
   { y: 960, reg: ["kyo"], t: "平安京遷都以来はじめて、内裏が丸焼けになりました。", k: "hist", src: "『日本紀略』天徳4年" },
-  { y: 969, when: isNoble, t: "左大臣源高明が謀反の疑いで大宰府に流されました（安和の変）。これで藤原氏に逆らえる家は、ほぼなくなりました。", k: "hist", src: "『日本紀略』" },
   { y: 974, epi: "hoso", tags: ["epidemic"], t: "疱瘡がまた流行しています。疱瘡を払う大祓が行われ、帝までかかりました。", k: "hist", src: "『日本紀略』天延2年" },
   { y: 980, reg: ["kyo"], t: "暴風雨で、都の正門・羅城門が倒れました。その後、再建されることはありませんでした。", k: "hist", src: "『百錬抄』天元3年7月9日条" },
   { y: 985, t: "源信が『往生要集』を著しました。地獄の描写があまりに具体的で、人々はこぞって念仏を唱え始めました。", k: "hist", src: "源信『往生要集』", fx: (s) => adj(s, { toku: 3 }) },
@@ -497,7 +494,7 @@ const HIST = [
   { y: 995, when: isNoble, t: "関白が二人続けて亡くなりました。空いた席には、藤原道長が座りました。", k: "hist", src: "『日本紀略』『栄花物語』" },
   { y: 998, epi: "hashika", tags: ["epidemic"], t: "赤斑瘡（あかもがさ）という新しい病が流行しています。はしかの、記録に残る最初の大流行とされます。", k: "hist", src: "『日本紀略』長徳4年7月条／『栄花物語』巻5" },
   { y: 1008, when: (s) => isNoble(s) && s.sex === "f", t: "宮中で『源氏の物語』という読み物が評判です。作者の紫式部は、漢字が読めることを周囲に隠しているそうです。", k: "hist", src: "『紫式部日記』" },
-  { y: 1018, when: isNoble, t: "藤原道長の宴で「この世をば我が世とぞ思ふ望月の欠けたることもなしと思へば」という歌が詠まれました。返歌を求められた藤原実資は、全員で唱和しようと提案して逃げ切りました。", k: "hist", src: "藤原実資『小右記』寛仁2年" },
+  { y: 1018, when: isNoble, t: "藤原道長の宴で「この世をば我が世とぞ思ふ望月の欠けたることもなしと思へば」という歌が詠まれました。返歌を求められた藤原実資は、全員で唱和しようと提案して逃げ切りました。", k: "hist", src: "藤原実資『小右記』寛仁2年", fx: (s) => { if (s.flags.pol_chotoku === "win") { adj(s, { en: 3 }); log(s, "あなたも唱和の輪に加わりました。道長派であることは、こういうときに得です。", "good"); } } },
   { y: 1019, reg: ["kyushu"], tags: ["war"], t: "海の向こうから刀伊（女真族）の船団が襲ってきました。壱岐・対馬から筑前まで、約360人が殺され、約1300人が連れ去られました。", k: "hist", src: "『小右記』『朝野群載』", fx: (s) => addRisk(s, 0.05, "刀伊の入寇", "船団は、朝の霧の中から来ました。") },
   { y: 1020, epi: "hoso", tags: ["epidemic"], t: "春から疱瘡が流行しています。大赦が行われ、調庸と雑徭が免除されました。", k: "hist", src: "『日本紀略』寛仁4年" },
   { y: 1020, reg: ["togoku"], t: "上総介の一家が、任期を終えて都へ帰っていきました。十三歳の娘は、都で物語を好きなだけ読めるよう、薬師仏に祈っていたそうです。", k: "hist", src: "菅原孝標女『更級日記』" },
@@ -510,7 +507,6 @@ const HIST = [
   { y: [1083, 1087], reg: ["michinoku"], tags: ["war"], t: "陸奥で清原氏の内紛に源義家が介入し、戦が続いています（後三年合戦）。", k: "hist", src: "『奥州後三年記』", fx: (s) => addRisk(s, s.st === "bushi" ? 0.06 : 0.012, "後三年合戦", "雪の中の籠城戦でした。") },
   { y: 1096, reg: ["kyo"], tags: ["fest"], t: "都じゅうが田楽に熱狂しています（永長の大田楽）。庶民から公卿まで、笛と鼓で踊り歩いています。大江匡房いわく「一城の人、皆狂へるがごとし」。", k: "hist", src: "大江匡房『洛陽田楽記』／『中右記』永長元年" },
   { y: 1108, reg: ["togoku"], tags: ["disaster", "famine"], t: "上野国の浅間山が大噴火しました。国司の報告によれば、国中の田畑がことごとく駄目になったそうです。", k: "hist", src: "『中右記』天仁元年9月5日条", fx: (s) => { adj(s, { w: -1.2 * sc(s), hp: -6 }); addRisk(s, 0.03, "浅間山の噴火", "山の火は、七月の末に上がりました。"); } },
-  { y: 1086, when: isNoble, t: "白河天皇が位を譲り、上皇として政治を続けることにしました。偉い人が一人増えました（院政のはじまり）。", k: "hist" },
   { y: 1156, reg: ["kyo"], tags: ["war"], t: "天皇方と上皇方が武士を集めて都で戦いました（保元の乱）。敗れた側の武士が処刑されました。朝廷による死刑は、約350年ぶりとされます。", k: "hist", src: "『兵範記』", fx: (s) => addRisk(s, s.st === "bushi" ? 0.1 : 0.008, "保元の乱", "夜明け前の白河殿でした。") },
   { y: 1159, reg: ["kyo"], tags: ["war"], t: "源義朝と平清盛が都で戦いました（平治の乱）。平家の時代が始まります。", k: "hist", src: "『平治物語』", fx: (s) => addRisk(s, s.st === "bushi" ? 0.1 : 0.008, "平治の乱", "雪の六波羅でした。") },
   { y: 1167, t: "平清盛が太政大臣になりました。「平家にあらずんば人にあらず」と言われる時代です。あなたは平家ではありません。", k: "hist", src: "『平家物語』" },
@@ -527,9 +523,103 @@ const HIST = [
   { y: 1185, reg: ["kyo"], tags: ["disaster"], t: "都を大地震が襲いました（元暦の大地震）。山は崩れ、海は傾き、寺も塔も無事なものはなかったといいます。", k: "hist", src: "鴨長明『方丈記』", fx: (s) => addRisk(s, 0.02, "元暦の大地震", "揺れは、何か月も続きました。") },
   { y: 1192, t: "源頼朝が征夷大将軍になりました。教科書的には時代が変わりましたが、あなたの暮らしは特に変わりません。", k: "hist", src: "『吾妻鏡』" },
   { y: 1212, t: "鴨長明という男が、方丈の庵で『方丈記』を書き上げました。あなたが見てきた災害が、だいたい全部載っています。", k: "hist" },
-  { y: 1221, t: "後鳥羽上皇が幕府に挑み、負けました（承久の乱）。上皇が島流しになる時代です。", k: "hist", src: "『吾妻鏡』" },
+  { y: 1221, when: (s) => !polAffected(s), t: "後鳥羽上皇が幕府に挑み、負けました（承久の乱）。上皇が島流しになる時代です。", k: "hist", src: "『吾妻鏡』" },
   { y: [1230, 1231], tags: ["famine"], t: "大飢饉です（寛喜の飢饉）。寛喜2年6月には美濃国で雪が降ったと、鎌倉に報告されています。もう鎌倉時代です。", k: "hist", src: "『吾妻鏡』寛喜2年6月16日条", fx: (s) => { const poor = !(isNoble(s) || s.wealth > 20); adj(s, { hp: poor ? -10 : -2, w: poor ? -1 : 0 }); addRisk(s, poor ? 0.07 : 0.01, "飢え（寛喜の飢饉）", "冷たい夏でした。"); } }
 ];
+/* ---------------- 政変（貴族が「どちらにつくか」を選ぶ） ---------------- */
+// sides: win=勝った側 lose=負けた側 mid=関わらない。sev: 負けた側への処分の重さ（exile=左遷・流罪 / death=処刑の危険あり / dismiss=解官）
+const POLITICS = [
+  { id: "kusuko", y: 810, title: "薬子の変", src: "『日本後紀』",
+    lead: "平城上皇が平城京へ都を戻すよう命じ、嵯峨天皇と対立しています。朝廷が二つに割れかけています。",
+    sides: [["win", "嵯峨天皇に従う", "今の帝の側"], ["lose", "平城上皇（藤原薬子・仲成）に従う", "前の帝の側"], ["mid", "どちらにも与しない", "様子を見る"]],
+    winText: "嵯峨天皇方の勝ちでした。上皇は出家し、藤原仲成は射殺され、薬子は自害しました。", sev: "exile" },
+  { id: "jowa", y: 842, title: "承和の変", src: "『続日本後紀』承和9年7月条",
+    lead: "嵯峨上皇が重い病です。皇太子恒貞親王の周りと、藤原良房の周りで、不穏な噂が流れています。",
+    sides: [["win", "藤原良房に近づく", "良房の甥・道康親王を推す側"], ["lose", "皇太子恒貞親王に仕える", "今の皇太子の側"], ["mid", "関わらない", "様子を見る"]],
+    winText: "上皇の崩御直後、伴健岑・橘逸勢が謀反の罪で捕らえられ、皇太子は廃されました。良房の甥が新しい皇太子です。", sev: "exile" },
+  { id: "otenmon", y: 866, title: "応天門の変", src: "『日本三代実録』",
+    lead: "応天門が焼けました。大納言伴善男は左大臣源信の放火だと訴えていますが、太政大臣藤原良房が動き始めました。",
+    sides: [["win", "藤原良房に従う", "摂政となる良房の側"], ["lose", "大納言伴善男に与する", "伴氏の側"], ["mid", "関わらない", "様子を見る"]],
+    winText: "放火の犯人は伴善男とされ、伴氏・紀氏の一族が流罪になりました。藤原良房は正式に摂政となりました。", sev: "exile" },
+  { id: "shotai", y: 901, title: "昌泰の変", src: "『日本紀略』",
+    lead: "右大臣菅原道真が、娘婿の斉世親王を帝に立てようとしている、という讒言が流れています。左大臣藤原時平の周りが騒がしくなっています。",
+    sides: [["win", "左大臣藤原時平につく", "藤原氏の側"], ["lose", "右大臣菅原道真を慕う", "学者・道真の側"], ["mid", "関わらない", "様子を見る"]],
+    winText: "道真は大宰権帥に左遷されました。道真に連なる人々も、各地へ左遷されました。", sev: "exile" },
+  { id: "anna", y: 969, title: "安和の変", src: "『日本紀略』",
+    lead: "左大臣源高明が、娘婿の為平親王を帝に立てようとしているという密告がありました。",
+    sides: [["win", "藤原氏の側につく", "右大臣藤原師尹らの側"], ["lose", "左大臣源高明に仕える", "源氏の側"], ["mid", "関わらない", "様子を見る"]],
+    winText: "源高明は大宰権帥に左遷されました。以後、藤原氏に並ぶ家はほとんどなくなります。", sev: "exile" },
+  { id: "chotoku", y: 996, title: "長徳の変", src: "『小右記』／『栄花物語』巻5「浦々の別」",
+    lead: "内大臣藤原伊周と、叔父の藤原道長が政権を争っています。伊周の弟・隆家の従者が花山法皇に矢を射かけた、という噂が広まりました。",
+    sides: [["win", "藤原道長につく", "左大臣の側"], ["lose", "内大臣藤原伊周・隆家兄弟につく", "中関白家の側"], ["mid", "関わらない", "様子を見る"]],
+    winText: "伊周は大宰権帥、隆家は出雲権守に左遷されました。道長の時代が始まります。", sev: "exile", pardon: 1 },
+  { id: "insei", y: 1086, title: "院政のはじまり", src: "『愚管抄』",
+    lead: "白河天皇が位を譲り、上皇として政治を続けることにしました。院の御所に、中級の貴族たちが集まり始めています。",
+    sides: [["win", "院の近臣になる", "受領などの中級貴族が出世しやすい"], ["mid", "摂関家に仕え続ける", "これまでどおり"]],
+    winText: "院政のもとで、院の近臣となった受領層の貴族が力を伸ばしていきます。", sev: "none" },
+  { id: "hogen", y: 1156, title: "保元の乱", src: "『兵範記』『保元物語』",
+    lead: "鳥羽法皇が亡くなりました。崇徳上皇と後白河天皇、藤原頼長と忠通の兄弟が、それぞれ武士を集めています。",
+    sides: [["win", "後白河天皇方につく", "平清盛・源義朝らの側"], ["lose", "崇徳上皇方につく", "藤原頼長・源為義らの側"], ["mid", "関わらない", "屋敷にこもる"]],
+    winText: "天皇方が夜討ちで勝ちました。崇徳上皇は讃岐へ流され、頼長は流れ矢で亡くなりました。上皇方の武士は処刑されました。", sev: "death" },
+  { id: "heiji", y: 1159, title: "平治の乱", src: "『平治物語』",
+    lead: "平清盛が熊野詣でに出た隙に、藤原信頼と源義朝が兵を挙げ、信西を討ちました。",
+    sides: [["win", "平清盛につく", "熊野から戻る清盛の側"], ["lose", "藤原信頼・源義朝につく", "都を押さえた側"], ["mid", "関わらない", "屋敷にこもる"]],
+    winText: "清盛が勝ちました。藤原信頼は斬られ、源義朝は東国へ逃げる途中で討たれました。", sev: "death" },
+  { id: "jisho", y: 1179, title: "治承三年の政変", src: "九条兼実『玉葉』",
+    lead: "平清盛が福原から大軍を率いて都に入りました。後白河法皇の周りの貴族が、次々に呼び出されています。",
+    sides: [["win", "平家に近づく", "今の勝ち組"], ["lose", "後白河法皇に仕え続ける", "法皇の側"], ["mid", "関わらない", "屋敷にこもる"]],
+    winText: "法皇は鳥羽殿に幽閉され、関白をはじめ多くの貴族が官職を解かれました。", sev: "dismiss", later: 1185 },
+  { id: "jokyu", y: 1221, title: "承久の乱", src: "『吾妻鏡』",
+    lead: "後鳥羽上皇が、執権北条義時を討てという命令を出しました。都の貴族は、上皇に従うよう求められています。",
+    sides: [["lose", "後鳥羽上皇に従う", "朝廷の側"], ["win", "ひそかに幕府に通じる", "鎌倉の側"], ["mid", "関わらない", "屋敷にこもる"]],
+    winText: "幕府軍が都を制しました。後鳥羽上皇は隠岐へ流され、上皇方の公卿の一部は処刑されました。", sev: "death" }
+];
+function polChoiceEligible(s) { return isOfficial(s) && s.age >= 15 && !(s.flags.exile > 0); }
+function polAffected(s) { return isNoble(s) || isOfficial(s); }
+function polChoice(s, P) {
+  return branch(s, "政変 ― " + P.title, P.lead, P.sides.map(([k, label, desc]) => ({
+    label, desc, apply: (st) => { st.flags["pol_" + P.id] = k; return [k === "mid" && P.sev !== "none" ? "どちらにも与せず、成り行きを見守ることにしました。" : label + "ことにしました。"]; }
+  })), P.src);
+}
+function polAuto(s, P) {
+  const r = R(), winP = 0.35 + s.en / 250;
+  const k = P.sev === "none" ? (r < winP ? "win" : "mid") : (r < winP ? "win" : (r < winP + 0.25 ? "lose" : "mid"));
+  s.flags["pol_" + P.id] = k; s.flags["polAuto_" + P.id] = 1;
+}
+function exile(s, years, why) {
+  s.flags.exile = years; s.flags.exiledEver = 1; s.flags.exileWhy = why;
+  s.rank = Math.max(0, s.rank - 1); s.juryo = 0;
+  s.wealth *= 0.6; adj(s, { en: -15 });
+  const dest = pick([["kyushu", "大宰府"], ["saigoku", "土佐"], ["togoku", "伊豆"], ["saigoku", "隠岐"]]);
+  s.region = dest[0];
+  log(s, why + "の連座で、" + dest[1] + "へ左遷（流罪）となりました。位も一つ下げられました。", "bad");
+}
+function polResolve(s, P) {
+  const k = s.flags["pol_" + P.id];
+  if (!k || s.flags["polDone_" + P.id]) return;
+  s.flags["polDone_" + P.id] = 1;
+  const auto = s.flags["polAuto_" + P.id];
+  const who = auto ? (s.sex === "f" ? (s.married && s.spouseAlive ? "夫の家" : "実家") : "家") : "あなた";
+  log(s, P.winText, "hist", P.src);
+  if (k === "win") {
+    adj(s, { en: auto ? 4 : 10 });
+    if (!auto && isOfficial(s) && R() < 0.5 && s.rank < rankCap(s)) { s.rank++; log(s, "勝った側についた恩賞として、" + RANKS[s.rank] + "に昇進しました。", "good"); }
+    else log(s, who + "は勝った側でした。周りの態度が、少し丁寧になりました。", "good");
+    if (P.id === "insei" && !auto) s.flags.inshin = 1;
+    if (P.later) s.flags["polLater_" + P.id] = 1;
+  } else if (k === "mid") {
+    adj(s, { en: -1 });
+    log(s, P.sev === "none" ? "これまでどおり摂関家に仕えています。その摂関家の力は、かつてほどではありません。" : who + "はどちらにも与しませんでした。嵐は頭の上を通り過ぎていきました。", "n");
+  } else {
+    if (auto) { adj(s, { en: -6 }); log(s, who + "は負けた側でした。後ろ盾を失い、肩身の狭い思いをしています。", "bad"); return; }
+    const pPunish = clamp(0.35 + s.rank * 0.03, 0.3, 0.85);
+    if (R() >= pPunish) { adj(s, { en: -8 }); log(s, "負けた側でしたが、処分は免れました。ただし、出世の道は細くなりました。", "bad"); return; }
+    if (P.sev === "dismiss") { s.rank = Math.max(0, s.rank - 1); s.juryo = 0; adj(s, { en: -12 }); log(s, "官職を解かれました（解官）。", "bad"); return; }
+    if (P.sev === "death" && s.rank >= 9 && R() < 0.4) { log(s, "謀反に加わった罪を問われ、捕らえられました。", "bad"); addRisk(s, 0.6, P.title + "の処刑", "都の六条河原で斬られました。"); if (R() < 0.6) return; }
+    exile(s, P.pardon ? 1 + Math.floor(R() * 2) : 3 + Math.floor(R() * 5), P.title);
+  }
+}
+
 function yearTags(s) {
   const t = new Set();
   for (const h of HIST) if (h.tags && histMatch(h, s)) h.tags.forEach(x => t.add(x));
@@ -721,6 +811,12 @@ function prepareYear(s) {
   if (a === 12 && (isNoble(s) || s.st === "kanjin") && !s.flags.genpuku) { q.push(chGenpuku(s)); s.branchThisYear = true; }
   // 庶民の一人前
   if (a === 15 && ["nomin", "gyomin", "gozoku"].includes(s.st) && !s.flags.coming) { q.push(chComing(s)); s.branchThisYear = true; }
+  // 政変
+  for (const P of POLITICS) {
+    if (P.y !== s.year || s.flags["pol_" + P.id] || !polAffected(s)) continue;
+    if (polChoiceEligible(s)) { q.unshift(polChoice(s, P)); s.branchThisYear = true; }
+    else if (s.age >= 6) polAuto(s, P);
+  }
   // 源平
   if (s.year === 1180 && a >= 15 && a < 60 && !s.flags.genpei && m && (s.st === "bushi" || s.st === "gozoku")) { q.push(chGenpei(s)); s.branchThisYear = true; }
   if (!s.branchThisYear) {
@@ -740,7 +836,7 @@ function prepareYear(s) {
       s.branchThisYear = true;
     }
     // 受領
-    else if (isOfficial(s) && s.rank >= 9 && s.rank <= 13 && s.juryo === 0 && a >= 28 && (s.flags.juryoAsked || -99) <= a - 8 && R() < 0.12 + s.en / 500) { s.flags.juryoAsked = a; q.push(chJuryo(s)); s.branchThisYear = true; }
+    else if (isOfficial(s) && !(s.flags.exile > 0) && s.rank >= 9 && s.rank <= 13 && s.juryo === 0 && a >= 28 && (s.flags.juryoAsked || -99) <= a - 8 && R() < 0.12 + s.en / 500 + (s.flags.inshin ? 0.12 : 0)) { s.flags.juryoAsked = a; q.push(chJuryo(s)); s.branchThisYear = true; }
     // 結婚
     else if ((!s.married || (!s.spouseAlive && s.flags.widowedAt != null && a - s.flags.widowedAt >= 1)) && s.st !== "so" && a >= (s.sex === "f" ? 13 : 15) && a <= (s.marriages > 0 ? 48 : 40) && !s.kokumo && R() < marryChance(s)) { q.push(chMarry(s)); s.branchThisYear = true; }
     // 庶民の出来事（選択式）
@@ -820,6 +916,7 @@ function runYear(s) {
   const kids = s.children.filter(c => c.alive && s.year - c.y < 15).length;
   up += kids * (isNoble(s) ? 2 : (s.st === "gozoku" || s.st === "bushi" ? 0.8 : 0.22));
   if (s.flags.kishin) inc *= 0.85;
+  if (s.flags.exile > 0) inc *= 0.3;
   s.wealth += inc - up;
   if (s.flags.suikoDebt) { s.wealth -= s.flags.suikoDebt; s.flags.suikoDebt = 0; }
   // 出挙（借りの利息）
@@ -845,6 +942,19 @@ function runYear(s) {
     if (h.fx) h.fx(s);
     if (s.forceDeath) break;
   }
+  // 政変の決着
+  if (!s.forceDeath) for (const P of POLITICS) if (P.y === s.year) polResolve(s, P);
+  if (s.year === 1185 && s.flags.polLater_jisho && !s.flags.jishoDone) {
+    s.flags.jishoDone = 1;
+    log(s, "平家が滅びました。平家に近かった貴族も、官職を解かれたり流されたりしています。", "hist", "『吾妻鏡』");
+    if (isOfficial(s) && !(s.flags.exile > 0) && R() < 0.5) exile(s, 3 + Math.floor(R() * 4), "平家への与同");
+    else adj(s, { en: -10 });
+  }
+  // 流罪からの赦免
+  if (s.flags.exile > 0 && !s.forceDeath) {
+    s.flags.exile--;
+    if (s.flags.exile === 0) { s.region = "kyo"; adj(s, { en: 4 }); log(s, "罪を赦されて、都に戻ることを許されました。", "good"); }
+  }
   // 源平合戦
   if (s.flags.genpei && s.year >= 1180 && s.year <= 1185 && !s.forceDeath) {
     const g = s.flags.genpei;
@@ -868,7 +978,7 @@ function runYear(s) {
   }
 
   // 出世（除目）
-  if (isOfficial(s) && s.age >= 15 && !s.forceDeath) promote(s);
+  if (isOfficial(s) && s.age >= 15 && !s.forceDeath && !(s.flags.exile > 0)) promote(s);
 
   // 家族
   family(s);
@@ -1054,6 +1164,7 @@ function epithet(s) {
   if (s.rank >= 14 && s.st !== "so") return "公卿まで上り詰めた人";
   if (s.flags.juryoEver && s.wealth > 300) return "倒れても土をつかんだ受領";
   if (s.st === "so") return (s.flags.shido ? "税から逃げた私度" : "仏にすがった") + (s.sex === "m" ? "僧" : "尼");
+  if (s.flags.exiledEver && s.rank >= 9) return (s.flags.exileWhy || "政変") + "に敗れた貴族";
   if (s.st === "furo") return "戸籍を捨てた浮浪人";
   if (s.st === "genin") return "名を残さなかった下人";
   if (s.birthStatus === "kanjin" && s.rank === 8) return "五位の壁に阻まれた官人";
