@@ -346,7 +346,7 @@ button{font-family:inherit;color:inherit;}
         <div class="bl" id="bl4">
           <div class="rarity">
             <span class="stamp" id="bStamp">凡</span>
-            <div class="r-num">この生まれは、およそ<br><b id="bOdds">1</b>人に1人</div>
+            <div class="r-num" id="bOdds">この生まれは、およそ<br><b>100</b>人に<b>86</b>人</div>
           </div>
           <p class="comment" id="bComment"></p>
         </div>
@@ -575,6 +575,12 @@ const COMMENT = {
   kugyo: "大当たりです。この国の、上から数十軒の家です。",
   kouzoku: "超大当たりです。ただし、皇位継承という名の別のくじが始まります。"
 };
+// 確率の言い方：1%以上なら「100人に◯人」、1%未満なら「◯人に1人」
+function oddsParts(p){
+  if (p >= 0.01) return { a: 100, b: Math.max(1, Math.round(p * 100)) };
+  return { a: Math.round(1 / p), b: 1 };
+}
+function oddsText(p){ const o = oddsParts(p); return fmtInt(o.a) + "人に" + o.b + "人"; }
 function stampFor(odds){
   if (odds >= 10000) return "大当";
   if (odds >= 1000) return "当";
@@ -596,7 +602,8 @@ function startBirth(){
   $("bWhen").innerHTML = H.wareki(S.birthYear) + "<small>西暦" + S.birthYear + "年</small>";
   $("bWhere").textContent = H.REGION[S.birthRegion];
   $("bWho").textContent = H.STATUS[st].birth[S.sex === "m" ? 0 : 1];
-  $("bOdds").textContent = fmtInt(odds);
+  const op = oddsParts(H.STATUS[st].p);
+  $("bOdds").innerHTML = "この生まれは、およそ<br><b>" + fmtInt(op.a) + "</b>人に<b>" + op.b + "</b>人";
   $("bStamp").textContent = stampFor(odds);
   $("bComment").textContent = COMMENT[st];
   ["bl1","bl2","bl3","bl4"].forEach(id => $(id).classList.remove("on"));
@@ -808,7 +815,7 @@ function finish(){
   HeianPixel.draw($("kScene").getContext("2d"), S, { t: 0, age: S.age, year: S.year, dead: true });
   $("kBirth").innerHTML = "<b></b><span class='d'></span>";
   $("kBirth").querySelector("b").textContent = r.birthWareki + "（" + r.birthYear + "年）";
-  $("kBirth").querySelector(".d").textContent = r.region + "の" + r.birthLabel + "として　※約" + fmtInt(r.odds) + "人に1人";
+  $("kBirth").querySelector(".d").textContent = r.region + "の" + r.birthLabel + "として　※およそ" + oddsText(r.birthP) + "の生まれ";
   $("kDeath").innerHTML = "<b></b><span class='d'></span>";
   $("kDeath").querySelector("b").textContent = r.deathWareki + "（" + r.deathYear + "年）　享年 " + r.kyonen;
   $("kDeath").querySelector(".d").textContent = (r.deathRegion !== r.region ? r.deathRegion + "にて　" : "") + "数え年";
@@ -938,7 +945,7 @@ function drawCard(r){
   let y = wrap(c, "『" + r.epithet + "』", L, 318 + (Rr - L) / 2 + 100, Rr - L, 66, "800 54px " + MIN);
   y += 44;
   const rows = [
-    ["生", r.birthWareki + "（" + r.birthYear + "年）", r.region + "の" + r.birthLabel + "　約" + fmtInt(r.odds) + "人に1人"],
+    ["生", r.birthWareki + "（" + r.birthYear + "年）", r.region + "の" + r.birthLabel + "　およそ" + oddsText(r.birthP)],
     ["没", r.deathWareki + "（" + r.deathYear + "年）　享年 " + r.kyonen + "（数え）", ""],
     ["死因", r.cause, r.causeDesc],
     ["身分", r.finalLabel, ""],
