@@ -520,7 +520,7 @@ function planPrompt(s) {
   if (!s.plan) lead = "数えで" + (s.age + 1) + "。物心がつきました。この先をどう過ごしますか。選んだあとも、画面下のボタンでいつでも変えられます。";
   else if (invalid) lead = "暮らしが変わりました。これからどう過ごしますか。";
   else lead = "新しい過ごし方を選べるようになりました（" + fresh.map(p => "「" + p.label + "」").join("、") + "）。どうしますか。";
-  const options = opts.map(p => ({ label: p.label + (fresh.length && !invalid && fresh.some(f => f.id === p.id) ? "（新）" : ""), desc: p.desc, apply: (st) => { st.plan = plansFor(st).find(x => x.id === p.id); st.planAge = st.age; return ["過ごし方を「" + p.label + "」にしました。"]; } }));
+  const options = opts.map(p => ({ label: p.label + (fresh.length && !invalid && fresh.some(f => f.id === p.id) ? "（新）" : ""), desc: p.desc + "　" + planHint(p.eff), apply: (st) => { st.plan = plansFor(st).find(x => x.id === p.id); st.planAge = st.age; return ["過ごし方を「" + p.label + "」にしました。"]; } }));
   if (!invalid) options.unshift({ label: "今のまま「" + s.plan.label + "」を続ける", desc: "変えない", apply: () => [] });
   return { kind: "plan", title: "過ごし方", lead, options };
 }
@@ -1360,6 +1360,7 @@ function marryChance(s) {
 
 function runYear(s) {
   s.risks = s.risks || [];
+  s.lastRisk = riskOf(s);
   nameMilestones(s);
   ensurePlan(s);
   const a = s.age, e = (s.plan && s.plan.eff) || {};
@@ -1422,7 +1423,7 @@ function runYear(s) {
   s.ytags = yearTags(s);
   for (const h of HIST) {
     if (!histMatch(h, s)) continue;
-    if (h.t) log(s, h.t, h.k || "hist", h.src);
+    if (h.t) { log(s, h.t, h.k || "hist", h.src); (s.seenHist = s.seenHist || []).push(HIST.indexOf(h)); }
     if (h.epi) epidemic(s, h.epi);
     if (h.fx) h.fx(s);
     if (s.forceDeath) break;
@@ -1499,11 +1500,70 @@ function runYear(s) {
     }
   }
   if (dead) {
+    const rk = s.lastRisk || { reasons: [] };
+    s.lastYear = { hp: Math.round(s.hp), wealth: s.wealth, tags: [...(s.ytags || [])], reasons: rk.reasons, level: rk.level };
     s.alive = false; s.cause = dead.cause; s.causeDesc = dead.desc;
     log(s, "数えで" + (a + 1) + "、" + dead.cause + "により死去。", "death");
   }
   s.risks = [];
   s.delta = { hp: s.hp - before.hp, sai: s.sai - before.sai, en: s.en - before.en, toku: s.toku - before.toku };
+}
+
+/* ---------------- 今年の危うさ（見積もり）と養生 ---------------- */
+// これから始まる一年に、どれくらい命の危険があるかの目安。実際の判定とは別の、プレイヤー向けの見積もり
+function riskOf(s) {
+  if (!s.alive) return { p: 0, level: 0, reasons: [] };
+  const a = s.age, tags = yearTags(s), reasons = [];
+  let p = baseHazard(a) * STATUS[s.st].haz * hpMult(s);
+  if (a < 5) reasons.push("幼さ");
+  else if (a >= 50) reasons.push("老い");
+  if (s.hp < 30) reasons.push("体の弱り");
+  const e = (s.plan && s.plan.eff) || {};
+  if (e.risk) { p += e.risk; reasons.push("過ごし方（" + (e.riskC || "危険な仕事") + "）"); }
+  if (tags.has("epidemic")) { p += s.flags.abata ? 0.02 : 0.08; reasons.push("疫病の流行"); }
+  if (tags.has("famine")) { const poor = !(isNoble(s) || s.wealth > 20); p += poor ? 0.07 : 0.01; reasons.push("飢饉"); }
+  if (tags.has("war")) { p += s.st === "bushi" ? 0.08 : 0.02; reasons.push("戦乱"); }
+  if (tags.has("disaster")) { p += 0.02; reasons.push("災害"); }
+  if (s.wealth < -1 && s.st !== "genin") { p += 0.01; reasons.push("借財と飢え"); }
+  if (s.sex === "f" && s.married && s.spouseAlive && a >= 14 && a <= 42) { p += 0.004; reasons.push("お産"); }
+  const level = p < 0.015 ? 0 : p < 0.035 ? 1 : p < 0.07 ? 2 : 3;
+  return { p, level, label: ["穏やか", "やや危うい", "危うい", "とても危うい"][level], reasons };
+}
+function yojoInfo(s) {
+  if (!s.alive || s.age < 6) return null;
+  const noble = isNoble(s) || s.st === "kanjin" || s.st === "gozoku" || s.st === "bushi";
+  const cost = s.st === "genin" ? 0 : (noble ? 2 * sc(s) : 0.6);
+  const label = s.st === "so" ? "経を読み、身を慎む" : s.st === "genin" ? "隙を見て体を休める" : noble ? "薬師を呼んで養生する" : "薬草を煎じて養生する";
+  return { cost, label, done: s.flags.yojoYear === s.year, can: s.flags.yojoYear !== s.year && (cost === 0 || s.wealth >= cost) };
+}
+// その年に一度だけ。体を少し戻す
+function yojo(s) {
+  const y = yojoInfo(s);
+  if (!y || !y.can) return null;
+  s.flags.yojoYear = s.year;
+  s.wealth -= y.cost;
+  const gain = s.st === "genin" ? 3 : 6;
+  adj(s, { hp: gain });
+  if (s.st === "genin" && R() < 0.3) adj(s, { hp: -4 });
+  const t = s.st === "genin" ? (R() < 0.3 ? "隙を見て休もうとしましたが、見つかって叱られました。" : "隙を見て、少し体を休めました。") :
+    s.st === "so" ? "経を読み、身を慎んで過ごしました。" : y.cost > 1 ? "薬師を呼び、唐物の薬を飲んで、しばらく体を休めました。" : "山で採れた薬草を煎じて飲み、しばらく体を休めました。";
+  const l = { age: s.age, year: s.year, t, k: "choice" };
+  s.logs.push(l);
+  return l;
+}
+// 過ごし方の効果の目安（1年あたり）
+function planHint(eff) {
+  const out = [], f = (v) => (v > 0 ? "＋" : "−") + Math.abs(v);
+  if (eff.inc) out.push("稼ぎ" + (eff.inc > 0 ? "＋" : "−") + Math.round(Math.abs(eff.inc) * 100) + "%");
+  if (eff.gamble) out.push("稼ぎが大きく上下");
+  if (eff.hp) out.push("体" + f(eff.hp));
+  if (eff.sai) out.push("才" + f(eff.sai));
+  if (eff.en) out.push("縁" + f(eff.en));
+  if (eff.toku) out.push("徳" + f(eff.toku));
+  if (eff.promo) out.push("出世" + (eff.promo > 0 ? "しやすい" : "しにくい"));
+  if (eff.marry) out.push("縁談が来やすい");
+  if (eff.risk) out.push("命の危険あり");
+  return out.length ? "1年ごとに " + out.join("・") : "特に変化なし";
 }
 
 function promote(s) {
@@ -1720,6 +1780,8 @@ function summary(s) {
     birthLabel: birthLabel(s),
     name: myName(s) + (s.nm && s.nm.dharma && !s.nm.custom && s.nm.secular ? "（俗名 " + s.nm.secular + "）" : ""),
     spouses: (s.spouses || []).slice(),
+    lastYear: s.lastYear || null,
+    seenHist: (s.seenHist || []).slice(), tierId: s.tier ? s.tier.id : null, birthStatus: s.birthStatus,
     parents: (s.kin || []).filter(k => k.rel === "父" || k.rel === "母").map(k => k.rel + "：" + (kinName(k) || "（名は伝わらない）")),
     childNames: s.children.map(c => ({ name: childName(c, s.year), alive: c.alive, dieAge: c.dieAge })),
     tier: s.tier ? { label: s.tier.label, share: s.tier.share } : null,
@@ -1768,7 +1830,8 @@ function simulate(n, opt) {
 // node 側で wpick の regions 用に k を返せるよう調整
 const api = {
   newLife, advance, choose, summary, simulate, autoLife, wareki, REGION, STATUS, RANKS,
-  curLabel, fmtW, kanjiNum, isMilestone, planOptions, setPlan, myName, renameSelf, kinAtHome, kinName, spouseName, childName, makeName, nameOf
+  curLabel, fmtW, kanjiNum, isMilestone, planOptions, setPlan, myName, renameSelf, kinAtHome, kinName,
+  riskOf, yojoInfo, yojo, planHint, TIERS, HIST_COUNT: HIST.filter(h => h.t && h.k === "hist").length, histTitle: (i) => { const h = HIST[i]; if (!h) return ""; const m = (h.t.match(/（([^）]*)）/g) || []).pop(); return (Array.isArray(h.y) ? h.y[0] : h.y) + "年 " + (m ? m.slice(1, -1) : h.t.slice(0, 14) + "…"); }, spouseName, childName, makeName, nameOf
 };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.Heian = api;

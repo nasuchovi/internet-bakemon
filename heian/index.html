@@ -173,7 +173,25 @@ button{font-family:inherit;color:inherit;}
 .bar .fl{position:absolute;left:0;top:0;bottom:0;background:var(--ink);transition:width .4s;}
 .bar.hp .fl{background:var(--shu);}
 .bar.toku .fl{background:var(--kin);}
+.bar,.zai{position:relative;background:none;border:none;padding:0;text-align:left;cursor:pointer;font:inherit;color:inherit;}
 .zai{text-align:right;}
+.bar:focus-visible,.zai:focus-visible,.risk:focus-visible{outline:2px solid var(--shu);outline-offset:2px;}
+.dv{position:absolute;right:0;top:-14px;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;opacity:0;pointer-events:none;}
+.dv.show{animation:dvup 1.6s ease forwards;}
+.dv.up{color:var(--moe);} .dv.down{color:var(--shu);}
+@keyframes dvup{0%{opacity:0;transform:translateY(4px);}15%{opacity:1;transform:none;}70%{opacity:1;}100%{opacity:0;transform:translateY(-4px);}}
+.risk-row{display:flex;align-items:center;gap:8px;margin-top:9px;}
+.risk{flex:1;display:flex;align-items:center;gap:6px;background:none;border:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left;min-width:0;}
+.risk .rl{font-size:11px;color:var(--ink-soft);letter-spacing:.08em;white-space:nowrap;}
+.risk b{font-size:13px;white-space:nowrap;}
+.risk small{font-size:11px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.lamp{width:14px;height:18px;flex:none;display:inline-block;}
+.risk.l1 b{color:#8a6a1e;} .risk.l2 b{color:#b5521e;} .risk.l3 b{color:var(--shu);}
+.yojo{flex:none;white-space:nowrap;}
+.yojo[disabled]{opacity:.45;cursor:not-allowed;}
+.tip{position:absolute;z-index:9;left:12px;right:12px;background:var(--paper);border:1px solid var(--ink);padding:10px 12px;font-size:13px;line-height:1.7;box-shadow:0 8px 20px -10px rgba(0,0,0,.5);}
+.tip b{display:block;font-size:14px;margin-bottom:2px;}
+.tip[hidden]{display:none;}
 .zai .lb{font-size:11px;color:var(--ink-soft);}
 .zai .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;}
 .zai .v.neg{color:var(--shu);}
@@ -306,6 +324,21 @@ button{font-family:inherit;color:inherit;}
 .src-list a{color:var(--ai);}
 
 #cardCanvas{display:none;}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--ink);margin-bottom:14px;}
+.tabs button{flex:1;padding:9px;font:inherit;font-weight:800;letter-spacing:.2em;background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--ink-soft);}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--shu);}
+.life-row{border-bottom:1px dotted var(--rule);padding:9px 0;font-size:13.5px;line-height:1.6;}
+.life-row b{font-size:15px;}
+.life-row .ep{display:block;font-weight:800;}
+.life-row small{display:block;color:var(--ink-soft);font-size:12px;}
+.dex h3{font-size:14px;font-weight:800;letter-spacing:.12em;margin:16px 0 6px;display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--rule);padding-bottom:3px;}
+.dex h3 small{font-size:12px;color:var(--ink-soft);font-weight:600;letter-spacing:0;}
+.meter{height:5px;background:var(--paper3);margin:2px 0 8px;}
+.meter i{display:block;height:100%;background:var(--shu);}
+.dex ul{list-style:none;display:flex;flex-wrap:wrap;gap:5px;font-size:12.5px;}
+.dex li{padding:3px 7px;border:1px solid var(--rule);background:var(--paper2);}
+.dex li.no{color:var(--ink-faint);background:none;border-style:dashed;}
+.empty{font-size:13.5px;color:var(--ink-soft);padding:12px 0;}
 .card-prev{margin-top:12px;text-align:center;}
 .card-prev img{width:100%;max-width:100%;border:1px solid var(--rule);display:block;}
 [hidden]{display:none !important;}
@@ -340,6 +373,7 @@ button{font-family:inherit;color:inherit;}
       </table>
       <p class="note">※確率は人口推計や史料をもとにゲーム用に丸めた推定値です。</p>
       <button class="btn shu" id="btnBorn">生 ま れ る</button>
+      <button class="btn sub" id="btnBook1">過去帳の綴り・図鑑</button>
       <button class="btn link" id="btnSrc1">出典と注記</button>
     </div>
   </section>
@@ -376,6 +410,7 @@ button{font-family:inherit;color:inherit;}
         <div class="scene-wrap">
           <canvas id="scene" class="scene" width="128" height="64" role="img" aria-label="暮らしの様子"></canvas>
           <div class="speed" role="group" aria-label="進む速さ">
+            <button type="button" id="btnSound" aria-label="音" title="音のあり・なし"></button>
             <button type="button" id="btnPause" aria-label="一時停止" title="一時停止（スペースキー）"></button>
             <button type="button" data-sp="slow" class="on" aria-label="ゆっくり" title="ゆっくり"><svg viewBox="0 0 8 16" width="9" height="13" aria-hidden="true"><path d="M1 3v10l6-5z" fill="currentColor"/></svg></button>
             <button type="button" data-sp="mid" aria-label="ふつう" title="ふつう"><svg viewBox="0 0 14 16" width="14" height="13" aria-hidden="true"><path d="M1 3v10l6-5z" fill="currentColor"/><path d="M7 3v10l6-5z" fill="currentColor"/></svg></button>
@@ -388,13 +423,18 @@ button{font-family:inherit;color:inherit;}
         </div>
         <div class="hud-who"><b id="hName" class="hud-name"></b>　身分：<b id="hWho"></b></div>
         <div class="bars">
-          <div class="bar hp"><div class="lb"><span>体</span><span id="vHp"></span></div><div class="tr"><div class="fl" id="fHp"></div></div></div>
-          <div class="bar"><div class="lb"><span>才</span><span id="vSai"></span></div><div class="tr"><div class="fl" id="fSai"></div></div></div>
-          <div class="bar"><div class="lb"><span>縁</span><span id="vEn"></span></div><div class="tr"><div class="fl" id="fEn"></div></div></div>
-          <div class="bar toku"><div class="lb"><span>徳</span><span id="vToku"></span></div><div class="tr"><div class="fl" id="fToku"></div></div></div>
-          <div class="zai"><div class="lb">財（石）</div><div class="v" id="vZai">0</div></div>
+          <button type="button" class="bar hp" data-tip="hp"><div class="lb"><span>体</span><span id="vHp"></span></div><div class="tr"><div class="fl" id="fHp"></div></div><span class="dv" id="dHp"></span></button>
+          <button type="button" class="bar" data-tip="sai"><div class="lb"><span>才</span><span id="vSai"></span></div><div class="tr"><div class="fl" id="fSai"></div></div><span class="dv" id="dSai"></span></button>
+          <button type="button" class="bar" data-tip="en"><div class="lb"><span>縁</span><span id="vEn"></span></div><div class="tr"><div class="fl" id="fEn"></div></div><span class="dv" id="dEn"></span></button>
+          <button type="button" class="bar toku" data-tip="toku"><div class="lb"><span>徳</span><span id="vToku"></span></div><div class="tr"><div class="fl" id="fToku"></div></div><span class="dv" id="dToku"></span></button>
+          <button type="button" class="zai" data-tip="zai"><div class="lb">財（石）</div><div class="v" id="vZai">0</div><span class="dv" id="dZai"></span></button>
+        </div>
+        <div class="risk-row">
+          <button type="button" class="risk" id="riskBtn" data-tip="risk"><span class="lamp" id="riskLamp" aria-hidden="true"></span><span class="rl">今年の危うさ</span><b id="riskLabel"></b><small id="riskWhy"></small></button>
+          <button type="button" class="mini yojo" id="btnYojo"></button>
         </div>
       </div>
+      <div class="tip" id="tip" hidden role="note"></div>
       <div class="log" id="log"></div>
     </div>
   </section>
@@ -417,6 +457,7 @@ button{font-family:inherit;color:inherit;}
         <dt>遺した財</dt><dd id="kZai"></dd>
         <dt>連れ合い</dt><dd id="kSpouse"></dd>
         <dt>子</dt><dd id="kKids"></dd>
+        <dt>最期の年</dt><dd id="kLast"></dd>
         <dt>史料</dt><dd id="kRecord"></dd>
       </dl>
       <div class="jisei" id="kJisei"></div>
@@ -434,6 +475,7 @@ button{font-family:inherit;color:inherit;}
         <div class="card-prev" id="cardPrev" hidden><img id="cardImg" alt="過去帳の画像"><p class="note">画像を長押し（右クリック）すると保存できます。</p></div>
         <button class="btn sub" id="btnLog">一生の記録を読み返す</button>
         <button class="btn" id="btnAgain">もう一度、生まれる</button>
+        <button class="btn sub" id="btnBook2">過去帳の綴り・図鑑</button>
         <button class="btn link" id="btnSrc2">出典と注記</button>
       </div>
       <div class="fulllog" id="fullLog"></div>
@@ -441,6 +483,21 @@ button{font-family:inherit;color:inherit;}
   </section>
 
   <!-- ========== 出典 ========== -->
+  <section id="screen-book" class="screen">
+    <div class="sheet">
+      <div class="eyebrow"><span>過去帳の綴り</span><span id="bookCount"></span></div>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tabLives" aria-selected="true">綴り</button>
+        <button type="button" role="tab" id="tabDex" aria-selected="false">図鑑</button>
+      </div>
+      <div id="paneLives"></div>
+      <div id="paneDex" hidden></div>
+      <p class="note">記録は、この端末のブラウザにだけ保存されます。ほかの端末や、ブラウザの記録を消した後には残りません。</p>
+      <button class="btn sub" id="btnBookBack">戻る</button>
+      <button class="btn link" id="btnBookClear">記録をすべて消す</button>
+    </div>
+  </section>
+
   <section id="screen-src" class="screen">
     <div class="sheet">
       <div class="eyebrow"><span>出典と注記</span><span>典拠一覧</span></div>
@@ -549,6 +606,7 @@ button{font-family:inherit;color:inherit;}
           <li>年齢は数え年で表示しています（生まれた年が1歳）。</li>
           <li>庶民の家計は「働き手の数×1人あたりの稼ぎ − 食べる口の数」で計算しています。10歳未満の子は半人前ほど食べ、10〜14歳は少し働き、15歳以上は一人前です。子は16歳を過ぎると独立していき、跡取りは家に残ります。</li>
           <li>辞世の歌は、このゲームのための創作です。</li>
+          <li>効果音は、音声ファイルを使わずブラウザの機能で合成したものです（鈴・拍子木・梵鐘・太鼓ふう）。</li>
           <li>ドット絵はこのゲームのための描き下ろしです。貴族の男性の服の色は『養老令』衣服令の位色（一位は深紫、二・三位は浅紫、四位は深緋、五位は浅緋、六位は深緑、七位は浅緑、八位は深縹、初位は浅縹）に合わせ、1000年以降は四位以上を黒とする平安中期の慣行に合わせています。</li>
           <li>説話や日記の逸話は、その時代の空気を伝える「典拠」として示しています。実際に誰の身にも起きたことを保証するものではありません。</li>
           <li>典拠の巻・段・条は、底本によって番号が異なることがあります。</li>
@@ -583,6 +641,7 @@ button{font-family:inherit;color:inherit;}
 
 <script src="engine.js"></script>
 <script src="pixel.js"></script>
+<script src="sound.js"></script>
 <script>
 "use strict";
 const $ = (id) => document.getElementById(id);
@@ -650,6 +709,76 @@ let lifeNo = 0;
 function fmtInt(n){ return n.toLocaleString("ja-JP"); }
 
 $("btnBorn").onclick = startBirth;
+/* ---------- 音 ---------- */
+const SPK_ON = '<svg viewBox="0 0 16 16" width="15" height="14" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor"/><path d="M11 5.5c1.2 1.2 1.2 3.8 0 5M12.8 3.8c2.2 2.2 2.2 6.2 0 8.4" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>', SPK_OFF = '<svg viewBox="0 0 16 16" width="15" height="14" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor"/><path d="M11 6l4 4M15 6l-4 4" stroke="currentColor" stroke-width="1.4"/></svg>';
+function renderSound(){ const b = $("btnSound"); b.innerHTML = HeianSound.on ? SPK_ON : SPK_OFF; b.classList.toggle("on", !HeianSound.on); b.setAttribute("aria-label", HeianSound.on ? "音：あり" : "音：なし"); }
+renderSound();
+$("btnSound").onclick = () => { HeianSound.toggle(); renderSound(); };
+/* ---------- 過去帳の綴り・図鑑（この端末のブラウザに保存） ---------- */
+const BOOK_KEY = "heian550_book";
+function loadBook(){ try { return JSON.parse(localStorage.getItem(BOOK_KEY) || "[]"); } catch (e) { return []; } }
+function saveBook(b){ try { localStorage.setItem(BOOK_KEY, JSON.stringify(b.slice(-300))); } catch (e) {} }
+function recordLife(r){
+  const b = loadBook();
+  b.push({ name: r.name, ep: r.epithet, by: r.birthYear, bw: r.birthWareki, dy: r.deathYear, ky: r.kyonen, cause: r.cause, bl: r.birthLabel, region: r.region, st: r.birthStatus, tier: r.tierId, tierLabel: r.tier ? r.tier.label : "", ojo: r.ojo.t, hist: r.seenHist, odds: r.birthP });
+  saveBook(b);
+}
+let bookFrom = "title";
+function openBook(from){ bookFrom = from; renderBook(); show("book"); }
+$("btnBook1").onclick = () => openBook("title");
+$("btnBook2").onclick = () => openBook("death");
+$("btnBookBack").onclick = () => show(bookFrom);
+function setTab(dex){ $("tabLives").setAttribute("aria-selected", dex ? "false" : "true"); $("tabDex").setAttribute("aria-selected", dex ? "true" : "false"); $("paneLives").hidden = dex; $("paneDex").hidden = !dex; }
+$("tabLives").onclick = () => setTab(false);
+$("tabDex").onclick = () => setTab(true);
+let clearArmed = false;
+$("btnBookClear").onclick = () => {
+  if (!clearArmed) { clearArmed = true; $("btnBookClear").textContent = "本当に消す（もう一度押す）"; setTimeout(() => { clearArmed = false; $("btnBookClear").textContent = "記録をすべて消す"; }, 4000); return; }
+  saveBook([]); clearArmed = false; $("btnBookClear").textContent = "記録をすべて消す"; renderBook();
+};
+function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function renderBook(){
+  const b = loadBook();
+  $("bookCount").textContent = b.length + "の生";
+  const L = $("paneLives"); L.innerHTML = "";
+  if (!b.length) L.append(el("p", "empty", "まだ記録がありません。一生を終えると、ここに綴られていきます。"));
+  b.slice().reverse().forEach((x, i) => {
+    const row = el("div", "life-row");
+    row.append(el("span", "ep", "第" + (b.length - i) + "の生　『" + x.ep + "』"));
+    row.append(el("b", null, x.name));
+    row.append(el("small", null, x.bw + "（" + x.by + "年）、" + x.region + "の" + x.bl + (x.tierLabel ? "（" + x.tierLabel + "）" : "") + "。数え" + x.ky + "、" + x.cause + "により死去。" + x.ojo + "。"));
+    L.append(row);
+  });
+  // 図鑑
+  const D = $("paneDex"); D.innerHTML = ""; D.className = "dex";
+  const sec = (title, have, total) => { const h = el("h3", null, title); h.append(el("small", null, total ? have + " / " + total : have + "種")); D.append(h); if (total) { const m = el("div", "meter"); const i = document.createElement("i"); i.style.width = Math.round(have / total * 100) + "%"; m.append(i); D.append(m); } };
+  // 生まれ
+  const ST = H.STATUS, births = [];
+  ["kouzoku","kugyo","kizoku","kanjin","kyomin","gozoku","gyomin","genin","nomin"].forEach(k => {
+    const tiers = H.TIERS[k];
+    if (tiers) tiers.forEach(t => births.push({ key: k + ":" + t.id, label: ST[k].name + "・" + t.label, hint: ST[k].name + "・？？？" }));
+    else births.push({ key: k + ":", label: ST[k].name, hint: "？？？" });
+  });
+  const seenB = new Set(b.map(x => x.st + ":" + (x.tier || "")));
+  sec("生まれ", births.filter(x => seenB.has(x.key)).length, births.length);
+  const ub = el("ul"); births.forEach(x => ub.append(el("li", seenB.has(x.key) ? "" : "no", seenB.has(x.key) ? x.label : x.hint))); D.append(ub);
+  // 死因
+  const causes = {}; b.forEach(x => causes[x.cause] = (causes[x.cause] || 0) + 1);
+  sec("死因", Object.keys(causes).length);
+  const uc = el("ul"); Object.entries(causes).sort((a, c) => c[1] - a[1]).forEach(([c, n]) => uc.append(el("li", "", c + " ×" + n))); D.append(uc);
+  // 二つ名
+  const eps = [...new Set(b.map(x => x.ep))];
+  sec("二つ名", eps.length);
+  const ue = el("ul"); eps.forEach(e => ue.append(el("li", "", e))); D.append(ue);
+  // 史実
+  const hs = new Set(); b.forEach(x => (x.hist || []).forEach(i => hs.add(i)));
+  sec("立ち会った史実", hs.size, H.HIST_COUNT);
+  const uh = el("ul"); [...hs].sort((a, c) => a - c).forEach(i => uh.append(el("li", "", H.histTitle(i)))); D.append(uh);
+  // 往生
+  const oj = { "極楽往生": 0, "六道輪廻": 0, "地獄行き": 0 }; b.forEach(x => { if (x.ojo in oj) oj[x.ojo]++; });
+  sec("往生判定", b.length ? 3 - Object.values(oj).filter(v => !v).length : 0, 3);
+  const uo = el("ul"); Object.entries(oj).forEach(([k, n]) => uo.append(el("li", n ? "" : "no", n ? k + " ×" + n : "？？？"))); D.append(uo);
+}
 const NAME_NOTE = {
   old: "戸籍に見える名にならっています（「〜麻呂」「〜売」など）。",
   noble_m: "いまは幼名です。元服すると、家の通字を使った実名を名乗ります。",
@@ -703,6 +832,7 @@ function startBirth(){
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const step = reduce ? 0 : 700;
   BL.forEach((id, i) => setTimeout(() => $(id).classList.add("on"), 200 + i * step));
+  setTimeout(() => HeianSound.play(odds >= 1000 ? "birthRare" : "birth"), 200 + (BL.length - 1) * step);
   setTimeout(() => { live.style.transition = "opacity .5s"; live.style.opacity = 1; live.style.pointerEvents = "auto"; }, 300 + BL.length * step);
 }
 
@@ -742,7 +872,7 @@ document.addEventListener("keydown", (e) => {
   if (e.code === "Space" && $("screen-life").classList.contains("active") && !$("choiceBg").classList.contains("show") && !/INPUT|TEXTAREA|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); togglePause(); }
 });
 $("btnLive").onclick = () => {
-  $("log").innerHTML = ""; $("log")._lastAge = undefined; $("chips")._key = "";
+  $("log").innerHTML = ""; $("log")._lastAge = undefined; $("chips")._key = ""; lastWealth = S.wealth;
   lastYearRow = -1;
   paused = false; setPauseIcon();
   show("life");
@@ -804,6 +934,9 @@ function tick(){
   logs.forEach(l => addRow(l));
   hud(r);
   setScene(r);
+  if (r.dead) HeianSound.play("death");
+  else if (logs.some(l => /人目の子（/.test(l.t))) HeianSound.play("child");
+  else if (logs.some(l => l.k === "good" && /叙され|昇進|公卿の仲間入り|国母|外祖父になり|一人前の武士|元服し|名乗りました/.test(l.t))) HeianSound.play("good");
   if (r.dead) { setTimeout(finish, 1400); return; }
   schedule(yearDelay(logs));
 }
@@ -835,7 +968,7 @@ function renderPlans(){
   const now = opts.find(o => o.id === cur);
   $("planNow").innerHTML = "";
   $("planNow").append(document.createTextNode(now ? now.label : "（まだ決めていません）"));
-  if (now) { const sm = document.createElement("small"); sm.textContent = now.desc; $("planNow").append(sm); }
+  if (now) { const sm = document.createElement("small"); sm.textContent = H.planHint(now.eff); $("planNow").append(sm); }
   const box = $("chips");
   const key = opts.map(o => o.id).join(",") + "|" + cur;
   if (box._key === key) return;
@@ -843,12 +976,55 @@ function renderPlans(){
   box.innerHTML = "";
   opts.forEach(o => {
     const b = document.createElement("button");
-    b.type = "button"; b.textContent = o.short; b.title = o.label + "：" + o.desc;
+    b.type = "button"; b.textContent = o.short; b.title = o.label + "：" + H.planHint(o.eff);
     b.setAttribute("aria-pressed", o.id === cur ? "true" : "false");
     b.onclick = () => { const l = H.setPlan(S, o.id); if (l) addRow(l); renderPlans(); };
     box.appendChild(b);
   });
 }
+const TIPS = {
+  hp: ["体", "体の強さ。低いほど病や飢えで死にやすくなり、0に近づくと衰弱して死ぬこともあります。働きすぎ・病・飢え・老いで減り、養生や薬、財のゆとりで戻ります。"],
+  sai: ["才", "学問と和歌の才。歌合の勝ち負けや、女房としての評判、官人の出世に効きます。"],
+  en: ["縁", "人とのつながりと評判。結婚の話、出世、受領の口、政変の結果、受けられる助けに効きます。"],
+  toku: ["徳", "積んだ功徳。死後の往生判定と、一部の出来事に効きます。寄進や寺通い、看病で上がり、私出挙や群盗で下がります。"],
+  zai: ["財（石）", "家の蓄え。米の量に換算したゲーム上の単位です。マイナスは出挙の借り（利息は年3割）。借りが膨らむと飢えて体が弱り、逃亡や身売りに追い込まれます。"],
+  risk: ["今年の危うさ", "これから始まる一年に、どれくらい命の危険があるかの目安です。幼さ・老い・体の弱り・疫病・飢饉・戦乱・お産・危険な仕事が重なるほど高くなります。過ごし方を変えたり、養生したりして備えられますが、避けきれない死もあります。"]
+};
+let tipOpen = null;
+document.querySelectorAll("[data-tip]").forEach(b => b.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const k = b.dataset.tip, t = $("tip");
+  if (tipOpen === k) { t.hidden = true; tipOpen = null; return; }
+  const extra = k === "risk" && S ? (() => { const rk = H.riskOf(S); return "<br>いまの主な原因：" + (rk.reasons.length ? rk.reasons.join("・") : "特になし"); })() : "";
+  t.innerHTML = "<b></b><span></span>" + extra;
+  t.querySelector("b").textContent = TIPS[k][0]; t.querySelector("span").textContent = TIPS[k][1];
+  t.hidden = false; tipOpen = k;
+}));
+document.addEventListener("click", () => { if (tipOpen) { $("tip").hidden = true; tipOpen = null; } });
+function flash(id, v, digits){
+  if (!v || Math.abs(v) < (digits ? 0.05 : 0.5)) return;
+  const el = $(id);
+  el.textContent = (v > 0 ? "＋" : "−") + (digits ? Math.abs(v).toFixed(1) : Math.round(Math.abs(v)));
+  el.className = "dv " + (v > 0 ? "up" : "down");
+  void el.offsetWidth; el.classList.add("show");
+}
+const LAMP = (lv) => {
+  const col = ["#c9b37a", "#d79a3a", "#d9652c", "#c0321e"][lv], h = [7, 10, 13, 16][lv];
+  return '<svg viewBox="0 0 14 18" width="14" height="18"><rect x="3" y="15" width="8" height="3" fill="#6b5236"/><path d="M7 ' + (15 - h) + ' C ' + (11 + lv) + ' ' + (14 - h * 0.4) + ' 10 15 7 15 C 4 15 ' + (3 - lv) + ' ' + (14 - h * 0.4) + ' 7 ' + (15 - h) + ' Z" fill="' + col + '"/></svg>';
+};
+let lastWealth = null;
+function renderRisk(){
+  if (!S || !S.alive) return;
+  const rk = H.riskOf(S);
+  const b = $("riskBtn"); b.className = "risk l" + rk.level;
+  $("riskLamp").innerHTML = LAMP(rk.level);
+  $("riskLabel").textContent = rk.label;
+  $("riskWhy").textContent = rk.reasons.length ? "（" + rk.reasons.slice(0, 3).join("・") + "）" : "";
+  const y = H.yojoInfo(S), yb = $("btnYojo");
+  yb.hidden = !y;
+  if (y) { yb.textContent = y.done ? "今年は養生済み" : "養生する" + (y.cost ? "（財 " + H.fmtW(y.cost) + "）" : ""); yb.disabled = !y.can; yb.title = y.label; }
+}
+$("btnYojo").onclick = (e) => { e.stopPropagation(); const before = S.hp, w = S.wealth; const l = H.yojo(S); if (l) { addRow(l); hud(); flash("dHp", S.hp - before); flash("dZai", S.wealth - w, true); lastWealth = S.wealth; } };
 function hud(r){
   const age = r && r.age != null ? r.age : S.age, year = r && r.year != null ? r.year : S.year;
   $("hAge").textContent = age + 1;
@@ -859,7 +1035,11 @@ function hud(r){
   $("hWho").textContent = H.curLabel(S) + (S.married && S.spouseAlive ? "・既婚" : "") + (S.children.filter(c => c.alive).length ? "・子" + S.children.filter(c => c.alive).length + "人" : "");
   const set = (k, v) => { $("v" + k).textContent = Math.round(v); $("f" + k).style.width = clamp(v, 0, 100) + "%"; };
   set("Hp", S.hp); set("Sai", S.sai); set("En", S.en); set("Toku", S.toku);
+  if (r && r.delta) { flash("dHp", r.delta.hp); flash("dSai", r.delta.sai); flash("dEn", r.delta.en); flash("dToku", r.delta.toku); }
+  if (r && r.logs && lastWealth != null) flash("dZai", S.wealth - lastWealth, true);
+  if (r && r.logs) lastWealth = S.wealth;
   renderPlans();
+  renderRisk();
   const z = $("vZai");
   z.innerHTML = H.fmtW(S.wealth) + "<small>石</small>";
   z.classList.toggle("neg", S.wealth < 0);
@@ -910,6 +1090,8 @@ function finish(){
   clearTimeout(timer);
   RES = H.summary(S);
   const r = RES;
+  recordLife(r);
+  setTimeout(() => HeianSound.play(r.ojo.k), 900);
   $("kNo").innerHTML = "第" + fmtInt(lifeNo) + "の生<br>" + r.deathWareki + " 記";
   const o = $("kOjo");
   o.innerHTML = r.ojo.t.slice(0, 2) + "<br>" + r.ojo.t.slice(2);
@@ -933,6 +1115,16 @@ function finish(){
   $("kKids").innerHTML = "";
   $("kKids").append(document.createTextNode(r.kids ? r.kids + "人（うち成人できたのは" + r.grown + "人）" : "なし"));
   if (r.kids) { const d = document.createElement("span"); d.className = "d"; d.textContent = r.childNames.map(c => c.name + (c.alive ? "" : "（数え" + (c.dieAge + 1) + "で没）")).join("、"); $("kKids").append(d); }
+  const ly = r.lastYear;
+  $("kLast").innerHTML = "";
+  if (ly) {
+    const TAGJ = { famine: "飢饉", epidemic: "疫病", war: "戦乱", disaster: "災害", flood: "洪水", drought: "日照り", bad_harvest: "凶作" };
+    const tg = ly.tags.map(t => TAGJ[t]).filter(Boolean);
+    const b1 = document.createElement("b"); b1.textContent = "体 " + ly.hp + "／財 " + H.fmtW(ly.wealth) + " 石" + (tg.length ? "／" + [...new Set(tg)].join("・") + "の年" : "");
+    const d1 = document.createElement("span"); d1.className = "d";
+    d1.textContent = "その年の危うさ：" + ["穏やか", "やや危うい", "危うい", "とても危うい"][ly.level || 0] + (ly.reasons.length ? "（" + ly.reasons.join("・") + "）" : "") + (ly.level === 0 ? "。避けようのない死もあります。" : "");
+    $("kLast").append(b1, d1);
+  }
   const rec = recordText(S, r);
   $("kRecord").innerHTML = "<b></b><span class='d'></span>";
   $("kRecord").querySelector("b").textContent = rec[0];
