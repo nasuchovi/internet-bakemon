@@ -587,7 +587,16 @@ function startBirth(){
 }
 
 /* ---------- 一生 ---------- */
-const SPEED = { slow: 1100, mid: 520, fast: 140 };
+// 1年ごとの待ち時間。base＝出来事のある年の基本、quiet＝何もない年、perChar＝表示した文字数に応じた読む時間（ミリ秒）
+const SPEED = { slow: 1800, mid: 1000, fast: 350 };
+const QUIET = { slow: 1000, mid: 550, fast: 150 };
+const PER_CHAR = { slow: 45, mid: 25, fast: 0 };
+function yearDelay(logs){
+  if (!logs.length) return QUIET[speed];
+  if (logs.every(l => l.k === "faint")) return QUIET[speed] * 1.3;
+  const chars = logs.reduce((n, l) => n + (l.k === "faint" ? 0 : l.t.length), 0);
+  return SPEED[speed] + chars * PER_CHAR[speed];
+}
 let speed = "slow", paused = false, timer = null, lastYearRow = -1;
 document.querySelectorAll(".ctrl [data-sp]").forEach(b => b.onclick = () => {
   speed = b.dataset.sp;
@@ -610,7 +619,7 @@ $("btnLive").onclick = () => {
   hud();
   sceneFx = {}; sceneAge = 0; sceneYear = S.year; sceneDead = false;
   drawScene(0); startSceneLoop();
-  schedule(600);
+  schedule(1200);
 };
 function schedule(ms){ clearTimeout(timer); timer = setTimeout(tick, ms); }
 
@@ -665,7 +674,7 @@ function tick(){
   hud(r);
   setScene(r);
   if (r.dead) { setTimeout(finish, 1400); return; }
-  schedule(logs.length ? SPEED[speed] * (logs.length > 1 ? 1.25 : 1) : SPEED[speed] * 0.35);
+  schedule(yearDelay(logs));
 }
 function pick(a){ return a[Math.floor(Math.random() * a.length)]; }
 
@@ -723,7 +732,7 @@ function openChoice(c){
       H.choose(S, i);
       hud();
       drawScene(performance.now());
-      schedule(280);
+      schedule(speed === "fast" ? 300 : 900);
     };
     box.appendChild(b);
   });
